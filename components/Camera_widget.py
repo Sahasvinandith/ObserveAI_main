@@ -31,6 +31,8 @@ class CameraItem(QGraphicsObject):
         self.view_angle = 70.0  # Field of View in degrees
         self.view_range = 200.0 # Max range in pixels
         self.view_rays = 90     # Number of rays to cast (more is smoother)
+        self.name = name
+        self.url = url
 
         # 2. CHILD ITEMS
         # --- The camera icon ---

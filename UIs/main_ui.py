@@ -15,10 +15,10 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QApplication, QGraphicsView, QHBoxLayout, QLabel,
-    QListWidget, QListWidgetItem, QMainWindow, QPushButton,
-    QSizePolicy, QSpacerItem, QStackedWidget, QStatusBar,
-    QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QFormLayout, QGraphicsView, QHBoxLayout,
+    QLabel, QListWidget, QListWidgetItem, QMainWindow,
+    QPushButton, QSizePolicy, QSpacerItem, QStackedWidget,
+    QStatusBar, QVBoxLayout, QWidget)
 import resources_rc
 
 class Ui_MainWindow(object):
@@ -126,6 +126,11 @@ class Ui_MainWindow(object):
 
         self.horizontalLayout_5.addWidget(self.save_map_btn)
 
+        self.load_map_btn = QPushButton(self.widget)
+        self.load_map_btn.setObjectName(u"load_map_btn")
+
+        self.horizontalLayout_5.addWidget(self.load_map_btn)
+
         self.horizontalSpacer = QSpacerItem(20, 20, QSizePolicy.Policy.Fixed, QSizePolicy.Policy.Minimum)
 
         self.horizontalLayout_5.addItem(self.horizontalSpacer)
@@ -166,12 +171,12 @@ class Ui_MainWindow(object):
         self.Content_stack.addWidget(self.cam_settings_page)
         self.cam_feed_page = QWidget()
         self.cam_feed_page.setObjectName(u"cam_feed_page")
-        self.horizontalLayout_4 = QHBoxLayout(self.cam_feed_page)
-        self.horizontalLayout_4.setObjectName(u"horizontalLayout_4")
+        self.formLayout = QFormLayout(self.cam_feed_page)
+        self.formLayout.setObjectName(u"formLayout")
         self.label_3 = QLabel(self.cam_feed_page)
         self.label_3.setObjectName(u"label_3")
 
-        self.horizontalLayout_4.addWidget(self.label_3)
+        self.formLayout.setWidget(0, QFormLayout.ItemRole.FieldRole, self.label_3)
 
         self.Content_stack.addWidget(self.cam_feed_page)
         self.database_page = QWidget()
@@ -213,6 +218,7 @@ class Ui_MainWindow(object):
         self.add_camera_btn.setText(QCoreApplication.translate("MainWindow", u"Add Camera", None))
         self.add_wall_btn.setText(QCoreApplication.translate("MainWindow", u"Add Wall", None))
         self.save_map_btn.setText(QCoreApplication.translate("MainWindow", u"Save Map", None))
+        self.load_map_btn.setText(QCoreApplication.translate("MainWindow", u"Load Map", None))
         self.label_3.setText(QCoreApplication.translate("MainWindow", u"Cam Feed page", None))
         self.label_4.setText(QCoreApplication.translate("MainWindow", u"Database", None))
     # retranslateUi
