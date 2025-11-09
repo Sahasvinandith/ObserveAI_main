@@ -8,7 +8,7 @@ class WallItem(QGraphicsRectItem):
     It can be rotated and resized using keyboard keys.
     """
     def __init__(self, x, y, width, height):
-        # Call the parent __init__ with the rectangle's geometry
+        # Call the sparent __init__ with the rectangle's geometry
         # (x, y, width, height) relative to the item's local 0,0
         super().__init__(-width / 2, -height / 2, width, height)
         

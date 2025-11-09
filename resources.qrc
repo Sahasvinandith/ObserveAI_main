@@ -1,5 +1,6 @@
 <RCC>
   <qresource prefix="images">
+    <file>images/cctv_logo.png</file>
     <file>logo.png</file>
   </qresource>
 </RCC>

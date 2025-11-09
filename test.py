@@ -4,38 +4,8 @@ from PyQt6.uic import loadUi
 from PyQt6.QtCore import Qt, QRectF
 from PyQt6.QtGui import QColor, QBrush, QPen
 from components.Wall import WallItem
-
-# --- AddCameraDialog class (no changes) ---
-class AddCameraDialog(QDialog):
-    """
-    A simple popup dialog to get a camera name and IP/URL.
-    """
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setWindowTitle("Add New Camera")
-        
-        self.layout = QVBoxLayout(self)
-        # Camera Name Entry
-        self.name_label = QLabel("Camera Name:")
-        self.name_input = QLineEdit("Lobby Camera")
-        self.layout.addWidget(self.name_label)
-        self.layout.addWidget(self.name_input)
-        
-        # Camera URL/IP Entry
-        self.url_label = QLabel("Camera URL (or 0 for webcam):")
-        self.url_input = QLineEdit("0")
-        self.layout.addWidget(self.url_label)
-        self.layout.addWidget(self.url_input)
-        
-        # OK and Cancel Buttons
-        self.button_box = QDialogButtonBox(QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel)
-        self.button_box.accepted.connect(self.accept)
-        self.button_box.rejected.connect(self.reject)
-        self.layout.addWidget(self.button_box)
-
-    def get_details(self):
-        """Helper function to return the entered text."""
-        return self.name_input.text(), self.url_input.text()
+from components.AddCamera_Dialog import AddCameraDialog
+from components.Camera_widget import CameraItem
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -59,12 +29,29 @@ class MainWindow(QMainWindow):
         self.cam_set_btn.clicked.connect(lambda: self.Content_stack.setCurrentIndex(0))
         self.cam_feed_btn.clicked.connect(lambda: self.Content_stack.setCurrentIndex(1))       
         self.db_btn.clicked.connect(lambda: self.Content_stack.setCurrentIndex(2))
-        self.add_camera_btn.clicked.connect(self.show_add_camera_dialog)
+        self.add_camera_btn.clicked.connect(self.add_camera)
         self.add_wall_btn.clicked.connect(self.add_a_wall)
     
     def add_a_wall(self):
         wall = WallItem(30,30,150,10)
         self.drag_area.scene().addItem(wall)
+        
+    def add_camera(self):
+        """
+        Called when the 'addCameraButton' is clicked.
+        """
+        cam = CameraItem()
+        
+        cam.setPos(30,30)
+        
+        # Add the camera to the scene (at position 0,0 by default)
+        self.drag_area.scene().addItem(cam)
+        
+        # Set its position to the center of the current view
+        # (This is more user-friendly)
+        # center_point = self.drag_area.mapToScene(self.graphics_scene.viewport().rect().center())
+        # cam.setPos()
+        print("Camera added.")
     
     def show_add_camera_dialog(self):
         """
@@ -97,5 +84,6 @@ class MainWindow(QMainWindow):
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
-    window.show()
+    window.setWindowTitle("ObserveAI")
+    window.showMaximized()
     sys.exit(app.exec())
