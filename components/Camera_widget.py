@@ -3,8 +3,8 @@ from PyQt6.QtWidgets import (
     QGraphicsObject, 
     QGraphicsPixmapItem, 
     QGraphicsPolygonItem, 
-    QGraphicsItem, 
-    QGraphicsRectItem
+    QGraphicsItem,
+    QGraphicsSimpleTextItem
 )
 from PyQt6.QtGui import (
     QPixmap, 
@@ -24,12 +24,12 @@ class CameraItem(QGraphicsObject):
     It contains a pixmap for the icon and a polygon for the FOV.
     It automatically updates its FOV by ray casting against WallItems.
     """
-    def __init__(self, parent=None):
+    def __init__(self, parent=None,name="Webcam", url="0"):
         super().__init__(parent)
         
         # 1. SETTINGS (You can change these)
-        self.view_angle = 90.0  # Field of View in degrees
-        self.view_range = 300.0 # Max range in pixels
+        self.view_angle = 70.0  # Field of View in degrees
+        self.view_range = 200.0 # Max range in pixels
         self.view_rays = 90     # Number of rays to cast (more is smoother)
 
         # 2. CHILD ITEMS
@@ -52,6 +52,29 @@ class CameraItem(QGraphicsObject):
         self.fov_item.setBrush(QBrush(QColor(255, 255, 0, 60))) # Semi-transparent yellow
         self.fov_item.setPen(QPen(QColor(255, 255, 0, 100), 1))
         self.fov_item.setZValue(-1) # Draw FOV *behind* the camera icon
+        
+        # --- NEW: The camera name label ---
+        self.text_item = QGraphicsSimpleTextItem(name, self)
+        self.text_item.setBrush(QBrush(QColor(255, 255, 255))) # White text
+        self.text_item.setZValue(1) # Draw label on top of icon
+
+        # Center the text *below* the camera icon
+        pixmap_rect = self.pixmap_item.boundingRect()
+        text_rect = self.text_item.boundingRect()
+        
+        # Position it:
+        # X: Centered horizontally relative to the item's (0,0)
+        # Y: Just below the pixmap's bottom edge
+        self.text_item.setPos(
+            -text_rect.width() / 2,
+            pixmap_rect.height() / 2
+        )
+
+        # --- THIS IS THE IMPORTANT PART ---
+        # Stop the text from rotating with the parent
+        self.text_item.setFlag(
+            QGraphicsItem.GraphicsItemFlag.ItemIgnoresTransformations
+        )
 
         # 3. ITEM FLAGS
         # Make the whole group movable, selectable, and make it
@@ -101,9 +124,9 @@ class CameraItem(QGraphicsObject):
         
         camera_pos = self.scenePos()
         camera_rotation = self.rotation() # Get item's rotation
-
+        
         # Cast rays
-        start_angle = camera_rotation - (self.view_angle / 2)
+        start_angle = -camera_rotation - (self.view_angle / 2)
         
         for i in range(self.view_rays + 1):
             # Calculate the angle of the current ray
@@ -116,6 +139,7 @@ class CameraItem(QGraphicsObject):
             
             # Create the ray as a line in SCENE coordinates
             ray_line = QLineF(camera_pos, camera_pos + QPointF(end_x, end_y))
+            # print(f"line coordinates: {camera_pos.x(),camera_pos.y(),end_x,end_y}")
             
             # This will be the final end-point of our ray
             closest_intersection = ray_line.p2()
@@ -123,13 +147,28 @@ class CameraItem(QGraphicsObject):
 
             # Check this ray against EVERY wall
             for wall in walls:
-                # Get the 4 lines of the wall in SCENE coordinates
-                wall_rect = wall.sceneBoundingRect()
+                # 1. Get the wall's 4 corners in its *local* coordinate system
+                local_rect = wall.rect()
+                p1_local = local_rect.topLeft()
+                p2_local = local_rect.topRight()
+                p3_local = local_rect.bottomRight()
+                p4_local = local_rect.bottomLeft()
+
+                # 2. Get the wall's transformation (position + rotation)
+                transform = wall.sceneTransform()
+
+                # 3. Map the 4 local corners to their *true* scene positions
+                p1_scene = transform.map(p1_local)
+                p2_scene = transform.map(p2_local)
+                p3_scene = transform.map(p3_local)
+                p4_scene = transform.map(p4_local)
+
+                # 4. Create the 4 *actual* rotated edge lines
                 wall_lines = [
-                    QLineF(wall_rect.topLeft(), wall_rect.topRight()),
-                    QLineF(wall_rect.topRight(), wall_rect.bottomRight()),
-                    QLineF(wall_rect.bottomRight(), wall_rect.bottomLeft()),
-                    QLineF(wall_rect.bottomLeft(), wall_rect.topLeft()),
+                    QLineF(p1_scene, p2_scene),
+                    QLineF(p2_scene, p3_scene),
+                    QLineF(p3_scene, p4_scene),
+                    QLineF(p4_scene, p1_scene),
                 ]
                 
                 for line in wall_lines:
@@ -155,10 +194,10 @@ class CameraItem(QGraphicsObject):
     def wheelEvent(self, event):
         if event.modifiers() & Qt.KeyboardModifier.ControlModifier:
             # Rotate camera
-            if event.angleDelta().y() > 0:
-                self.setRotation(self.rotation() + 5) # Rotate right
+            if event.delta() > 0:
+                self.setRotation(self.rotation() - 5) # Rotate right
             else:
-                self.setRotation(self.rotation() - 5) # Rotate left
+                self.setRotation(self.rotation() + 5) # Rotate left
             event.accept()
         else:
             # Let the scene handle zooming

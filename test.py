@@ -1,4 +1,4 @@
-from PyQt6.QtWidgets import (QGraphicsItem,QGraphicsScene,QApplication, QMainWindow, QLabel, QVBoxLayout,QLineEdit,QDialogButtonBox,QDialog, QGraphicsRectItem)
+from PyQt6.QtWidgets import (QListWidgetItem,QGraphicsItem,QGraphicsScene,QApplication, QMainWindow, QLabel, QVBoxLayout,QLineEdit,QDialogButtonBox,QDialog, QGraphicsRectItem)
 import sys
 from PyQt6.uic import loadUi
 from PyQt6.QtCore import Qt, QRectF
@@ -6,6 +6,8 @@ from PyQt6.QtGui import QColor, QBrush, QPen
 from components.Wall import WallItem
 from components.AddCamera_Dialog import AddCameraDialog
 from components.Camera_widget import CameraItem
+from components.Camera_list_widget import CameraFeedWidget
+
 
 class MainWindow(QMainWindow):
     def __init__(self):
@@ -20,6 +22,8 @@ class MainWindow(QMainWindow):
 
         # 3. (Optional but recommended) Set a size for the scene
         self.graphics_scene.setSceneRect(0, 0, 1200, 1200)
+        # --- List for cleanup ---
+        self.feed_widgets = []
         
         
         self.signal_setup()
@@ -40,17 +44,9 @@ class MainWindow(QMainWindow):
         """
         Called when the 'addCameraButton' is clicked.
         """
-        cam = CameraItem()
         
-        cam.setPos(30,30)
+        self.show_add_camera_dialog()
         
-        # Add the camera to the scene (at position 0,0 by default)
-        self.drag_area.scene().addItem(cam)
-        
-        # Set its position to the center of the current view
-        # (This is more user-friendly)
-        # center_point = self.drag_area.mapToScene(self.graphics_scene.viewport().rect().center())
-        # cam.setPos()
         print("Camera added.")
     
     def show_add_camera_dialog(self):
@@ -64,26 +60,41 @@ class MainWindow(QMainWindow):
             if name and url:
                 print(f"Adding camera: {name}, {url}")
                 
-                # # --- !! NEW, CORRECT ORDER !! ---
+                cam = CameraItem(name=name, url=url)
+                cam.setPos(30,30)
+                # Add the camera to the scene (at position 0,0 by default)
+                self.drag_area.scene().addItem(cam)
                 
-                # # 1. Create the new camera widget
-                # #    Its __init__ will run and return immediately.
-                # new_cam = CameraWidget(name, url, self.scene)
+                # Adding the camera feed to the list
+                feed_widget = CameraFeedWidget(name, url)
+                self.feed_widgets.append(feed_widget)
                 
-                # # 2. Connect the signal. The "wire" is now live,
-                # #    waiting for the camera to emit.
-                # new_cam.camera_added.connect(self.add_camera_to_list)
+                item = QListWidgetItem()
                 
-                # # 3. Add the widget to the scene
-                # self.scene.addItem(new_cam)
+                # 3. Set the row's size to match the widget
+                item.setSizeHint(feed_widget.sizeHint())
                 
-                # # 4. Store a reference
-                # self.cameras[name] = new_cam 
-                # print("xrr")
+                # 4. Add the row to the list
+                self.cam_list.addItem(item)
+                
+                # 5. Set your custom widget to be the content of that row
+                self.cam_list.setItemWidget(item, feed_widget)
+                
+    def closeEvent(self, event):
+        """
+        This is crucial! It stops all camera threads
+        when you close the main window.
+        """
+        print("Window closing, stopping all camera feeds...")
+        for widget in self.feed_widgets:
+            widget.stop_feed()
+        
+        super().closeEvent(event)
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()
     window.setWindowTitle("ObserveAI")
-    window.showMaximized()
+    # window.showMaximized()
+    window.showMinimized()
     sys.exit(app.exec())
