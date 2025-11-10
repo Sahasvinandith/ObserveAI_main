@@ -87,6 +87,7 @@ class CameraItem(QGraphicsObject):
             QGraphicsItem.GraphicsItemFlag.ItemSendsScenePositionChanges
         )
         
+        
         # We need this to get keyboard focus to allow rotation
         self.setAcceptHoverEvents(True)
 
@@ -106,6 +107,10 @@ class CameraItem(QGraphicsObject):
         if change == QGraphicsItem.GraphicsItemChange.ItemPositionHasChanged and self.scene():
             # When the item moves, update the FOV
             self.updateFov()
+        
+        elif change == QGraphicsItem.GraphicsItemChange.ItemSceneHasChanged:
+            self.updateFov()
+        
         return super().itemChange(change, value)
 
     # Also update FOV when rotated
