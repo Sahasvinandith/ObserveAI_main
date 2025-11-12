@@ -1,6 +1,7 @@
 import json
 from PyQt6.QtWidgets import (QListWidgetItem,QFileDialog,QGraphicsScene,QApplication, QMainWindow, QLabel, QVBoxLayout,QLineEdit,QDialogButtonBox,QDialog, QGraphicsRectItem)
 from PyQt6.QtCore import (QPointF)
+import threading
 import cv2
 
 from PyQt6.uic import loadUi
@@ -16,6 +17,9 @@ class MainWindow(QMainWindow):
         loadUi("./UIs/main.ui", self)
         
         self.graphics_scene = QGraphicsScene()
+        
+        # test parameters
+        self.is_running = True
         
         #  ADD TRACKERS ---
         # These will keep track of all items for saving
@@ -58,6 +62,7 @@ class MainWindow(QMainWindow):
         """
         
         self.show_add_camera_dialog()
+        self.start_buffer_test()
         
         print("Camera added.")
     
@@ -256,6 +261,37 @@ class MainWindow(QMainWindow):
         super().closeEvent(event)
     
     
+    # --- Buffer Testing ---
+    def start_buffer_test(self):
+        """
+        Called when the 'test_buffer_btn' is clicked.
+        Starts a new thread to display the buffer feed in a CV2 window.
+        """
+        # Get camera name from the QLineEdit
+        # (Make sure your .ui file has a QLineEdit named 'test_buffer_name_input')
+             
+        cam_name = "cam1"
+
+        if not cam_name:
+            print("Please enter a camera name in the text box.")
+            return
+
+        if cam_name not in self.camera_buffers:
+            print(f"Error: No buffer found with name '{cam_name}'.")
+            return
+            
+        print(f"Starting buffer test thread for: {cam_name}")
+        
+        # Run the 'buffer_test_worker' in a new daemon thread.
+        # 'daemon=True' means the thread will auto-close when the app exits.
+        test_thread = threading.Thread(
+            target=self.buffer_test_worker, 
+            args=(cam_name,),
+            daemon=True
+        )
+        test_thread.start()
+        
+    def buffer_test_worker(self, camera_name='cam1'):
         """
         This function runs in a separate thread.
         It pulls frames from the buffer and displays them using cv2.
