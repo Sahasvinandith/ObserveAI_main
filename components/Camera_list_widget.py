@@ -3,15 +3,17 @@ from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QImage, QPixmap
 from PyQt6.QtCore import QThread,pyqtSlot
 from components.Camera_worker import CameraWorker
+import queue
 
 class CameraFeedWidget(QWidget):
     """
     A QWidget that shows a live camera feed.
     It now delegates all cv2 work to CameraWorker on a QThread.
     """
-    def __init__(self, name, url, parent=None):
+    def __init__(self, name, url,frame_buffer: queue.Queue, parent=None):
         super().__init__(parent)
         self.name = name
+        self.frame_buffer = frame_buffer
         
         # --- 1. UI Setup (Same as before) ---
         self.layout = QVBoxLayout(self)
@@ -34,7 +36,7 @@ class CameraFeedWidget(QWidget):
         # Create the thread
         self.thread = QThread()
         # Create the worker
-        self.worker = CameraWorker(name, url)
+        self.worker = CameraWorker(name, url,self.frame_buffer)
         
         # Move the worker to the thread. All its work will be done there.
         self.worker.moveToThread(self.thread)

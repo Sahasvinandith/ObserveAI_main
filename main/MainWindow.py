@@ -1,17 +1,18 @@
 import json
 from PyQt6.QtWidgets import (QListWidgetItem,QFileDialog,QGraphicsScene,QApplication, QMainWindow, QLabel, QVBoxLayout,QLineEdit,QDialogButtonBox,QDialog, QGraphicsRectItem)
-from PyQt6.QtCore import QPointF
+from PyQt6.QtCore import (QPointF)
+import cv2
+
 from PyQt6.uic import loadUi
 from components.Wall import WallItem
 from components.AddCamera_Dialog import AddCameraDialog
 from components.Camera_widget import CameraItem
 from components.Camera_list_widget import CameraFeedWidget
-
+import queue
 
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        
         loadUi("./UIs/main.ui", self)
         
         self.graphics_scene = QGraphicsScene()
@@ -21,6 +22,10 @@ class MainWindow(QMainWindow):
         self.feed_widgets = []    # Tracks QListWidget items
         self.scene_cameras = {}   # Tracks QGraphicsScene cameras (name -> item)
         self.scene_walls = []     # Tracks QGraphicsScene walls
+        
+        # Adding the buffer dictionary for each 
+        self.camera_buffers = {}
+        self.FRAME_BUFFER_SIZE = 10 # Max frames to hold per camera
 
         # 2. Tell your 'drag_area' (the QGraphicsView) to look at this new scene
         self.drag_area.setScene(self.graphics_scene)
@@ -79,11 +84,20 @@ class MainWindow(QMainWindow):
         """
         Creates and adds a camera to BOTH the list and the scene.
         'pos' and 'rot' are for loading saved layouts.
+        
         """
+        
+        # --- 3. Create a new buffer for this camera ---
+        if name not in self.camera_buffers:
+            frame_buffer = queue.Queue(maxsize=self.FRAME_BUFFER_SIZE)
+            self.camera_buffers[name] = frame_buffer
+        else:
+            # This case should ideally not happen if names are unique
+            frame_buffer = self.camera_buffers[name]
         
         # 1. Create and add LIST item (CameraFeedWidget)
         print(f"Creating feed widget for {name}")
-        feed_widget = CameraFeedWidget(name, url)
+        feed_widget = CameraFeedWidget(name=name, url=url,frame_buffer=frame_buffer)
         self.feed_widgets.append(feed_widget) # Track for cleanup
         
         item = QListWidgetItem()
@@ -192,7 +206,9 @@ class MainWindow(QMainWindow):
                     cam_data["rot"]
                 )
             except Exception as e:
+                
                 print(f"Error loading camera '{cam_data.get('name')}': {e}")
+                print(f"Camera data: {cam_data}")
         
         print("Layout loaded successfully.")
 
@@ -211,6 +227,19 @@ class MainWindow(QMainWindow):
         self.scene_cameras.clear()
         self.scene_walls.clear()
         
+        # --- 5. Clear the buffers ---
+        # Empty all queues and clear the dictionary
+        for q in self.camera_buffers.values():
+            while not q.empty():
+                try:
+                    q.get_nowait()
+                except queue.Empty:
+                    pass
+        self.camera_buffers.clear()
+
+        self.cam_list.clear()
+        self.graphics_scene.clear()
+        
         # 3. Clear the Qt widgets themselves
         self.cam_list.clear() # Clears the QListWidget
         self.graphics_scene.clear() # Clears the QGraphicsScene
@@ -225,3 +254,43 @@ class MainWindow(QMainWindow):
             widget.stop_feed()
         
         super().closeEvent(event)
+    
+    
+        """
+        This function runs in a separate thread.
+        It pulls frames from the buffer and displays them using cv2.
+        """
+        try:
+            buffer = self.camera_buffers[camera_name]
+        except KeyError:
+            print(f"[Thread {camera_name}] Buffer does not exist.")
+            return
+
+        window_name = f"Buffer Feed: {camera_name} (Press 'q' to close)"
+
+        while self.is_running:
+            try:
+                # Wait up to 1 second for a new frame
+                frame = buffer.get(timeout=1.0)
+                
+                # We got a frame, display it
+                cv2.imshow(window_name, frame)
+
+            except queue.Empty:
+                # No frame in 1 second, just loop again
+                print(f"[{camera_name} buffer] No new frame...")
+                pass # Just continue the loop
+            except Exception as e:
+                print(f"Error in buffer test thread: {e}")
+                break
+
+            # Check for 'q' key to quit *this window*
+            if cv2.waitKey(1) & 0xFF == ord('q'):
+                break
+        
+        # --- Cleanup ---
+        print(f"Closing CV2 test window for {camera_name}.")
+        try:
+            cv2.destroyWindow(window_name)
+        except:
+            pass # Window might already be closed

@@ -1,6 +1,7 @@
-from PyQt6.QtCore import  QObject, pyqtSignal
+from PyQt6.QtCore import  QObject, pyqtSignal ,QThread
 import cv2
 from PyQt6.QtGui import QImage
+import queue
 
 class CameraWorker(QObject):
     """
@@ -14,10 +15,11 @@ class CameraWorker(QObject):
     # Signal to report a failure
     connectionFailed = pyqtSignal(str)
 
-    def __init__(self, name, url, parent=None):
+    def __init__(self, name, url,frame_buffer: queue.Queue, parent=None):
         super().__init__(parent)
         self.name = name
         self.url_str = url
+        self.frame_buffer = frame_buffer
         self.is_running = True # Flag to control the loop
 
         try:
@@ -51,14 +53,30 @@ class CameraWorker(QObject):
                 self.is_running = False # Stop loop
                 break # Exit loop
             
-            # Convert frame for Qt
-            rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-            h, w, ch = rgb_image.shape
-            bytes_per_line = ch * w
-            qt_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+            if self.frame_buffer:
+                try:
+                    # Put a *copy* in the queue
+                    self.frame_buffer.put_nowait(frame.copy())
+                except queue.Full:
+                    # Queue is full, drop the frame
+                    # You could also drop the *oldest* frame first, then add
+                    try:
+                        self.frame_buffer.get_nowait() # Remove oldest
+                        self.frame_buffer.put_nowait(frame.copy()) # Add newest
+                    except queue.Empty:
+                        pass # Should not happen, but good to check
+                    
+                    
+                    # adding the captured frame as a Qimage and outputing in cameralist widget
+            try:
+                rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                h, w, ch = rgb_image.shape
+                bytes_per_line = ch * w
+                qt_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+                self.frameReady.emit(qt_image)
+            except Exception as e:
+                print(f"Error converting frame for display: {e}")
             
-            # Emit the frame
-            self.frameReady.emit(qt_image)
             
             # A short sleep to prevent the thread from
             # hogging 100% CPU if the camera is fast.
@@ -68,6 +86,8 @@ class CameraWorker(QObject):
         if cap:
             cap.release()
         print(f"[{self.name}] Worker thread stopped.")
+        
+        QThread.msleep(10) # ~100 FPS cap, adjust as needed
 
     def stop(self):
         """
