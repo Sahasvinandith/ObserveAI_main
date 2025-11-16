@@ -10,10 +10,9 @@ class CameraFeedWidget(QWidget):
     A QWidget that shows a live camera feed.
     It now delegates all cv2 work to CameraWorker on a QThread.
     """
-    def __init__(self, name, url,frame_buffer: queue.Queue, parent=None):
+    def __init__(self, name, parent=None):
         super().__init__(parent)
         self.name = name
-        self.frame_buffer = frame_buffer
         
         # --- 1. UI Setup (Same as before) ---
         self.layout = QVBoxLayout(self)
@@ -33,41 +32,14 @@ class CameraFeedWidget(QWidget):
         
         # --- 2. Thread and Worker Setup ---
         
-        # Create the thread
-        self.thread = QThread()
-        # Create the worker
-        self.worker = CameraWorker(name, url,self.frame_buffer)
-        
-        # Move the worker to the thread. All its work will be done there.
-        self.worker.moveToThread(self.thread)
-        
-        # --- 3. Connect Signals and Slots ---
-        
-        # When the thread starts, tell the worker to start its 'run' loop
-        self.thread.started.connect(self.worker.run)
-        
-        # When the worker emits a frame, update our label
-        self.worker.frameReady.connect(self.update_frame)
-        
-        # When the worker fails, update our label
-        self.worker.connectionFailed.connect(self.set_error_message)
-        
-        # When the worker succeeds, clear the label
-        self.worker.connectionSuccess.connect(self.on_connection_success)
-        
-        # When the thread finishes, clean it up
-        self.thread.finished.connect(self.thread.deleteLater)
-        self.thread.finished.connect(self.worker.deleteLater)
-        
-        # --- 4. Start the Thread ---
-        self.thread.start()
 
     @pyqtSlot(QImage)
     def update_frame(self, qt_image):
         """Slot to receive the QImage from the worker thread."""
-        scaled_image = qt_image.scaled(self.video_label.width(), self.video_label.height(),
-                                       Qt.AspectRatioMode.KeepAspectRatio)
-        self.video_label.setPixmap(QPixmap.fromImage(scaled_image))
+        if not qt_image.isNull():
+            scaled_image = qt_image.scaled(self.video_label.width(), self.video_label.height(),
+                                        Qt.AspectRatioMode.KeepAspectRatio,Qt.TransformationMode.SmoothTransformation)
+            self.video_label.setPixmap(QPixmap.fromImage(scaled_image))
 
     @pyqtSlot(str)
     def set_error_message(self, message):
@@ -80,17 +52,3 @@ class CameraFeedWidget(QWidget):
         """Slot when connection is made."""
         self.video_label.setStyleSheet("") # Clear style
         self.video_label.setText("") # Clear text
-
-    def stop_feed(self):
-        """
-        Tells the worker to stop its loop and tells the thread to quit.
-        """
-        print(f"[{self.name}] Stopping feed...")
-        # Tell the worker to stop its loop
-        self.worker.stop()
-        
-        # Tell the thread to quit
-        self.thread.quit()
-        
-        # Wait for the thread to finish (optional but good for cleanup)
-        self.thread.wait(500) # Wait max 500ms

@@ -15,10 +15,10 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QApplication, QFormLayout, QGraphicsView, QHBoxLayout,
-    QLabel, QListWidget, QListWidgetItem, QMainWindow,
-    QPushButton, QSizePolicy, QSpacerItem, QStackedWidget,
-    QStatusBar, QVBoxLayout, QWidget)
+from PySide6.QtWidgets import (QApplication, QFormLayout, QGraphicsView, QGridLayout,
+    QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
+    QMainWindow, QPushButton, QSizePolicy, QSpacerItem,
+    QStackedWidget, QStatusBar, QVBoxLayout, QWidget)
 import resources_rc
 
 class Ui_MainWindow(object):
@@ -173,10 +173,10 @@ class Ui_MainWindow(object):
         self.cam_feed_page.setObjectName(u"cam_feed_page")
         self.formLayout = QFormLayout(self.cam_feed_page)
         self.formLayout.setObjectName(u"formLayout")
-        self.label_3 = QLabel(self.cam_feed_page)
-        self.label_3.setObjectName(u"label_3")
+        self.cam_feed_layout = QGridLayout()
+        self.cam_feed_layout.setObjectName(u"cam_feed_layout")
 
-        self.formLayout.setWidget(0, QFormLayout.ItemRole.FieldRole, self.label_3)
+        self.formLayout.setLayout(0, QFormLayout.ItemRole.LabelRole, self.cam_feed_layout)
 
         self.Content_stack.addWidget(self.cam_feed_page)
         self.database_page = QWidget()
@@ -203,7 +203,7 @@ class Ui_MainWindow(object):
         self.retranslateUi(MainWindow)
         self.cam_set_btn.pressed.connect(self.Content_stack.lower)
 
-        self.Content_stack.setCurrentIndex(0)
+        self.Content_stack.setCurrentIndex(1)
 
 
         QMetaObject.connectSlotsByName(MainWindow)
@@ -219,7 +219,6 @@ class Ui_MainWindow(object):
         self.add_wall_btn.setText(QCoreApplication.translate("MainWindow", u"Add Wall", None))
         self.save_map_btn.setText(QCoreApplication.translate("MainWindow", u"Save Map", None))
         self.load_map_btn.setText(QCoreApplication.translate("MainWindow", u"Load Map", None))
-        self.label_3.setText(QCoreApplication.translate("MainWindow", u"Cam Feed page", None))
         self.label_4.setText(QCoreApplication.translate("MainWindow", u"Database", None))
     # retranslateUi
 

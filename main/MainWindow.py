@@ -1,6 +1,6 @@
 import json
 from PyQt6.QtWidgets import (QListWidgetItem,QFileDialog,QGraphicsScene,QApplication, QMainWindow, QLabel, QVBoxLayout,QLineEdit,QDialogButtonBox,QDialog, QGraphicsRectItem)
-from PyQt6.QtCore import (QPointF)
+from PyQt6.QtCore import (QPointF,QThread,Qt)
 import threading
 import cv2
 
@@ -9,6 +9,8 @@ from components.Wall import WallItem
 from components.AddCamera_Dialog import AddCameraDialog
 from components.Camera_widget import CameraItem
 from components.Camera_list_widget import CameraFeedWidget
+from components.Grid_feed_widget import GridFeedWidget
+from components.Camera_worker import CameraWorker
 import queue
 
 class MainWindow(QMainWindow):
@@ -23,21 +25,27 @@ class MainWindow(QMainWindow):
         
         #  ADD TRACKERS ---
         # These will keep track of all items for saving
-        self.feed_widgets = []    # Tracks QListWidget items
+        self.feed_widgets = {}    # Tracks QListWidget items
         self.scene_cameras = {}   # Tracks QGraphicsScene cameras (name -> item)
         self.scene_walls = []     # Tracks QGraphicsScene walls
+        self.grid_feed_widgets = {} # name -> GridFeedWidget
+        
+        self.camera_workers ={}
+        self.camera_threads = {}
         
         # Adding the buffer dictionary for each 
         self.camera_buffers = {}
         self.FRAME_BUFFER_SIZE = 10 # Max frames to hold per camera
+        
+        self.maximized_widget = None # Tracks which widget is maximized, if any
+        self.COLUMNS_IN_GRID = 3     # Set how many columns you want
 
         # 2. Tell your 'drag_area' (the QGraphicsView) to look at this new scene
         self.drag_area.setScene(self.graphics_scene)
 
         # 3. (Optional but recommended) Set a size for the scene
         self.graphics_scene.setSceneRect(0, 0, 1200, 1200)
-        # --- List for cleanup ---
-        self.feed_widgets = []
+        
         
         
         self.signal_setup()
@@ -87,44 +95,108 @@ class MainWindow(QMainWindow):
     
     def create_camera_items(self, name, url, pos=None, rot=None):
         """
-        Creates and adds a camera to BOTH the list and the scene.
-        'pos' and 'rot' are for loading saved layouts.
-        
+        --- 5. THIS IS THE NEW REFACTORED FUNCTION ---
+        Creates and connects all objects for a new camera.
         """
         
-        # --- 3. Create a new buffer for this camera ---
-        if name not in self.camera_buffers:
-            frame_buffer = queue.Queue(maxsize=self.FRAME_BUFFER_SIZE)
-            self.camera_buffers[name] = frame_buffer
-        else:
-            # This case should ideally not happen if names are unique
-            frame_buffer = self.camera_buffers[name]
+        # --- 1. Create Data Objects ---
+        frame_buffer = queue.Queue(maxsize=self.FRAME_BUFFER_SIZE)
+        thread = QThread()
+        worker = CameraWorker(name, url, frame_buffer)
         
-        # 1. Create and add LIST item (CameraFeedWidget)
-        print(f"Creating feed widget for {name}")
-        feed_widget = CameraFeedWidget(name=name, url=url,frame_buffer=frame_buffer)
-        self.feed_widgets.append(feed_widget) # Track for cleanup
+        worker.moveToThread(thread)
         
-        item = QListWidgetItem()
-        item.setSizeHint(feed_widget.sizeHint())
-        self.cam_list.addItem(item)
-        self.cam_list.setItemWidget(item, feed_widget)
-
-        # 2. Create and add SCENE item (CameraItem)
-        print(f"Creating scene item for {name}")
+        # --- 2. Create UI Widgets ---
+        list_widget = CameraFeedWidget(name)
+        grid_widget = GridFeedWidget(name)
         cam_item = CameraItem(name=name, url=url)
         
-        # Apply saved position/rotation if they exist
-        if pos:
-            cam_item.setPos(pos)
-        else:
-            cam_item.setPos(30, 30) # Default new pos
-            
-        if rot is not None:
-            cam_item.setRotation(rot)
-            
+        # --- 3. Connect Worker Signals to UI Slots ---
+        # When worker gets a frame, update BOTH widgets
+        worker.frameReady.connect(list_widget.update_frame)
+        worker.frameReady.connect(grid_widget.update_frame)
+        
+        # Connect error/success signals
+        worker.connectionFailed.connect(list_widget.set_error_message)
+        worker.connectionFailed.connect(grid_widget.set_error_message)
+        worker.connectionSuccess.connect(list_widget.on_connection_success)
+        worker.connectionSuccess.connect(grid_widget.on_connection_success)
+        
+        # Connect thread management
+        thread.started.connect(worker.run)
+        worker.finished.connect(thread.quit)
+        worker.finished.connect(worker.deleteLater)
+        thread.finished.connect(thread.deleteLater)
+
+        # --- 4. Connect Grid Widget's Maximize Signal ---
+        # Use lambda to pass the widget itself to the slot
+        grid_widget.toggle_maximize.connect(
+            lambda: self.handle_maximize_toggle(grid_widget)
+        )
+
+        # --- 5. Add Widgets to Layouts ---
+        # Add to List (cam_list)
+        item = QListWidgetItem()
+        item.setSizeHint(list_widget.sizeHint())
+        self.cam_list.addItem(item)
+        self.cam_list.setItemWidget(item, list_widget)
+        
+        # Add to Scene (drag_area)
+        if pos: cam_item.setPos(pos)
+        else: cam_item.setPos(30, 30)
+        if rot is not None: cam_item.setRotation(rot)
         self.graphics_scene.addItem(cam_item)
+        
+        # Add to Grid (feed_grid_layout)
+        # This is how we add to the grid. We calculate the (row, col)
+        # based on how many widgets are already there.
+        count = len(self.grid_feed_widgets)
+        row = count // self.COLUMNS_IN_GRID
+        col = count % self.COLUMNS_IN_GRID
+        # This is the `feed_grid_layout` you named in Qt Designer
+        self.cam_feed_layout.addWidget(grid_widget, row, col)
+
+        # --- 6. Store Objects in Trackers ---
+        self.camera_buffers[name] = frame_buffer
+        self.camera_threads[name] = thread
+        self.camera_workers[name] = worker
+        self.feed_widgets[name] = list_widget
+        self.grid_feed_widgets[name] = grid_widget
         self.scene_cameras[name] = cam_item
+        
+        # --- 7. Start the Thread ---
+        thread.start()
+    
+    def handle_maximize_toggle(self, widget_to_toggle: GridFeedWidget):
+        """
+        --- 6. NEW: Handles the maximize/minimize logic ---
+        """
+        if self.maximized_widget is None:
+            # --- MAXIMIZING ---
+            self.maximized_widget = widget_to_toggle
+            self.maximized_widget.maximize_button.setText("v") # "Minimize"
+            
+            # Hide all *other* widgets in the grid
+            for widget in self.grid_feed_widgets.values():
+                if widget is not self.maximized_widget:
+                    widget.hide()
+            
+            # Disable scrolling while maximized
+            self.feed_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            self.feed_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+
+        else:
+            # --- MINIMIZING ---
+            self.maximized_widget.maximize_button.setText("□") # "Maximize"
+            self.maximized_widget = None
+            
+            # Show all widgets
+            for widget in self.grid_feed_widgets.values():
+                widget.show()
+                
+            # Re-enable scrolling
+            self.feed_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            self.feed_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         
     def save_layout(self):
         """
@@ -223,14 +295,29 @@ class MainWindow(QMainWindow):
         Stops all feeds and clears the scene and list.
         """
         print("Clearing all items...")
-        # 1. Stop all camera feed threads
-        for widget in self.feed_widgets:
-            widget.stop_feed()
         
+        # --- 1. Stop all workers and threads ---
+        for name, worker in self.camera_workers.items():
+            worker.stop()
+        for name, thread in self.camera_threads.items():
+            thread.quit()
+            if not thread.wait(1000): # Wait max 1 sec
+                print(f"Thread {name} did not stop gracefully. Terminating.")
+                thread.terminate()
+                
         # 2. Clear all trackers
         self.feed_widgets.clear()
         self.scene_cameras.clear()
         self.scene_walls.clear()
+        self.grid_feed_widgets.clear()
+        self.camera_workers.clear()
+        self.camera_threads.clear()
+        
+        # Clear the grid layout (this is the correct way)
+        while self.cam_feed_layout.count():
+            child = self.cam_feed_layout.takeAt(0)
+            if child.widget():
+                child.widget().deleteLater()
         
         # --- 5. Clear the buffers ---
         # Empty all queues and clear the dictionary
@@ -241,11 +328,7 @@ class MainWindow(QMainWindow):
                 except queue.Empty:
                     pass
         self.camera_buffers.clear()
-
-        self.cam_list.clear()
-        self.graphics_scene.clear()
         
-        # 3. Clear the Qt widgets themselves
         self.cam_list.clear() # Clears the QListWidget
         self.graphics_scene.clear() # Clears the QGraphicsScene
                 
@@ -255,8 +338,8 @@ class MainWindow(QMainWindow):
         when you close the main window.
         """
         print("Window closing, stopping all camera feeds...")
-        for widget in self.feed_widgets:
-            widget.stop_feed()
+        self.is_running = False
+        self.clear_all()
         
         super().closeEvent(event)
     

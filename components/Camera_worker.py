@@ -14,6 +14,7 @@ class CameraWorker(QObject):
     connectionSuccess = pyqtSignal(str)
     # Signal to report a failure
     connectionFailed = pyqtSignal(str)
+    finished = pyqtSignal()
 
     def __init__(self, name, url,frame_buffer: queue.Queue, parent=None):
         super().__init__(parent)
