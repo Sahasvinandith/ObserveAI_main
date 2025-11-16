@@ -15,9 +15,9 @@ from PySide6.QtGui import (QBrush, QColor, QConicalGradient, QCursor,
     QFont, QFontDatabase, QGradient, QIcon,
     QImage, QKeySequence, QLinearGradient, QPainter,
     QPalette, QPixmap, QRadialGradient, QTransform)
-from PySide6.QtWidgets import (QApplication, QFormLayout, QGraphicsView, QGridLayout,
-    QHBoxLayout, QLabel, QListWidget, QListWidgetItem,
-    QMainWindow, QPushButton, QSizePolicy, QSpacerItem,
+from PySide6.QtWidgets import (QApplication, QGraphicsView, QGridLayout, QHBoxLayout,
+    QLabel, QListWidget, QListWidgetItem, QMainWindow,
+    QPushButton, QScrollArea, QSizePolicy, QSpacerItem,
     QStackedWidget, QStatusBar, QVBoxLayout, QWidget)
 import resources_rc
 
@@ -30,8 +30,8 @@ class Ui_MainWindow(object):
         self.centralwidget = QWidget(MainWindow)
         self.centralwidget.setObjectName(u"centralwidget")
         self.centralwidget.setAutoFillBackground(True)
-        self.horizontalLayout_2 = QHBoxLayout(self.centralwidget)
-        self.horizontalLayout_2.setObjectName(u"horizontalLayout_2")
+        self.gridLayout = QGridLayout(self.centralwidget)
+        self.gridLayout.setObjectName(u"gridLayout")
         self.Menubar = QWidget(self.centralwidget)
         self.Menubar.setObjectName(u"Menubar")
         sizePolicy = QSizePolicy(QSizePolicy.Policy.Expanding, QSizePolicy.Policy.Preferred)
@@ -68,7 +68,7 @@ class Ui_MainWindow(object):
         self.verticalLayout.addWidget(self.db_btn)
 
 
-        self.horizontalLayout_2.addWidget(self.Menubar)
+        self.gridLayout.addWidget(self.Menubar, 0, 0, 1, 1)
 
         self.Content = QWidget(self.centralwidget)
         self.Content.setObjectName(u"Content")
@@ -171,12 +171,24 @@ class Ui_MainWindow(object):
         self.Content_stack.addWidget(self.cam_settings_page)
         self.cam_feed_page = QWidget()
         self.cam_feed_page.setObjectName(u"cam_feed_page")
-        self.formLayout = QFormLayout(self.cam_feed_page)
-        self.formLayout.setObjectName(u"formLayout")
+        self.horizontalLayout_4 = QHBoxLayout(self.cam_feed_page)
+        self.horizontalLayout_4.setObjectName(u"horizontalLayout_4")
+        self.scrollArea = QScrollArea(self.cam_feed_page)
+        self.scrollArea.setObjectName(u"scrollArea")
+        self.scrollArea.setWidgetResizable(True)
+        self.scroll_container = QWidget()
+        self.scroll_container.setObjectName(u"scroll_container")
+        self.scroll_container.setGeometry(QRect(0, 0, 703, 578))
+        self.horizontalLayout_6 = QHBoxLayout(self.scroll_container)
+        self.horizontalLayout_6.setObjectName(u"horizontalLayout_6")
         self.cam_feed_layout = QGridLayout()
         self.cam_feed_layout.setObjectName(u"cam_feed_layout")
 
-        self.formLayout.setLayout(0, QFormLayout.ItemRole.LabelRole, self.cam_feed_layout)
+        self.horizontalLayout_6.addLayout(self.cam_feed_layout)
+
+        self.scrollArea.setWidget(self.scroll_container)
+
+        self.horizontalLayout_4.addWidget(self.scrollArea)
 
         self.Content_stack.addWidget(self.cam_feed_page)
         self.database_page = QWidget()
@@ -193,7 +205,7 @@ class Ui_MainWindow(object):
         self.horizontalLayout.addWidget(self.Content_stack)
 
 
-        self.horizontalLayout_2.addWidget(self.Content)
+        self.gridLayout.addWidget(self.Content, 0, 1, 1, 1)
 
         MainWindow.setCentralWidget(self.centralwidget)
         self.statusbar = QStatusBar(MainWindow)
