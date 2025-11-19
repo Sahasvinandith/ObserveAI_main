@@ -3,7 +3,6 @@ from PyQt6.QtWidgets import (QListWidgetItem,QFileDialog,QGraphicsScene,QApplica
 from PyQt6.QtCore import (QPointF,QThread,Qt)
 import threading
 import cv2
-
 from PyQt6.uic import loadUi
 from components.Wall import WallItem
 from components.AddCamera_Dialog import AddCameraDialog
@@ -182,8 +181,8 @@ class MainWindow(QMainWindow):
                     widget.hide()
             
             # Disable scrolling while maximized
-            self.feed_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
-            self.feed_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
+            self.scrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAlwaysOff)
 
         else:
             # --- MINIMIZING ---
@@ -195,8 +194,8 @@ class MainWindow(QMainWindow):
                 widget.show()
                 
             # Re-enable scrolling
-            self.feed_scroll_area.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-            self.feed_scroll_area.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
+            self.scrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
         
     def save_layout(self):
         """
