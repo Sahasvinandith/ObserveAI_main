@@ -1,6 +1,6 @@
 import json
 from PyQt6.QtWidgets import (QListWidgetItem,QFileDialog,QGraphicsScene,QApplication, QMainWindow, QLabel, QVBoxLayout,QLineEdit,QDialogButtonBox,QDialog, QGraphicsRectItem)
-from PyQt6.QtCore import (QPointF,QThread,Qt)
+from PyQt6.QtCore import (QPointF,QThread,Qt, pyqtSignal,pyqtSlot)
 import threading
 import cv2
 from PyQt6.uic import loadUi
@@ -11,8 +11,12 @@ from components.Camera_list_widget import CameraFeedWidget
 from components.Grid_feed_widget import GridFeedWidget
 from components.Camera_worker import CameraWorker
 import queue
+from PyQt6.QtGui import QImage
+from DataModel.DetectionSystem_Update import DetectionSystem
+
 
 class MainWindow(QMainWindow):
+    ai_frame_processed_signal = pyqtSignal(str,object)
     def __init__(self):
         super().__init__()
         loadUi("./UIs/main.ui", self)
@@ -32,6 +36,10 @@ class MainWindow(QMainWindow):
         self.camera_workers ={}
         self.camera_threads = {}
         
+        # --- AI MANAGEMENT ---
+        self.ai_instances = {} # Stores the DetectionSystem objects
+        self.ai_threads = {}   # Stores the Python Threads for AI
+        
         # Adding the buffer dictionary for each 
         self.camera_buffers = {}
         self.FRAME_BUFFER_SIZE = 10 # Max frames to hold per camera
@@ -46,8 +54,10 @@ class MainWindow(QMainWindow):
         self.graphics_scene.setSceneRect(0, 0, 1200, 1200)
         
         
-        
         self.signal_setup()
+        
+        # Connect the AI Signal to the UI Slot
+        self.ai_frame_processed_signal.connect(self.update_grid_from_ai)
         self.Content_stack.setCurrentIndex(0)
     
     def signal_setup(self):
@@ -59,6 +69,33 @@ class MainWindow(QMainWindow):
         self.save_map_btn.clicked.connect(self.save_layout)
         self.load_map_btn.clicked.connect(self.load_layout)
     
+    
+    @pyqtSlot(str, object)
+    def update_grid_from_ai(self, cam_name, frame):
+        """
+        Receives (Name, Frame) from DetectionSystem thread.
+        Converts numpy array to QImage and updates the UI.
+        """
+        if cam_name in self.grid_feed_widgets:
+            try:
+                # 1. Get dimensions
+                h, w, ch = frame.shape
+                bytes_per_line = ch * w
+                
+                # 2. Convert BGR (OpenCV) to RGB (Qt)
+                # We create a copy to avoid memory issues when the numpy array is garbage collected
+                rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                
+                # 3. Create QImage
+                qt_image = QImage(rgb_frame.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+                
+                # 4. Update the widget with the QImage
+                self.grid_feed_widgets[cam_name].update_frame(qt_image)
+                
+            except Exception as e:
+                print(f"Error converting AI frame: {e}")
+                
+    
     def add_a_wall(self):
         wall = WallItem(30,30,150,10)
         self.drag_area.scene().addItem(wall)
@@ -69,9 +106,7 @@ class MainWindow(QMainWindow):
         """
         
         self.show_add_camera_dialog()
-        self.start_buffer_test()
-        
-        print("Camera added.")
+        # self.start_buffer_test()
     
     def show_add_camera_dialog(self):
         """
@@ -100,10 +135,10 @@ class MainWindow(QMainWindow):
         
         # --- 1. Create Data Objects ---
         frame_buffer = queue.Queue(maxsize=self.FRAME_BUFFER_SIZE)
-        thread = QThread()
+        qt_thread = QThread()
         worker = CameraWorker(name, url, frame_buffer)
         
-        worker.moveToThread(thread)
+        worker.moveToThread(qt_thread)
         
         # --- 2. Create UI Widgets ---
         list_widget = CameraFeedWidget(name)
@@ -113,7 +148,6 @@ class MainWindow(QMainWindow):
         # --- 3. Connect Worker Signals to UI Slots ---
         # When worker gets a frame, update BOTH widgets
         worker.frameReady.connect(list_widget.update_frame)
-        worker.frameReady.connect(grid_widget.update_frame)
         
         # Connect error/success signals
         worker.connectionFailed.connect(list_widget.set_error_message)
@@ -122,10 +156,10 @@ class MainWindow(QMainWindow):
         worker.connectionSuccess.connect(grid_widget.on_connection_success)
         
         # Connect thread management
-        thread.started.connect(worker.run)
-        worker.finished.connect(thread.quit)
+        qt_thread.started.connect(worker.run)
+        worker.finished.connect(qt_thread.quit)
         worker.finished.connect(worker.deleteLater)
-        thread.finished.connect(thread.deleteLater)
+        qt_thread.finished.connect(qt_thread.deleteLater)
 
         # --- 4. Connect Grid Widget's Maximize Signal ---
         # Use lambda to pass the widget itself to the slot
@@ -157,14 +191,37 @@ class MainWindow(QMainWindow):
 
         # --- 6. Store Objects in Trackers ---
         self.camera_buffers[name] = frame_buffer
-        self.camera_threads[name] = thread
+        self.camera_threads[name] = qt_thread
         self.camera_workers[name] = worker
         self.feed_widgets[name] = list_widget
         self.grid_feed_widgets[name] = grid_widget
         self.scene_cameras[name] = cam_item
         
         # --- 7. Start the Thread ---
-        thread.start()
+        qt_thread.start()
+        
+        # =========================================================
+        # --- 8. AUTO-START AI DETECTION SYSTEM ---
+        # =========================================================
+        print(f"Initializing AI System for Camera{name}...")
+        
+        # Create the AI System
+        ai_sys = DetectionSystem(
+            camera_name=name,
+            db_path="Faces_db",
+            camera_buffer=frame_buffer,
+            output_callback=self.ai_frame_processed_signal.emit
+        )
+        
+        # Store it
+        self.ai_instances[name] = ai_sys
+        
+        # Create and Start the AI Thread
+        ai_thread = threading.Thread(target=ai_sys.start, daemon=True)
+        self.ai_threads[name] = ai_thread
+        ai_thread.start()
+        
+        print(f"AI System for {name} started.")
     
     def handle_maximize_toggle(self, widget_to_toggle: GridFeedWidget):
         """
@@ -291,20 +348,25 @@ class MainWindow(QMainWindow):
 
     def clear_all(self):
         """
-        Stops all feeds and clears the scene and list.
+        Stops all workers AND AI threads.
         """
         print("Clearing all items...")
         
-        # --- 1. Stop all workers and threads ---
+        # 1. Stop AI Threads first
+        for name, ai_sys in self.ai_instances.items():
+            ai_sys.stop()
+        self.ai_instances.clear()
+        self.ai_threads.clear()
+
+        # 2. Stop Camera Workers
         for name, worker in self.camera_workers.items():
             worker.stop()
         for name, thread in self.camera_threads.items():
             thread.quit()
-            if not thread.wait(1000): # Wait max 1 sec
-                print(f"Thread {name} did not stop gracefully. Terminating.")
+            if not thread.wait(1000):
                 thread.terminate()
                 
-        # 2. Clear all trackers
+        # 3. Clear UI and Trackers
         self.feed_widgets.clear()
         self.scene_cameras.clear()
         self.scene_walls.clear()
@@ -312,36 +374,26 @@ class MainWindow(QMainWindow):
         self.camera_workers.clear()
         self.camera_threads.clear()
         
-        # Clear the grid layout (this is the correct way)
         while self.cam_feed_layout.count():
             child = self.cam_feed_layout.takeAt(0)
             if child.widget():
                 child.widget().deleteLater()
         
-        # --- 5. Clear the buffers ---
-        # Empty all queues and clear the dictionary
+        # 4. Clear Buffers
         for q in self.camera_buffers.values():
             while not q.empty():
-                try:
-                    q.get_nowait()
-                except queue.Empty:
-                    pass
+                try: q.get_nowait()
+                except queue.Empty: pass
         self.camera_buffers.clear()
         
-        self.cam_list.clear() # Clears the QListWidget
-        self.graphics_scene.clear() # Clears the QGraphicsScene
+        self.cam_list.clear()
+        self.graphics_scene.clear()
                 
     def closeEvent(self, event):
-        """
-        This is crucial! It stops all camera threads
-        when you close the main window.
-        """
-        print("Window closing, stopping all camera feeds...")
+        print("Window closing, stopping all threads...")
         self.is_running = False
         self.clear_all()
-        
         super().closeEvent(event)
-    
     
     # --- Buffer Testing ---
     def start_buffer_test(self):
