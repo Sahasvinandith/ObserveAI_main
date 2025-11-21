@@ -222,7 +222,7 @@ def recognize_face(face_img):
             return "Unknown", 1.0
 
         best_match = "Unknown"
-        best_confidence = 1.0
+        best_confidence = 0.3
 
         # Use DeepFace's verify function with each user folder
         for user_folder in os.listdir(db_path):
@@ -245,23 +245,24 @@ def recognize_face(face_img):
                     print("Verifying with image: ")
                     result = DeepFace.verify(img1_path=face_img,
                                              img2_path=reference_img,
-                                             enforce_detection=True,
-                                             model_name="ArcFace") #VGG-Face or any other model. please rever the doc inside the project folder
+                                             enforce_detection=False,
+                                             model_name="ArcFace",
+                                             detector_backend="skip") #VGG-Face or any other model. please rever the doc inside the project folder
                     
                     print("result: ", result)
 
-                    if result["verified"] and result["distance"] < best_confidence:
+                    if result["verified"] and (result["distance"] < best_confidence):
                         best_match = user_folder
                         best_confidence = result["distance"]
                         # If we found a very good match, break early
-                        if best_confidence < 0.3:
+                        if best_confidence < 0.2:
                             break
                 except Exception as e:
                     print(f"Error verifying with image {img_file}: {e}")
                     continue
 
             # If we found a very good match, break out of user loop too
-            if best_confidence < 0.3:
+            if best_confidence < 0.2:
                 break
 
         return best_match, best_confidence
