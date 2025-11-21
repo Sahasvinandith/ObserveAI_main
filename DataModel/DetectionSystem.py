@@ -1,6 +1,7 @@
 import os
 import cv2
 import tkinter as tk
+import math
 import threading
 import time
 import queue
@@ -12,6 +13,7 @@ import torch
 import torch.nn as nn
 from torchvision.transforms import transforms
 from DataModel.Reid_model import ReIDModel
+import traceback
 # At the top of main/MainWindow.py
 
 
@@ -62,6 +64,7 @@ class Face:
         self.tracker = tracker
         self.person_id = person_id  # Link to parent person
         self.last_seen = time.time()
+        self.is_recognizing = False # Flag for async queue
 
     def position_update(self, x, y, w, h):
         self.x = x
@@ -78,15 +81,21 @@ class Face:
         self.tracker = tracker
         self.last_seen = time.time()
 
+    # --- THIS WAS MISSING ---
+    def get_center(self):
+        return (self.x + self.w // 2, self.y + self.h // 2)
 
 def get_screen_resolution():
-    root = tk.Tk()
-    # Prevents a main window from popping up
-    root.withdraw()
-    screen_width = root.winfo_screenwidth()
-    screen_height = root.winfo_screenheight()
-    root.destroy()
-    return screen_width, screen_height
+    try:
+        root = tk.Tk()
+        # Prevents a main window from popping up
+        root.withdraw()
+        screen_width = root.winfo_screenwidth()
+        screen_height = root.winfo_screenheight()
+        root.destroy()
+        return screen_width, screen_height
+    except:
+        return 1280,720
 
 
 class DetectionSystem:
@@ -506,6 +515,7 @@ class DetectionSystem:
                 continue
             except Exception as e:
                 print(f"Error in processing thread: {e}")
+                traceback.print_exc()
                 time.sleep(0.1)
 
         # Clean up

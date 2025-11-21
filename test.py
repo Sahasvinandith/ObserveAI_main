@@ -1,4 +1,6 @@
+import os
 import sys
+os.environ["TF_USE_LEGACY_KERAS"] = "1"
 import tensorflow
 from PyQt6.QtWidgets import QApplication
 from main.MainWindow import MainWindow

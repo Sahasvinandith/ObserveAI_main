@@ -218,6 +218,7 @@ def recognize_face(face_img):
     try:
         # First check if the database has any entries
         if not any(os.path.isdir(os.path.join(db_path, d)) for d in os.listdir(db_path)):
+            print("No users in database.")
             return "Unknown", 1.0
 
         best_match = "Unknown"
@@ -225,22 +226,29 @@ def recognize_face(face_img):
 
         # Use DeepFace's verify function with each user folder
         for user_folder in os.listdir(db_path):
+            print("CHECKING USER FOLDER: ", user_folder)
             user_path = os.path.join(db_path, user_folder)
             if not os.path.isdir(user_path):
+                print("User folder does not exist, skipping.")
                 continue
 
             image_files = [f for f in os.listdir(user_path) if f.endswith(('.jpg', '.jpeg', '.png'))]
             if not image_files:
+                print("No images in user folder, skipping.")
                 continue
+            print("Found image files: ", image_files)
 
             # Try to verify against multiple reference images in the folder
             for img_file in image_files[:3]:  # Check up to 3 images per user for speed
                 reference_img = os.path.join(user_path, img_file)
                 try:
+                    print("Verifying with image: ")
                     result = DeepFace.verify(img1_path=face_img,
                                              img2_path=reference_img,
-                                             enforce_detection=False,
+                                             enforce_detection=True,
                                              model_name="ArcFace") #VGG-Face or any other model. please rever the doc inside the project folder
+                    
+                    print("result: ", result)
 
                     if result["verified"] and result["distance"] < best_confidence:
                         best_match = user_folder
@@ -249,6 +257,7 @@ def recognize_face(face_img):
                         if best_confidence < 0.3:
                             break
                 except Exception as e:
+                    print(f"Error verifying with image {img_file}: {e}")
                     continue
 
             # If we found a very good match, break out of user loop too
