@@ -10,6 +10,7 @@ from components.Camera_widget import CameraItem
 from components.Camera_list_widget import CameraFeedWidget
 from components.Grid_feed_widget import GridFeedWidget
 from components.Camera_worker import CameraWorker
+from components.Database_viewer import DatabaseViewer
 import queue
 from PyQt6.QtGui import QImage
 from DataModel.DetectionSystem_Update import DetectionSystem
@@ -56,6 +57,9 @@ class MainWindow(QMainWindow):
         
         self.signal_setup()
         
+        # database setup
+        self.setup_database_page()
+        
         # Connect the AI Signal to the UI Slot
         self.ai_frame_processed_signal.connect(self.update_grid_from_ai)
         self.Content_stack.setCurrentIndex(0)
@@ -68,7 +72,29 @@ class MainWindow(QMainWindow):
         self.add_wall_btn.clicked.connect(self.add_a_wall)
         self.save_map_btn.clicked.connect(self.save_layout)
         self.load_map_btn.clicked.connect(self.load_layout)
+        self.db_btn.clicked.connect(self.show_database_page)
     
+    def setup_database_page(self):
+        """
+        Injects the DatabaseViewer into the database_page widget.
+        """
+        # 1. Create the viewer instance
+        self.db_viewer = DatabaseViewer(db_path="Faces_db")
+        
+        # 2. Add it to the existing database_page layout
+        # Note: Your XML for database_page has 'horizontalLayout_3'
+        # We can simply add the widget to it.
+        
+        # Clear any placeholder labels if you want (optional)
+        # for i in range(self.database_page.layout().count()):
+        #     self.database_page.layout().itemAt(i).widget().deleteLater()
+        self.database_page.layout().addWidget(self.db_viewer)
+
+    def show_database_page(self):
+        """Switch to DB page and refresh data"""
+        self.Content_stack.setCurrentIndex(2)
+        if hasattr(self, 'db_viewer'):
+            self.db_viewer.refresh_database()
     
     @pyqtSlot(str, object)
     def update_grid_from_ai(self, cam_name, frame):
