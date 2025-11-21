@@ -5,13 +5,14 @@ import threading
 import time
 import queue
 import numpy as np
-from face_detection import *
+from DataModel.face_detection import *
 from ultralytics import YOLO
 from deep_sort_realtime.deepsort_tracker import DeepSort
 import torch
 import torch.nn as nn
 from torchvision.transforms import transforms
-from Reid_model import ReIDModel
+from DataModel.Reid_model import ReIDModel
+# At the top of main/MainWindow.py
 
 
 class Person:
@@ -89,7 +90,7 @@ def get_screen_resolution():
 
 
 class DetectionSystem:
-    def __init__(self, db_path="Faces_db", video_path="test_videos/1.mp4"):
+    def __init__(self,camera_name, db_path="Faces_db",camera_buffer=None, output_callback=None):
         """
         Initialize the entire detection system.
         All global variables and configurations become instance attributes.
@@ -97,12 +98,14 @@ class DetectionSystem:
         print("[INFO] Initializing Detection System...")
 
         # --- Setup & Configuration ---
+        self.camera_name = camera_name
         self.db_path = db_path
         os.makedirs(self.db_path, exist_ok=True)
+        
+        self.camera_buffer = camera_buffer  # Camera buffer passed from main 
+        self.output_callback = output_callback  # Output callback function
 
-        self.video_path = video_path  # Make video path an init parameter
-
-        # Configuration constants
+    
 
         # Configuration
         self.CONFIDENCE_THRESHOLD = 0.3  # Lower is better match
@@ -264,82 +267,42 @@ class DetectionSystem:
         return detections
 
     def camera_thread_function(self):
-        """Thread function to capture frames from camera."""
-
-        video_path = os.path.join("DataModel","test_videos", "1.mp4")
-        print(f"[THREAD] Video thread started, attempting to open: {video_path}")
-
-        # Initialize video capture with the file path instead of camera index (0)
-        cap = cv2.VideoCapture(video_path)
-
-        delay_s = 0.04  # Corresponds to your original ~25 FPS rate
-
-        if not cap.isOpened():
-            print(f"Error: Could not open video file at {video_path}. Check the path and file integrity.")
-            self.stop_event.set()
-            return
-
-        # --- Get Original Video Dimensions ---
-        original_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
-        original_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
-        print(f"Video Original Resolution: {original_width}x{original_height}")
-
-        # Get the resolution once
-        max_screen_width, max_screen_height = get_screen_resolution()
-
-        target_width = original_width
-        target_height = original_height
-
-        if original_width > max_screen_width or original_height > max_screen_height:
-            # Only scale down if the video is too large for the screen/limit
-            scale_w = max_screen_width / original_width
-            scale_h = max_screen_height / original_height
-            scale_factor = min(scale_w, scale_h)
-
-            target_width = int(original_width * scale_factor)
-            target_height = int(original_height * scale_factor)
+        """Thread function to capture frames from camera buffers."""
+        print("[THREAD] Camera thread started, using camera buffers from Main System")
 
         while not self.stop_event.is_set():
-            ret, frame = cap.read()
-            # For testing - you can uncomment the next two lines to use static image
-            # image_path = "E:\Campus\Data_Management_project\iiro.jpg"
-            # frame = cv2.imread(image_path, cv2.IMREAD_COLOR)
+            try:
+                # Fetch the latest frame from the camera buffer
+                with self.lock:
+                    if self.camera_buffer and not self.camera_buffer.empty():
+                        frame = self.camera_buffer.get()
+                    else:
+                        time.sleep(0.01)  # Wait briefly if no frame is available
+                        continue
 
-            if not ret:
-                # Check if we reached the end of the video
-                if not frame is None:  # frame is None might happen if reading failed initially
-                    print("Error: Failed to capture frame.")
-                    time.sleep(0.1)
-                    continue
-                else:
-                    print("Info: Reached end of video file.")
-                    # Option 2: Stop the thread (recommended for processing a single video)
-                    break
-
-            if target_width != original_width or target_height != original_height:
-                frame = cv2.resize(frame, (target_width, target_height), interpolation=cv2.INTER_AREA)
-
-            # Always update the shared buffer
-            with self.lock:
+                # Always update the shared buffer
                 self.last_frame_buffer["frame"] = frame.copy()
                 self.last_frame_buffer["timestamp"] = time.time()
 
-            # If queue is full, remove oldest frame
-            if self.frame_queue.full():
+                # If queue is full, remove the oldest frame
+                if self.frame_queue.full():
+                    try:
+                        self.frame_queue.get_nowait()
+                    except queue.Empty:
+                        pass
+
+                # Add the new frame to the queue
                 try:
-                    self.frame_queue.get_nowait()
-                except:
+                    self.frame_queue.put(frame, block=False)
+                except queue.Full:
                     pass
 
-            # Add new frame to queue
-            try:
-                self.frame_queue.put(frame, block=False)
-            except:
-                pass
+                time.sleep(0.04)  # ~25 FPS capture rate
 
-            time.sleep(0.04)  # ~25 FPS capture
+            except Exception as e:
+                print(f"[ERROR] Camera thread encountered an error: {e}")
+                time.sleep(0.1)
 
-        cap.release()
         print("[THREAD] Camera thread stopped")
 
     def process_faces_in_person(self,frame, person_bbox, person_id, temp_face_path):
@@ -589,7 +552,7 @@ class DetectionSystem:
         """Get next available face ID by scanning database"""
         highest_id = -1
         try:
-            existing_dirs = [d for d in os.listdir(db_path) if os.path.isdir(os.path.join(db_path, d))]
+            existing_dirs = [d for d in os.listdir(self.db_path) if os.path.isdir(os.path.join(self.db_path, d))]
 
             for d in existing_dirs:
                 if d.startswith("User_"):
@@ -603,7 +566,7 @@ class DetectionSystem:
                     if current_id > highest_id:
                         highest_id = current_id
         except FileNotFoundError:
-            print(f"Database path not found: {db_path}")
+            print(f"Database path not found: {self.db_path}")
             return 0
 
         return highest_id + 1
@@ -692,6 +655,9 @@ class DetectionSystem:
                                 (fx, fy - 10), cv2.FONT_HERSHEY_SIMPLEX, 0.5, face_color, 1)
                     cv2.putText(frame, f"Conf: {face_confidence:.2f}",
                                 (fx, fy + fh + 15), cv2.FONT_HERSHEY_SIMPLEX, 0.4, face_color, 1)
+            
+            if self.output_callback:
+                self.output_callback(self.camera_name, frame)
 
             # Display system status
             status_text = "Person Tracking + Face Recognition"
@@ -705,7 +671,7 @@ class DetectionSystem:
             # Show quality metrics
             cv2.putText(frame, "System Status:", (10, frame.shape[0] - 80),
                         cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
-            cv2.putText(frame, f"Queue: {self.frame_queue.qsize()}/{FRAME_QUEUE_SIZE}",
+            cv2.putText(frame, f"Queue: {self.frame_queue.qsize()}/{self.FRAME_QUEUE_SIZE}",
                         (10, frame.shape[0] - 60), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)
             cv2.putText(frame, f"YOLO + DeepSORT + Face Recognition",
                         (10, frame.shape[0] - 40), cv2.FONT_HERSHEY_SIMPLEX, 0.5, (255, 255, 255), 1)

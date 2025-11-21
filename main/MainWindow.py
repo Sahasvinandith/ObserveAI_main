@@ -13,7 +13,7 @@ from components.Camera_worker import CameraWorker
 from components.Database_viewer import DatabaseViewer
 import queue
 from PyQt6.QtGui import QImage
-from DataModel.DetectionSystem_Update import DetectionSystem
+from DataModel.DetectionSystem import DetectionSystem
 
 
 class MainWindow(QMainWindow):
