@@ -8,6 +8,8 @@ from deepface import DeepFace
 db_path = "Faces_db"
 os.makedirs(db_path, exist_ok=True)
 
+DB_UPDATED = False  # Flag to indicate if DB was updated
+
 # Configuration
 CONFIDENCE_THRESHOLD = 0.6  # Lower is better match
 MIN_FACE_SIZE = (120, 120)  # Minimum face size for recognition
@@ -211,70 +213,21 @@ def calculate_face_quality(face_img):
 
     return quality_score
 
-
-# def recognize_face(face_img):
-#     """Compare a face with all users in the database."""
-#     print("Recognize with deepface::")
-#     try:
-#         # First check if the database has any entries
-#         if not any(os.path.isdir(os.path.join(db_path, d)) for d in os.listdir(db_path)):
-#             print("No users in database.")
-#             return "Unknown", 1.0
-
-#         best_match = "Unknown"
-#         best_confidence = 0.3
-
-#         # Use DeepFace's verify function with each user folder
-#         for user_folder in os.listdir(db_path):
-#             print("CHECKING USER FOLDER: ", user_folder)
-#             user_path = os.path.join(db_path, user_folder)
-#             if not os.path.isdir(user_path):
-#                 print("User folder does not exist, skipping.")
-#                 continue
-
-#             image_files = [f for f in os.listdir(user_path) if f.endswith(('.jpg', '.jpeg', '.png'))]
-#             if not image_files:
-#                 print("No images in user folder, skipping.")
-#                 continue
-#             print("Found image files: ", image_files)
-
-#             # Try to verify against multiple reference images in the folder
-#             for img_file in image_files[:3]:  # Check up to 3 images per user for speed
-#                 reference_img = os.path.join(user_path, img_file)
-#                 try:
-#                     print("Verifying with image: ")
-#                     result = DeepFace.verify(img1_path=face_img,
-#                                              img2_path=reference_img,
-#                                              enforce_detection=False,
-#                                              model_name="ArcFace",
-#                                              detector_backend="skip") #VGG-Face or any other model. please rever the doc inside the project folder
-                    
-#                     print("result: ", result)
-
-#                     if result["verified"] and (result["distance"] < best_confidence):
-#                         best_match = user_folder
-#                         best_confidence = result["distance"]
-#                         # If we found a very good match, break early
-#                         if best_confidence < 0.2:
-#                             break
-#                 except Exception as e:
-#                     print(f"Error verifying with image {img_file}: {e}")
-#                     continue
-
-#             # If we found a very good match, break out of user loop too
-#             if best_confidence < 0.2:
-#                 break
-
-#         return best_match, best_confidence
-#     except Exception as e:
-#         print(f"Recognition error: {e}")
-#         return "Unknown", 1.0
-
 def recognize_face(face_img):
     """
     Compare a face with all users in the database using DeepFace.find
     This is much faster than looping through verify().
     """
+    
+    global DB_UPDATED
+    print("DB updated flag: ",DB_UPDATED)
+    if DB_UPDATED:
+        pkl_path = os.path.join(db_path, "representations_arcface.pkl")
+        if os.path.exists(pkl_path):
+            os.remove(pkl_path)
+            print("Refreshing Face Embeddings...")
+        DB_UPDATED = False # Reset flag
+        
     print("Recognize with deepface::")
     try:
         # Check if DB has users
@@ -288,7 +241,10 @@ def recognize_face(face_img):
                             model_name="ArcFace", 
                             detector_backend="skip", 
                             enforce_detection=False, 
-                            silent=True)
+                            silent=True,
+                            distance_metric="cosine",
+                            normalization="base"
+                            )
         
         if len(dfs) > 0 and not dfs[0].empty:
             # Get the first result (closest match)
@@ -310,50 +266,76 @@ def recognize_face(face_img):
         print(f"Recognition error: {e}")
         return "Unknown", 1.0
 
-def update_user_faces(user_folder, face_img, quality_score):
+# def update_user_faces(user_folder, face_img, quality_score):
+#     """Update a user's face database with better quality images."""
+    
+#     global DB_UPDATED
+    
+#     try:
+#         print("updating user folder: ",user_folder)
+#         user_path = os.path.join(db_path, str(user_folder))
+#         os.makedirs(user_path, exist_ok=True)
+
+#         # Get existing images and their quality scores
+#         images = []
+#         for filename in os.listdir(user_path):
+#             if not filename.endswith(('.jpg', '.jpeg', '.png')):
+#                 continue
+
+#             file_path = os.path.join(user_path, filename)
+
+#             # Extract quality from filename if available
+#             if '_q' in filename:
+#                 try:
+#                     file_quality = float(filename.split('_q')[1].split('.')[0])
+#                 except:
+#                     file_quality = 0
+#             else:
+#                 file_quality = 0
+
+#             images.append((file_path, file_quality))
+
+#         # Sort by quality (lowest first)
+#         images.sort(key=lambda x: x[1])
+
+#         # If we have too many images, replace the worst one
+#         if len(images) >= MAX_FACES_PER_USER:
+#             # Only replace if new image is better than the worst one
+#             if quality_score > images[0][1]:
+#                 os.remove(images[0][0])
+#                 timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+#                 new_file = os.path.join(user_path, f"face_{timestamp}_q{quality_score:.1f}.jpg")
+#                 cv2.imwrite(new_file, face_img)
+#                 print(f"[UPDATED] Replaced low quality face with better one (q: {quality_score:.1f}) for {user_folder}")
+#         else:
+#             # Add new image
+#             timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+#             new_file = os.path.join(user_path, f"face_{timestamp}_q{quality_score:.1f}.jpg")
+#             cv2.imwrite(new_file, face_img)
+#             print(f"[ADDED] New face image (q: {quality_score:.1f}) for {user_folder}")
+        
+#         DB_UPDATED = True  # Set the flag to indicate DB was updated
+
+#     except Exception as e:
+#         print(f"Error updating user faces: {e}")
+        
+def update_user_faces(user_folder, face_img):
     """Update a user's face database with better quality images."""
+    
+    global DB_UPDATED
+    
     try:
         print("updating user folder: ",user_folder)
         user_path = os.path.join(db_path, str(user_folder))
         os.makedirs(user_path, exist_ok=True)
-
-        # Get existing images and their quality scores
-        images = []
-        for filename in os.listdir(user_path):
-            if not filename.endswith(('.jpg', '.jpeg', '.png')):
-                continue
-
-            file_path = os.path.join(user_path, filename)
-
-            # Extract quality from filename if available
-            if '_q' in filename:
-                try:
-                    file_quality = float(filename.split('_q')[1].split('.')[0])
-                except:
-                    file_quality = 0
-            else:
-                file_quality = 0
-
-            images.append((file_path, file_quality))
-
-        # Sort by quality (lowest first)
-        images.sort(key=lambda x: x[1])
-
-        # If we have too many images, replace the worst one
-        if len(images) >= MAX_FACES_PER_USER:
-            # Only replace if new image is better than the worst one
-            if quality_score > images[0][1]:
-                os.remove(images[0][0])
-                timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-                new_file = os.path.join(user_path, f"face_{timestamp}_q{quality_score:.1f}.jpg")
-                cv2.imwrite(new_file, face_img)
-                print(f"[UPDATED] Replaced low quality face with better one (q: {quality_score:.1f}) for {user_folder}")
-        else:
-            # Add new image
-            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-            new_file = os.path.join(user_path, f"face_{timestamp}_q{quality_score:.1f}.jpg")
-            cv2.imwrite(new_file, face_img)
-            print(f"[ADDED] New face image (q: {quality_score:.1f}) for {user_folder}")
+        
+        save_path = os.path.join(user_path, "1.jpg")
+        
+        cv2.imwrite(save_path, face_img)
+        print(f"[ADDED] New face image for {user_folder}")
+        
+        DB_UPDATED = True  # Set the flag to indicate DB was updated
 
     except Exception as e:
         print(f"Error updating user faces: {e}")
+

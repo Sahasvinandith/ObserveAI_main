@@ -228,15 +228,7 @@ class DetectionSystem:
                         new_folder_name = f"User_{new_id_num}"
                         print(f"[STORAGE] Assigning New User ID: {new_folder_name}")
                         
-                        # Create Folder
-                        new_path = os.path.join(self.db_path, new_folder_name)
-                        os.makedirs(new_path, exist_ok=True)
-                        
-                        # Save Image
-                        save_path = os.path.join(new_path, "1.jpg")
-                        cv2.imwrite(save_path, face_img)
-                        
-                        print(f"[STORAGE] Unknown saved as New User: {new_folder_name}")
+                        update_user_faces(new_folder_name,face_img=face_img)
                         
                         # Update live object name
                         face_obj.name = new_folder_name
