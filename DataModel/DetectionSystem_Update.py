@@ -215,6 +215,9 @@ class DetectionSystem:
                 with self.lock:
                     if face_id_key in self.identified_faces:
                         face_obj = self.identified_faces[face_id_key]
+                    else:
+                        print(f"[RECOG WORKER] Face ID {face_id_key} not found in identified_faces.")
+                        print(f"[RECOG WORKER] Identifaed Faces Keys: {list(self.identified_faces.keys())}")
                         
                 # --- LOGIC: Handle New User ---
                 
@@ -335,6 +338,21 @@ class DetectionSystem:
                             if face_img.size > 0:
                                 # Generate ID
                                 face_id = str(self.next_face_id)
+                                
+                                # Initialize Tracker
+                                try:
+                                    tracker = cv2.TrackerCSRT_create()
+                                except:
+                                    tracker = cv2.legacy.TrackerCSRT_create()
+                                tracker.init(frame, (gx, gy, gw, gh))
+                                
+                                # Create Face Object
+                                new_face = Face("Scanning...", gx, gy, gw, gh, face_id, 0.0, tracker, person_id)
+                                new_face.is_recognizing = True
+                                
+                                with self.lock:
+                                    self.identified_faces[face_id] = new_face
+                                    print(f"[QUEUE] Created Face {face_id} and added to identified_faces")
 
                                 # Try to push to queue
                                 self.recognition_queue.put((face_id, face_img), block=False)
@@ -343,19 +361,7 @@ class DetectionSystem:
                                 self.next_face_id += 1
                                 print(f"[QUEUE] Pushed Face {face_id} for recognition")
 
-                                # Initialize Tracker
-                                try:
-                                    tracker = cv2.TrackerCSRT_create()
-                                except:
-                                    tracker = cv2.legacy.TrackerCSRT_create()
-                                tracker.init(frame, (gx, gy, gw, gh))
-
-                                # Create Face Object
-                                new_face = Face("Scanning...", gx, gy, gw, gh, face_id, 0.0, tracker, person_id)
-                                new_face.is_recognizing = True
-
-                                with self.lock:
-                                    self.identified_faces[face_id] = new_face
+                                
 
                                 detected_face_ids.append(face_id)
 
@@ -484,23 +490,23 @@ class DetectionSystem:
                 cv2.putText(frame, f"ID:{pid} {prim_face}", (px, py - 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
 
-                # Draw Faces
-                try:
-                    for face_obj in person_obj.faces.values():
-                        fx, fy, fw, fh = face_obj.x, face_obj.y, face_obj.w, face_obj.h
+                # # Draw Faces
+                # try:
+                #     for face_obj in person_obj.faces.values():
+                #         fx, fy, fw, fh = face_obj.x, face_obj.y, face_obj.w, face_obj.h
 
-                        if face_obj.is_recognizing:
-                            f_color = (0, 255, 255)  # Yellow
-                            label = "Scanning..."
-                        else:
-                            f_color = (0, 0, 255)  # Red
-                            label = f"{face_obj.name} ({face_obj.confidence:.2f})"
+                #         if face_obj.is_recognizing:
+                #             f_color = (0, 255, 255)  # Yellow
+                #             label = "Scanning..."
+                #         else:
+                #             f_color = (0, 0, 255)  # Red
+                #             label = f"{face_obj.name} ({face_obj.confidence:.2f})"
 
-                        cv2.rectangle(frame, (fx, fy), (fx + fw, fy + fh), f_color, 2)
-                        cv2.putText(frame, label, (fx, fy - 10),
-                                    cv2.FONT_HERSHEY_SIMPLEX, 0.5, f_color, 1)
-                except RuntimeError:
-                    pass
+                #         cv2.rectangle(frame, (fx, fy), (fx + fw, fy + fh), f_color, 2)
+                #         cv2.putText(frame, label, (fx, fy - 10),
+                #                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, f_color, 1)
+                # except RuntimeError:
+                #     pass
             
             # Send to PyQt
             if self.output_callback:

@@ -212,64 +212,103 @@ def calculate_face_quality(face_img):
     return quality_score
 
 
+# def recognize_face(face_img):
+#     """Compare a face with all users in the database."""
+#     print("Recognize with deepface::")
+#     try:
+#         # First check if the database has any entries
+#         if not any(os.path.isdir(os.path.join(db_path, d)) for d in os.listdir(db_path)):
+#             print("No users in database.")
+#             return "Unknown", 1.0
+
+#         best_match = "Unknown"
+#         best_confidence = 0.3
+
+#         # Use DeepFace's verify function with each user folder
+#         for user_folder in os.listdir(db_path):
+#             print("CHECKING USER FOLDER: ", user_folder)
+#             user_path = os.path.join(db_path, user_folder)
+#             if not os.path.isdir(user_path):
+#                 print("User folder does not exist, skipping.")
+#                 continue
+
+#             image_files = [f for f in os.listdir(user_path) if f.endswith(('.jpg', '.jpeg', '.png'))]
+#             if not image_files:
+#                 print("No images in user folder, skipping.")
+#                 continue
+#             print("Found image files: ", image_files)
+
+#             # Try to verify against multiple reference images in the folder
+#             for img_file in image_files[:3]:  # Check up to 3 images per user for speed
+#                 reference_img = os.path.join(user_path, img_file)
+#                 try:
+#                     print("Verifying with image: ")
+#                     result = DeepFace.verify(img1_path=face_img,
+#                                              img2_path=reference_img,
+#                                              enforce_detection=False,
+#                                              model_name="ArcFace",
+#                                              detector_backend="skip") #VGG-Face or any other model. please rever the doc inside the project folder
+                    
+#                     print("result: ", result)
+
+#                     if result["verified"] and (result["distance"] < best_confidence):
+#                         best_match = user_folder
+#                         best_confidence = result["distance"]
+#                         # If we found a very good match, break early
+#                         if best_confidence < 0.2:
+#                             break
+#                 except Exception as e:
+#                     print(f"Error verifying with image {img_file}: {e}")
+#                     continue
+
+#             # If we found a very good match, break out of user loop too
+#             if best_confidence < 0.2:
+#                 break
+
+#         return best_match, best_confidence
+#     except Exception as e:
+#         print(f"Recognition error: {e}")
+#         return "Unknown", 1.0
+
 def recognize_face(face_img):
-    """Compare a face with all users in the database."""
+    """
+    Compare a face with all users in the database using DeepFace.find
+    This is much faster than looping through verify().
+    """
     print("Recognize with deepface::")
     try:
-        # First check if the database has any entries
-        if not any(os.path.isdir(os.path.join(db_path, d)) for d in os.listdir(db_path)):
-            print("No users in database.")
-            return "Unknown", 1.0
+        # Check if DB has users
+        if not os.path.exists(db_path) or not os.listdir(db_path):
+             return "Unknown", 1.0
 
-        best_match = "Unknown"
-        best_confidence = 0.3
+        # DeepFace.find automatically searches the DB_PATH
+        # It returns a list of pandas dataframes
+        dfs = DeepFace.find(img_path=face_img, 
+                            db_path=db_path, 
+                            model_name="ArcFace", 
+                            detector_backend="skip", 
+                            enforce_detection=False, 
+                            silent=True)
+        
+        if len(dfs) > 0 and not dfs[0].empty:
+            # Get the first result (closest match)
+            match = dfs[0].iloc[0]
+            identity_path = match['identity']
+            distance = match['distance'] # Lower is better
+            
+            # The identity_path will be something like "Faces_db/User_Name/image.jpg"
+            # We need to extract just the "User_Name" folder
+            user_folder = os.path.basename(os.path.dirname(identity_path))
+            
+            # ArcFace threshold is usually around 0.68, but for strict matching use 0.4 or 0.5
+            if distance < 0.5: 
+                return user_folder, distance
+                
+        return "Unknown", 1.0
 
-        # Use DeepFace's verify function with each user folder
-        for user_folder in os.listdir(db_path):
-            print("CHECKING USER FOLDER: ", user_folder)
-            user_path = os.path.join(db_path, user_folder)
-            if not os.path.isdir(user_path):
-                print("User folder does not exist, skipping.")
-                continue
-
-            image_files = [f for f in os.listdir(user_path) if f.endswith(('.jpg', '.jpeg', '.png'))]
-            if not image_files:
-                print("No images in user folder, skipping.")
-                continue
-            print("Found image files: ", image_files)
-
-            # Try to verify against multiple reference images in the folder
-            for img_file in image_files[:3]:  # Check up to 3 images per user for speed
-                reference_img = os.path.join(user_path, img_file)
-                try:
-                    print("Verifying with image: ")
-                    result = DeepFace.verify(img1_path=face_img,
-                                             img2_path=reference_img,
-                                             enforce_detection=False,
-                                             model_name="ArcFace",
-                                             detector_backend="skip") #VGG-Face or any other model. please rever the doc inside the project folder
-                    
-                    print("result: ", result)
-
-                    if result["verified"] and (result["distance"] < best_confidence):
-                        best_match = user_folder
-                        best_confidence = result["distance"]
-                        # If we found a very good match, break early
-                        if best_confidence < 0.2:
-                            break
-                except Exception as e:
-                    print(f"Error verifying with image {img_file}: {e}")
-                    continue
-
-            # If we found a very good match, break out of user loop too
-            if best_confidence < 0.2:
-                break
-
-        return best_match, best_confidence
     except Exception as e:
         print(f"Recognition error: {e}")
         return "Unknown", 1.0
-
 
 def update_user_faces(user_folder, face_img, quality_score):
     """Update a user's face database with better quality images."""
