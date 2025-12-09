@@ -211,11 +211,13 @@ class DetectionSystem:
 
     def initialize_models(self):
         """Initialize and load all models."""
-        # Note: 'global' keywords are gone. We use 'self.'
+    
+        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         self.yolo_model = YOLO("yolov8n.pt")
         self.yolo_face_model = YOLO("yolov11n-face.pt")
-
-        device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        self.yolo_model.to(device=device)
+        self.yolo_face_model.to(device=device)
+        
         self.reid_model = ReIDModel().to(device)
         self.reid_model.eval()
 
