@@ -210,6 +210,7 @@ class DetectionSystem:
                 face_id_key, face_img = task
                 
                 name, confidence = recognize_face(face_img=face_img)
+                # face_id, confidence = "Unknown", 1.0  # Placeholder for actual recognition
                 
                 # 2. Update Logic
                 with self.lock:

@@ -214,6 +214,7 @@ def calculate_face_quality(face_img):
     return quality_score
 
 def recognize_face(face_img):
+    print("recognize_face called")
     """
     Compare a face with all users in the database using DeepFace.find
     This is much faster than looping through verify().
@@ -321,6 +322,7 @@ def recognize_face(face_img):
         
 def update_user_faces(user_folder, face_img):
     """Update a user's face database with better quality images."""
+    print("Inside update_user_faces function")
     
     global DB_UPDATED
     
