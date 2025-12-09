@@ -5,15 +5,17 @@ import math
 import threading
 import time
 import queue
+import psutil
 import numpy as np
 
 # --- IMPORTS ---
-from DataModel.face_detection import * 
+from DataModel.face_detection import update_user_faces
 from DataModel.Reid_model import ReIDModel
 from ultralytics import YOLO
 from deep_sort_realtime.deepsort_tracker import DeepSort
 import torch
 from torchvision.transforms import transforms
+from DataModel.EmbeddingCache import EmbeddingCache
 
 class Person:
     def __init__(self, person_id, x, y, w, h, confidence):
@@ -89,8 +91,12 @@ class DetectionSystem:
         self.db_path = db_path
         os.makedirs(self.db_path, exist_ok=True)
         
+        self.EmbeddingCache = None  # Placeholder for EmbeddingCache instance
+        
         self.camera_buffer = camera_buffer
         self.output_callback = output_callback 
+        
+        self.process = psutil.Process(os.getpid())
 
         # Configuration
         self.CONFIDENCE_THRESHOLD = 0.3
@@ -142,14 +148,33 @@ class DetectionSystem:
 
         print("[INFO] System initialized successfully.")
 
+    def log_resource_usage(self):
+        # CPU usage of the process (as a percentage of one CPU core)
+        cpu_percent = self.process.cpu_percent(interval=None) 
+        
+        # RAM usage of the process (Resident Set Size - non-swapped physical memory)
+        ram_bytes = self.process.memory_info().rss
+        ram_mb = ram_bytes / (1024 * 1024) 
+        
+        # Log the data
+        log_message = f"CPU: {cpu_percent:.2f}%, RAM: {ram_mb:.2f} MB"
+        print(f"[RESOURCE USAGE] {log_message}")
+
     def initialize_models(self):
+        
         self.yolo_model = YOLO("yolov8n.pt")
         self.yolo_face_model = YOLO("yolov11n-face.pt")
+        
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
+        # Initialize EmbeddingCache
+        self.EmbeddingCache = EmbeddingCache(db_path=self.db_path)  # Initialize EmbeddingCache
         self.reid_model = ReIDModel().to(device)
         self.reid_model.eval()
+        
         self.person_tracker = DeepSort(max_age=self.PERSON_TRACKING_MAX_AGE, n_init=self.PERSON_TRACKING_N_INIT)
         print("[INFO] Models loaded.")
+        self.log_resource_usage()
 
     def get_next_available_face_id(self):
         """Scans Faces_db to find the next 'User_X' ID"""
@@ -209,7 +234,7 @@ class DetectionSystem:
                 task = self.recognition_queue.get(timeout=1.0)
                 face_id_key, face_img = task
                 
-                name, confidence = recognize_face(face_img=face_img)
+                name, confidence = self.EmbeddingCache.find_match(face_img)
                 # face_id, confidence = "Unknown", 1.0  # Placeholder for actual recognition
                 
                 # 2. Update Logic
@@ -231,6 +256,8 @@ class DetectionSystem:
                         
                         update_user_faces(new_folder_name,face_img=face_img)
                         
+                        self.EmbeddingCache.add_new_user(new_folder_name, face_img)
+                        
                         # Update live object name
                         face_obj.name = new_folder_name
                         
@@ -243,6 +270,9 @@ class DetectionSystem:
                     # Known match
                     face_obj.name = name
                     face_obj.confidence = confidence
+                    
+                    # Add a feature based database update here if needed
+                
                 face_obj.is_recognizing = False # Unlock flag
                     
             except queue.Empty:
@@ -369,6 +399,7 @@ class DetectionSystem:
 
     def processing_thread_function(self):
         print("[THREAD] Processing thread started")
+        self.log_resource_usage()
         
         while not self.stop_event.is_set():
             try:
@@ -389,6 +420,8 @@ class DetectionSystem:
                         continue
 
                 self.frame_count += 1
+                
+                print(f"[PROCESSING] Processing frame using yolo_model...")
 
                 # 1. Detect persons using YOLO
                 results = self.yolo_model(frame, verbose=False)
@@ -400,6 +433,8 @@ class DetectionSystem:
                             conf = float(box.conf[0])
                             if conf >= self.PERSON_CONFIDENCE_THRESHOLD:
                                 detections.append(([x1, y1, x2 - x1, y2 - y1], conf, 0))
+                
+                print(f"[PROCESSING] Detected {len(detections)} persons")
 
                 # 2. Update person tracker
                 tracks = self.person_tracker.update_tracks(detections, frame=frame)
