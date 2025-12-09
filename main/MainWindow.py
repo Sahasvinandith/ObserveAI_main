@@ -73,6 +73,7 @@ class MainWindow(QMainWindow):
         self.save_map_btn.clicked.connect(self.save_layout)
         self.load_map_btn.clicked.connect(self.load_layout)
         self.db_btn.clicked.connect(self.show_database_page)
+        self.logs_btn.clicked.connect(lambda: self.Content_stack.setCurrentIndex(3))
     
     def setup_database_page(self):
         """

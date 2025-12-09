@@ -67,6 +67,13 @@ class Ui_MainWindow(object):
 
         self.verticalLayout.addWidget(self.db_btn)
 
+        self.logs_btn = QPushButton(self.Menubar)
+        self.logs_btn.setObjectName(u"logs_btn")
+        sizePolicy1.setHeightForWidth(self.logs_btn.sizePolicy().hasHeightForWidth())
+        self.logs_btn.setSizePolicy(sizePolicy1)
+
+        self.verticalLayout.addWidget(self.logs_btn)
+
 
         self.gridLayout.addWidget(self.Menubar, 0, 0, 1, 1)
 
@@ -195,12 +202,13 @@ class Ui_MainWindow(object):
         self.database_page.setObjectName(u"database_page")
         self.horizontalLayout_3 = QHBoxLayout(self.database_page)
         self.horizontalLayout_3.setObjectName(u"horizontalLayout_3")
-        self.label_4 = QLabel(self.database_page)
-        self.label_4.setObjectName(u"label_4")
-
-        self.horizontalLayout_3.addWidget(self.label_4)
-
         self.Content_stack.addWidget(self.database_page)
+        self.page = QWidget()
+        self.page.setObjectName(u"page")
+        self.label = QLabel(self.page)
+        self.label.setObjectName(u"label")
+        self.label.setGeometry(QRect(258, 300, 161, 81))
+        self.Content_stack.addWidget(self.page)
 
         self.horizontalLayout.addWidget(self.Content_stack)
 
@@ -215,7 +223,7 @@ class Ui_MainWindow(object):
         self.retranslateUi(MainWindow)
         self.cam_set_btn.pressed.connect(self.Content_stack.lower)
 
-        self.Content_stack.setCurrentIndex(1)
+        self.Content_stack.setCurrentIndex(3)
 
 
         QMetaObject.connectSlotsByName(MainWindow)
@@ -226,11 +234,12 @@ class Ui_MainWindow(object):
         self.cam_set_btn.setText(QCoreApplication.translate("MainWindow", u"Camera settings", None))
         self.cam_feed_btn.setText(QCoreApplication.translate("MainWindow", u"Camera feed", None))
         self.db_btn.setText(QCoreApplication.translate("MainWindow", u"Database", None))
+        self.logs_btn.setText(QCoreApplication.translate("MainWindow", u"Logs", None))
         self.label_2.setText(QCoreApplication.translate("MainWindow", u"Camera settings page", None))
         self.add_camera_btn.setText(QCoreApplication.translate("MainWindow", u"Add Camera", None))
         self.add_wall_btn.setText(QCoreApplication.translate("MainWindow", u"Add Wall", None))
         self.save_map_btn.setText(QCoreApplication.translate("MainWindow", u"Save Map", None))
         self.load_map_btn.setText(QCoreApplication.translate("MainWindow", u"Load Map", None))
-        self.label_4.setText(QCoreApplication.translate("MainWindow", u"Database", None))
+        self.label.setText(QCoreApplication.translate("MainWindow", u"Logs page", None))
     # retranslateUi
 

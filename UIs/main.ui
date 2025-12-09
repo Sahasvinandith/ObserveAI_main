@@ -81,6 +81,19 @@
          </property>
         </widget>
        </item>
+       <item>
+        <widget class="QPushButton" name="logs_btn">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
+           <horstretch>0</horstretch>
+           <verstretch>2</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>Logs</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
     </item>
@@ -105,7 +118,7 @@
        <item>
         <widget class="QStackedWidget" name="Content_stack">
          <property name="currentIndex">
-          <number>2</number>
+          <number>3</number>
          </property>
          <widget class="QWidget" name="cam_settings_page">
           <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -276,6 +289,21 @@ border-color: rgb(34, 34, 34);</string>
          </widget>
          <widget class="QWidget" name="database_page">
           <layout class="QHBoxLayout" name="horizontalLayout_3"/>
+         </widget>
+         <widget class="QWidget" name="page">
+          <widget class="QLabel" name="label">
+           <property name="geometry">
+            <rect>
+             <x>258</x>
+             <y>300</y>
+             <width>161</width>
+             <height>81</height>
+            </rect>
+           </property>
+           <property name="text">
+            <string>Logs page</string>
+           </property>
+          </widget>
          </widget>
         </widget>
        </item>
