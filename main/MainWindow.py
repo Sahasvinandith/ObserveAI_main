@@ -223,8 +223,10 @@ class MainWindow(QMainWindow):
         self.feed_widgets[name] = list_widget
         self.grid_feed_widgets[name] = grid_widget
         self.scene_cameras[name] = cam_item
+
         
         # --- 7. Start the Thread ---
+        print(f"Starting camera worker thread for: {name}")
         qt_thread.start()
         
         # =========================================================
@@ -242,6 +244,7 @@ class MainWindow(QMainWindow):
         
         # Store it
         self.ai_instances[name] = ai_sys
+        
         
         # Create and Start the AI Thread
         ai_thread = threading.Thread(target=ai_sys.start, daemon=True)

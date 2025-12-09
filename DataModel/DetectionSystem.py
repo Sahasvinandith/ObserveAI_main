@@ -268,9 +268,12 @@ class DetectionSystem:
     # --- 2. CAMERA THREAD ---
     def camera_thread_function(self):
         print("[THREAD] Camera thread started")
+        print(f"stop event is set: {self.stop_event.is_set()}")
         while not self.stop_event.is_set():
             try:
+                print(f"[CAM THREAD] trying to access camera buffer")
                 with self.lock:
+                    print(f"[CAM THREAD] camera buffer accessible")
                     if self.camera_buffer and not self.camera_buffer.empty():
                         frame = self.camera_buffer.get()
                     else:
@@ -284,7 +287,9 @@ class DetectionSystem:
                     except: pass
                 self.frame_queue.put(frame, block=False)
                 time.sleep(0.03)
-            except: time.sleep(0.1)
+            except Exception as e:
+                print(f"[CAM THREAD ERROR] {e}")
+                time.sleep(0.1)
 
     
     def process_faces_in_person(self, frame, person_bbox, person_id):

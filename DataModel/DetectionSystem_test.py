@@ -174,6 +174,7 @@ class DetectionSystem:
         
         self.person_tracker = DeepSort(max_age=self.PERSON_TRACKING_MAX_AGE, n_init=self.PERSON_TRACKING_N_INIT)
         print("[INFO] Models loaded.")
+        time.sleep(3.0)
         self.log_resource_usage()
 
     def get_next_available_face_id(self):
@@ -192,23 +193,26 @@ class DetectionSystem:
 
     def start(self):
         print("[INFO] Starting all threads...")
-        self.stop_event.clear()
+        try:    
+            self.stop_event.clear()
 
-        self.cam_thread = threading.Thread(target=self.camera_thread_function, daemon=True)
-        self.cam_thread.start()
+            self.cam_thread = threading.Thread(target=self.camera_thread_function, daemon=True)
+            self.cam_thread.start()
 
-        self.proc_thread = threading.Thread(target=self.processing_thread_function, daemon=True)
-        self.proc_thread.start()
+            self.proc_thread = threading.Thread(target=self.processing_thread_function, daemon=True)
+            self.proc_thread.start()
 
-        # RESTORED: Recognition Worker Thread
-        self.recog_thread = threading.Thread(target=self.recognition_worker_function, daemon=True)
-        self.recog_thread.start()
+            # RESTORED: Recognition Worker Thread
+            self.recog_thread = threading.Thread(target=self.recognition_worker_function, daemon=True)
+            self.recog_thread.start()
 
-        self.disp_thread = threading.Thread(target=self.display_thread_function, daemon=True)
-        self.disp_thread.start()
+            self.disp_thread = threading.Thread(target=self.display_thread_function, daemon=True)
+            self.disp_thread.start()
 
-        self.watchdog_thread = threading.Thread(target=self.watchdog_thread_function, daemon=True)
-        self.watchdog_thread.start()
+            self.watchdog_thread = threading.Thread(target=self.watchdog_thread_function, daemon=True)
+            self.watchdog_thread.start()
+        except Exception as e:
+            print(f"[ERROR] Failed to start threads: {e}")
 
     def stop(self):
         print("[INFO] Stopping all threads...")
@@ -299,7 +303,9 @@ class DetectionSystem:
                     except: pass
                 self.frame_queue.put(frame, block=False)
                 time.sleep(0.03)
-            except: time.sleep(0.1)
+            except Exception as e:
+                print(f"[CAM THREAD ERROR] {e}")
+                time.sleep(0.1)
 
     
     def process_faces_in_person(self, frame, person_bbox, person_id):
