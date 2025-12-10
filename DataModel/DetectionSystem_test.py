@@ -402,7 +402,7 @@ class DetectionSystem:
 
         return detected_face_ids
         
-
+# Need to check the processing thread function for lag fixes
     def processing_thread_function(self):
         print("[THREAD] Processing thread started")
         self.log_resource_usage()
