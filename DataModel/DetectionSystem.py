@@ -6,6 +6,7 @@ import threading
 import time
 import queue
 import numpy as np
+import psutil
 
 # --- IMPORTS ---
 from DataModel.face_detection import * 
@@ -89,6 +90,8 @@ class DetectionSystem:
         self.db_path = db_path
         os.makedirs(self.db_path, exist_ok=True)
         
+        self.process = psutil.Process(os.getpid())
+        
         self.camera_buffer = camera_buffer
         self.output_callback = output_callback 
 
@@ -141,6 +144,18 @@ class DetectionSystem:
         self.watchdog_thread = None
 
         print("[INFO] System initialized successfully.")
+    
+    def log_resource_usage(self):
+        # CPU usage of the process (as a percentage of one CPU core)
+        cpu_percent = self.process.cpu_percent(interval=None) 
+        
+        # RAM usage of the process (Resident Set Size - non-swapped physical memory)
+        ram_bytes = self.process.memory_info().rss
+        ram_mb = ram_bytes / (1024 * 1024) 
+        
+        # Log the data
+        log_message = f"CPU: {cpu_percent:.2f}%, RAM: {ram_mb:.2f} MB"
+        print(f"[RESOURCE USAGE] {log_message}")
 
     def initialize_models(self):
         self.yolo_model = YOLO("yolov8n.pt")
@@ -253,9 +268,12 @@ class DetectionSystem:
     # --- 2. CAMERA THREAD ---
     def camera_thread_function(self):
         print("[THREAD] Camera thread started")
+        print(f"stop event is set: {self.stop_event.is_set()}")
         while not self.stop_event.is_set():
             try:
+                print(f"[CAM THREAD] trying to access camera buffer")
                 with self.lock:
+                    print(f"[CAM THREAD] camera buffer accessible")
                     if self.camera_buffer and not self.camera_buffer.empty():
                         frame = self.camera_buffer.get()
                     else:
@@ -269,7 +287,9 @@ class DetectionSystem:
                     except: pass
                 self.frame_queue.put(frame, block=False)
                 time.sleep(0.03)
-            except: time.sleep(0.1)
+            except Exception as e:
+                print(f"[CAM THREAD ERROR] {e}")
+                time.sleep(0.1)
 
     
     def process_faces_in_person(self, frame, person_bbox, person_id):
@@ -369,6 +389,7 @@ class DetectionSystem:
 
     def processing_thread_function(self):
         print("[THREAD] Processing thread started")
+        self.log_resource_usage()
         
         while not self.stop_event.is_set():
             try:

@@ -34,61 +34,65 @@ class CameraWorker(QObject):
         """
         cap = None
         
-        # --- 1. Connection Phase ---
-        print(f"[{self.name}] Worker thread: Trying to connect...")
-        url_to_try = self.url_int if self.url_int is not None else self.url_str
-        cap = cv2.VideoCapture(url_to_try)
+        try:
         
-        if not cap or not cap.isOpened():
-            self.connectionFailed.emit(f"Failed to open:\n{self.url_str}")
-            return # Stop the thread
-        
-        self.connectionSuccess.emit("Connected")
-        
-        # --- 2. Frame Grab Phase ---
-        while self.is_running:
-            ret, frame = cap.read()
+            # --- 1. Connection Phase ---
+            print(f"[{self.name}] Worker thread: Trying to connect...")
+            url_to_try = self.url_int if self.url_int is not None else self.url_str
+            cap = cv2.VideoCapture(url_to_try)
             
-            if not ret:
-                self.connectionFailed.emit("Camera disconnected")
-                self.is_running = False # Stop loop
-                break # Exit loop
+            if not cap or not cap.isOpened():
+                self.connectionFailed.emit(f"Failed to open:\n{self.url_str}")
+                return # Stop the thread
             
-            if self.frame_buffer:
-                try:
-                    # Put a *copy* in the queue
-                    self.frame_buffer.put_nowait(frame.copy())
-                except queue.Full:
-                    # Queue is full, drop the frame
-                    # You could also drop the *oldest* frame first, then add
+            self.connectionSuccess.emit("Connected")
+            
+            # --- 2. Frame Grab Phase ---
+            while self.is_running:
+                ret, frame = cap.read()
+                
+                if not ret:
+                    self.connectionFailed.emit("Camera disconnected")
+                    self.is_running = False # Stop loop
+                    break # Exit loop
+                
+                if self.frame_buffer:
                     try:
-                        self.frame_buffer.get_nowait() # Remove oldest
-                        self.frame_buffer.put_nowait(frame.copy()) # Add newest
-                    except queue.Empty:
-                        pass # Should not happen, but good to check
-                    
-                    
-                    # adding the captured frame as a Qimage and outputing in cameralist widget
-            try:
-                rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
-                h, w, ch = rgb_image.shape
-                bytes_per_line = ch * w
-                qt_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
-                self.frameReady.emit(qt_image)
-            except Exception as e:
-                print(f"Error converting frame for display: {e}")
+                        # Put a *copy* in the queue
+                        self.frame_buffer.put_nowait(frame.copy())
+                    except queue.Full:
+                        # Queue is full, drop the frame
+                        # You could also drop the *oldest* frame first, then add
+                        try:
+                            self.frame_buffer.get_nowait() # Remove oldest
+                            self.frame_buffer.put_nowait(frame.copy()) # Add newest
+                        except queue.Empty:
+                            pass # Should not happen, but good to check
+                        
+                        
+                        # adding the captured frame as a Qimage and outputing in cameralist widget
+                try:
+                    rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+                    h, w, ch = rgb_image.shape
+                    bytes_per_line = ch * w
+                    qt_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+                    self.frameReady.emit(qt_image)
+                except Exception as e:
+                    print(f"Error converting frame for display: {e}")
+                
+                
+                # A short sleep to prevent the thread from
+                # hogging 100% CPU if the camera is fast.
+                # QThread.msleep(10) # ~100 fps max
+                
+            # --- 3. Cleanup ---
+            if cap:
+                cap.release()
+            print(f"[{self.name}] Worker thread stopped.")
             
-            
-            # A short sleep to prevent the thread from
-            # hogging 100% CPU if the camera is fast.
-            # QThread.msleep(10) # ~100 fps max
-            
-        # --- 3. Cleanup ---
-        if cap:
-            cap.release()
-        print(f"[{self.name}] Worker thread stopped.")
-        
-        QThread.msleep(10) # ~100 FPS cap, adjust as needed
+            QThread.msleep(10) # ~100 FPS cap, adjust as needed
+        except Exception as e:
+            print(f"[{self.name}] Worker thread error: {e}")
 
     def stop(self):
         """
