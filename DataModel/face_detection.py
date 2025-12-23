@@ -18,7 +18,7 @@ QUALITY_THRESHOLD = 100  # Minimum quality score to save face (higher is better)
 FRAME_QUEUE_SIZE = 10  # Size of frame queue between threads
 
 # Feature detector for ORB
-orb = cv2.ORB_create(nfeatures=100, scaleFactor=1.2, WTA_K=2, scoreType=cv2.ORB_HARRIS_SCORE)
+# orb = cv2.ORB_create(nfeatures=100, scaleFactor=1.2, WTA_K=2, scoreType=cv2.ORB_HARRIS_SCORE)
 
 
 def create_kalman_filter():

@@ -43,10 +43,12 @@ class Person:
         # Prioritize faces that are NOT scanning and NOT unknown if possible
         valid_faces = [f for f in self.faces.values() if f.name != "Scanning..." and f.name != "Unknown"]
         if valid_faces:
-            return valid_faces[0].name
+            # Choose the face with highest confidence among valid faces
+            best_valid = max(valid_faces, key=lambda f: f.confidence)
+            return best_valid.name
             
-        # Fallback
-        best_face = min(self.faces.values(), key=lambda f: f.confidence)
+        # Fallback: pick the most confident face overall
+        best_face = max(self.faces.values(), key=lambda f: f.confidence)
         return best_face.name
 
 
@@ -191,6 +193,45 @@ class DetectionSystem:
         except: return 1
         return highest_id + 1
 
+    def _create_tracker(self):
+        """Create a tracker using multiple fallbacks. Returns a tracker instance or None.
+        Tries CSRT first (preferred), then falls back to KCF, MOSSE, or the generic factory.
+        """
+        # Preferred: CSRT
+        try:
+            # Newer OpenCV: cv2.TrackerCSRT_create()
+            return cv2.TrackerCSRT_create()
+        except Exception:
+            pass
+        try:
+            # Another variant: cv2.TrackerCSRT.create()
+            return cv2.TrackerCSRT.create()
+        except Exception:
+            pass
+        try:
+            # Some builds expose it under legacy
+            return cv2.legacy.TrackerCSRT_create()
+        except Exception:
+            pass
+
+        # Fallbacks: try KCF, MOSSE, or generic factory
+        try:
+            return cv2.TrackerKCF_create()
+        except Exception:
+            pass
+        try:
+            return cv2.TrackerMOSSE_create()
+        except Exception:
+            pass
+        try:
+            # Older OpenCV had a generic factory
+            return cv2.Tracker_create('CSRT')
+        except Exception:
+            pass
+
+        print('[TRACKER] No suitable tracker factory found. Please install opencv-contrib-python or use a build with trackers enabled.')
+        return None
+
     def start(self):
         print("[INFO] Starting all threads...")
         try:    
@@ -243,41 +284,45 @@ class DetectionSystem:
                 
                 # 2. Update Logic
                 with self.lock:
-                    if face_id_key in self.identified_faces:
-                        face_obj = self.identified_faces[face_id_key]
-                    else:
+                    face_obj = self.identified_faces.get(face_id_key)
+                    if face_obj is None:
                         print(f"[RECOG WORKER] Face ID {face_id_key} not found in identified_faces.")
-                        print(f"[RECOG WORKER] Identifaed Faces Keys: {list(self.identified_faces.keys())}")
-                        
+                        print(f"[RECOG WORKER] Identified Faces Keys: {list(self.identified_faces.keys())}")
+                # If the face was removed while queued for recognition, skip it
+                if face_obj is None:
+                    continue
+
                 # --- LOGIC: Handle New User ---
-                
                 if name == "Unknown":
                     try:
                         # Generate next ID safely
                         new_id_num = self.get_next_available_face_id()
                         new_folder_name = f"User_{new_id_num}"
                         print(f"[STORAGE] Assigning New User ID: {new_folder_name}")
-                        
-                        update_user_faces(new_folder_name,face_img=face_img)
-                        
+
+                        update_user_faces(new_folder_name, face_img=face_img)
+
                         self.EmbeddingCache.add_new_user(new_folder_name, face_img)
-                        
-                        # Update live object name
-                        face_obj.name = new_folder_name
-                        
-                        # Increment internal counter to reduce scanning conflict
-                        # (Though get_next_available is safest)
+
+                        # Update live object name under lock
+                        with self.lock:
+                            face_obj.name = new_folder_name
+
                     except Exception as e:
                         print(f"[ERROR] Failed to save new user: {e}")
-                        face_obj.name = "Unknown"
+                        with self.lock:
+                            face_obj.name = "Unknown"
                 else:
-                    # Known match
-                    face_obj.name = name
-                    face_obj.confidence = confidence
-                    
-                    # Add a feature based database update here if needed
-                
-                face_obj.is_recognizing = False # Unlock flag
+                    # Known match: update under lock
+                    with self.lock:
+                        face_obj.name = name
+                        face_obj.confidence = confidence
+
+                        # Add a feature based database update here if needed
+
+                # Unlock flag under lock
+                with self.lock:
+                    face_obj.is_recognizing = False
                     
             except queue.Empty:
                 continue
@@ -320,7 +365,12 @@ class DetectionSystem:
         active_tracked_faces = []
         
         for face_obj in person_faces:
-            success, bbox = face_obj.tracker.update(frame)
+            try:
+                success, bbox = face_obj.tracker.update(frame)
+            except Exception as e:
+                # Tracker failed; skip this face for now
+                print(f"[TRACKER ERROR] face_id {face_obj.face_id}: {e}")
+                continue
             if success:
                 x, y, w, h = [int(v) for v in bbox]
                 face_obj.position_update(x, y, w, h)
@@ -369,11 +419,28 @@ class DetectionSystem:
                                 face_id = str(self.next_face_id)
                                 
                                 # Initialize Tracker
+                                # Create tracker using helper with robust fallbacks
+                                tracker = self._create_tracker()
+                                if tracker is None:
+                                    print(f"[TRACKER] Could not create a tracker for face {face_id}; skipping face.")
+                                    continue
                                 try:
-                                    tracker = cv2.TrackerCSRT_create()
-                                except:
-                                    tracker = cv2.legacy.TrackerCSRT_create()
-                                tracker.init(frame, (gx, gy, gw, gh))
+                                    tracker.init(frame, (gx, gy, gw, gh))
+                                except Exception as e:
+                                    print(f"[TRACKER INIT ERROR] face_id {face_id}: {e}")
+                                    # If init fails, try a different tracker once
+                                    alt = None
+                                    try:
+                                        alt = cv2.TrackerKCF_create()
+                                    except Exception:
+                                        pass
+                                    if alt is not None:
+                                        try:
+                                            alt.init(frame, (gx, gy, gw, gh))
+                                            tracker = alt
+                                        except Exception as e2:
+                                            print(f"[TRACKER INIT ERROR] alternative tracker failed: {e2}")
+                                            continue
                                 
                                 # Create Face Object
                                 new_face = Face("Scanning...", gx, gy, gw, gh, face_id, 0.0, tracker, person_id)
@@ -470,9 +537,10 @@ class DetectionSystem:
                     # 4. Process faces (The new Async Logic)
                     face_ids = self.process_faces_in_person(frame, (l, t, w, h), tid)
 
-                    # Link faces to person
-                    self.tracked_persons[tid].faces = {fid: self.identified_faces[fid] for fid in face_ids if
-                                                       fid in self.identified_faces}
+                    # Link faces to person (read under lock to avoid races with recognition worker)
+                    with self.lock:
+                        self.tracked_persons[tid].faces = {fid: self.identified_faces[fid] for fid in face_ids if
+                                                           fid in self.identified_faces}
 
                 # 5. Cleanup
                 with self.lock:
