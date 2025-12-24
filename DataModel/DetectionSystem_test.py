@@ -496,8 +496,6 @@ class DetectionSystem:
                         continue
 
                 self.frame_count += 1
-                
-                print(f"[PROCESSING] Processing frame using yolo_model...")
 
                 # 1. Detect persons using YOLO
                 results = self.yolo_model(frame, verbose=False)
@@ -509,8 +507,6 @@ class DetectionSystem:
                             conf = float(box.conf[0])
                             if conf >= self.PERSON_CONFIDENCE_THRESHOLD:
                                 detections.append(([x1, y1, x2 - x1, y2 - y1], conf, 0))
-                
-                print(f"[PROCESSING] Detected {len(detections)} persons")
 
                 # 2. Update person tracker
                 tracks = self.person_tracker.update_tracks(detections, frame=frame)

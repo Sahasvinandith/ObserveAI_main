@@ -173,7 +173,11 @@ class MainWindow(QMainWindow):
         grid_widget = GridFeedWidget(name)
         cam_item = CameraItem(name=name, url=url)
         
-        # --- 3. Connect Worker Signals to UI Slots ---
+        # --- 3. Pass Worker References to Widgets (for refresh capability) ---
+        list_widget.worker = worker
+        grid_widget.worker = worker
+        
+        # --- 4. Connect Worker Signals to UI Slots ---
         # When worker gets a frame, update BOTH widgets
         worker.frameReady.connect(list_widget.update_frame)
         
@@ -189,13 +193,13 @@ class MainWindow(QMainWindow):
         worker.finished.connect(worker.deleteLater)
         qt_thread.finished.connect(qt_thread.deleteLater)
 
-        # --- 4. Connect Grid Widget's Maximize Signal ---
+        # --- 5. Connect Grid Widget's Maximize Signal ---
         # Use lambda to pass the widget itself to the slot
         grid_widget.toggle_maximize.connect(
             lambda: self.handle_maximize_toggle(grid_widget)
         )
 
-        # --- 5. Add Widgets to Layouts ---
+        # --- 6. Add Widgets to Layouts ---
         # Add to List (cam_list)
         item = QListWidgetItem()
         item.setSizeHint(list_widget.sizeHint())
@@ -217,7 +221,7 @@ class MainWindow(QMainWindow):
         # This is the `feed_grid_layout` you named in Qt Designer
         self.cam_feed_layout.addWidget(grid_widget, row, col)
 
-        # --- 6. Store Objects in Trackers ---
+        # --- 7. Store Objects in Trackers ---
         self.camera_buffers[name] = frame_buffer
         self.camera_threads[name] = qt_thread
         self.camera_workers[name] = worker
@@ -226,12 +230,12 @@ class MainWindow(QMainWindow):
         self.scene_cameras[name] = cam_item
 
         
-        # --- 7. Start the Thread ---
+        # --- 8. Start the Thread ---
         print(f"Starting camera worker thread for: {name}")
         qt_thread.start()
         
         # =========================================================
-        # --- 8. AUTO-START AI DETECTION SYSTEM ---
+        # --- 9. AUTO-START AI DETECTION SYSTEM ---
         # =========================================================
         print(f"Initializing AI System for Camera{name}...")
         

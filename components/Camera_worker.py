@@ -22,6 +22,7 @@ class CameraWorker(QObject):
         self.url_str = url
         self.frame_buffer = frame_buffer
         self.is_running = True # Flag to control the loop
+        self.should_reconnect = False  # Flag to trigger reconnection attempt
 
         try:
             self.url_int = int(self.url_str)
@@ -43,18 +44,44 @@ class CameraWorker(QObject):
             
             if not cap or not cap.isOpened():
                 self.connectionFailed.emit(f"Failed to open:\n{self.url_str}")
-                return # Stop the thread
-            
-            self.connectionSuccess.emit("Connected")
+                cap = None
+            else:
+                self.connectionSuccess.emit("Connected")
             
             # --- 2. Frame Grab Phase ---
             while self.is_running:
+                # Check if reconnection is requested
+                if self.should_reconnect:
+                    print(f"[{self.name}] Reconnection attempt requested...")
+                    self.should_reconnect = False
+                    
+                    # Release old connection if it exists
+                    if cap is not None:
+                        cap.release()
+                        cap = None
+                    
+                    # Try to reconnect
+                    cap = cv2.VideoCapture(url_to_try)
+                    if not cap or not cap.isOpened():
+                        self.connectionFailed.emit(f"Reconnection failed:\n{self.url_str}")
+                        cap = None
+                    else:
+                        self.connectionSuccess.emit("Reconnected")
+                
+                # Only try to grab frames if connected
+                if cap is None or not cap.isOpened():
+                    QThread.msleep(500)  # Wait a bit before trying again
+                    continue
+                    
                 ret, frame = cap.read()
                 
                 if not ret:
                     self.connectionFailed.emit("Camera disconnected")
-                    self.is_running = False # Stop loop
-                    break # Exit loop
+                    if cap is not None:
+                        cap.release()
+                        cap = None
+                    QThread.msleep(500)  # Wait before attempting reconnection
+                    continue
                 
                 if self.frame_buffer:
                     try:
@@ -70,7 +97,7 @@ class CameraWorker(QObject):
                             pass # Should not happen, but good to check
                         
                         
-                        # adding the captured frame as a Qimage and outputing in cameralist widget
+                # adding the captured frame as a Qimage and outputing in cameralist widget
                 try:
                     rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     h, w, ch = rgb_image.shape
@@ -80,17 +107,13 @@ class CameraWorker(QObject):
                 except Exception as e:
                     print(f"Error converting frame for display: {e}")
                 
-                
-                # A short sleep to prevent the thread from
-                # hogging 100% CPU if the camera is fast.
-                # QThread.msleep(10) # ~100 fps max
-                
+                QThread.msleep(10) # ~100 FPS cap, adjust as needed
+            
             # --- 3. Cleanup ---
             if cap:
                 cap.release()
             print(f"[{self.name}] Worker thread stopped.")
             
-            QThread.msleep(10) # ~100 FPS cap, adjust as needed
         except Exception as e:
             print(f"[{self.name}] Worker thread error: {e}")
 
@@ -100,3 +123,11 @@ class CameraWorker(QObject):
         """
         print(f"[{self.name}] stop() called.")
         self.is_running = False
+    
+    def restart(self):
+        """
+        Request a reconnection attempt without stopping the thread.
+        This is the minimum-CPU-cost way to refresh the camera connection.
+        """
+        print(f"[{self.name}] restart() called - requesting reconnection.")
+        self.should_reconnect = True

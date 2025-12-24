@@ -2,7 +2,7 @@ from PyQt6.QtWidgets import (
     QWidget, QVBoxLayout, QHBoxLayout, QLabel, 
     QToolButton, QFrame, QSizePolicy
 )
-from PyQt6.QtCore import pyqtSignal, Qt, QSize
+from PyQt6.QtCore import pyqtSignal, Qt, QSize, pyqtSlot
 from PyQt6.QtGui import QImage, QPixmap
 
 class GridFeedWidget(QWidget):
@@ -17,6 +17,7 @@ class GridFeedWidget(QWidget):
     def __init__(self, camera_name: str, parent=None):
         super().__init__(parent)
         self.camera_name = camera_name
+        self.worker = None  # Will be set by MainWindow after creation
         
         # --- Set Size Policy and Minimum Size ---
         # This is for your "smart sizing" requirement.
@@ -45,6 +46,16 @@ class GridFeedWidget(QWidget):
         self.title_label = QLabel(self.camera_name)
         self.title_label.setStyleSheet("color: white; font-weight: bold;")
         
+        self.refresh_button = QToolButton(self)
+        self.refresh_button.setText("↻")  # Refresh symbol
+        self.refresh_button.setToolTip("Refresh Camera Connection")
+        self.refresh_button.setStyleSheet("""
+            QToolButton { color: white; border: none; font-size: 14px; }
+            QToolButton:hover { background-color: #555; }
+        """)
+        # Connect the refresh button
+        self.refresh_button.clicked.connect(self.on_refresh_clicked)
+        
         self.maximize_button = QToolButton(self)
         self.maximize_button.setText("□") # "Maximize" character
         self.maximize_button.setToolTip("Toggle Fullscreen")
@@ -57,6 +68,7 @@ class GridFeedWidget(QWidget):
 
         title_layout.addWidget(self.title_label)
         title_layout.addStretch()
+        title_layout.addWidget(self.refresh_button)
         title_layout.addWidget(self.maximize_button)
 
         # --- 2. Video Label ---
@@ -69,6 +81,18 @@ class GridFeedWidget(QWidget):
         # --- Add to main layout ---
         main_layout.addWidget(self.title_bar)
         main_layout.addWidget(self.video_label, stretch=1) # stretch=1 makes it fill
+
+    @pyqtSlot()
+    def on_refresh_clicked(self):
+        """
+        Called when the refresh button is clicked.
+        Requests the worker to attempt reconnection.
+        """
+        if self.worker:
+            print(f"[{self.camera_name}] Refresh button clicked - requesting worker restart.")
+            self.worker.restart()
+        else:
+            print(f"[{self.camera_name}] Warning: No worker assigned to this widget.")
 
     def update_frame(self, qt_image: QImage):
         """Public slot to receive a new frame."""

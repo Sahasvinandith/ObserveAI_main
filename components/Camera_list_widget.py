@@ -11,17 +11,31 @@ class CameraFeedWidget(QWidget):
     def __init__(self, name, parent=None):
         super().__init__(parent)
         self.name = name
+        self.worker = None  # Will be set by MainWindow after creation
         
         # --- 1. Load UI from Designer file ---
         # Ensure the path is correct relative to this script
         uic.loadUi("./UIs/camera_feed_widget.ui", self)
         
+        self.refresh_btn.clicked.connect(self.on_refresh_clicked)
         # --- 2. Post-Load Setup ---
         # Access widgets by the objectNames you set in Designer
         self.title_label.setText(self.name)
         
         # (Optional) If you didn't set fixed size in Designer, you can still do it here:
-        # self.video_label.setFixedSize(240, 180) 
+        # self.video_label.setFixedSize(240, 180)
+
+    @pyqtSlot()
+    def on_refresh_clicked(self):
+        """
+        Called when the refresh button is clicked.
+        Requests the worker to attempt reconnection.
+        """
+        if self.worker:
+            print(f"[{self.name}] Refresh button clicked - requesting worker restart.")
+            self.worker.restart()
+        else:
+            print(f"[{self.name}] Warning: No worker assigned to this widget.")
 
     @pyqtSlot(QImage)
     def update_frame(self, qt_image):
