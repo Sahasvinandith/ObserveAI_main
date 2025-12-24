@@ -500,19 +500,29 @@ class DetectionSystem:
 
                 self.frame_count += 1
 
-                # 1. Detect persons using YOLO
-                results = self.yolo_model(frame, verbose=False)
-                detections = []
-                for r in results:
-                    for box in r.boxes:
-                        if int(box.cls[0]) == 0:
-                            x1, y1, x2, y2 = map(int, box.xyxy[0])
-                            conf = float(box.conf[0])
-                            if conf >= self.PERSON_CONFIDENCE_THRESHOLD:
-                                detections.append(([x1, y1, x2 - x1, y2 - y1], conf, 0))
+                should_run_yolo_detection = 1
 
-                # 2. Update person tracker
-                tracks = self.person_tracker.update_tracks(detections, frame=frame)
+                # --- FRAME SKIP: Only run heavy YOLO detection every N frames ---
+                should_run_yolo_detection = (self.frame_count % self.frame_skip_interval) == 0
+
+                
+                # 1. Detect persons using YOLO (with frame skipping for efficiency)
+                detections = []
+                if should_run_yolo_detection:
+                    results = self.yolo_model(frame, verbose=False)
+                    for r in results:
+                        for box in r.boxes:
+                            if int(box.cls[0]) == 0:
+                                x1, y1, x2, y2 = map(int, box.xyxy[0])
+                                conf = float(box.conf[0])
+                                if conf >= self.PERSON_CONFIDENCE_THRESHOLD:
+                                    detections.append(([x1, y1, x2 - x1, y2 - y1], conf, 0))
+                    # Only update tracker when we have fresh detections
+                    tracks = self.person_tracker.update_tracks(detections, frame=frame)
+                else:
+                    # Between detection frames, still update tracker with empty detections
+                    # This keeps existing tracks alive
+                    tracks = self.person_tracker.update_tracks([], frame=frame)
 
                 # 3. Process tracked persons
                 current_tracked_ids = []
