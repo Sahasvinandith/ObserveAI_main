@@ -65,6 +65,7 @@ class Face:
         self.person_id = person_id
         self.last_seen = time.time()
         self.is_recognizing = False # Flag for async queue
+        self.tracker_miscount: int = 0  # Count of consecutive tracker failures
 
     def position_update(self, x, y, w, h):
         self.x = x
@@ -372,6 +373,7 @@ class DetectionSystem:
                 print(f"[TRACKER ERROR] face_id {face_obj.face_id}: {e}")
                 continue
             if success:
+                print("identifying by tracking success:Face id:",face_obj.face_id)
                 x, y, w, h = [int(v) for v in bbox]
                 face_obj.position_update(x, y, w, h)
                 detected_face_ids.append(face_obj.face_id)
@@ -403,6 +405,7 @@ class DetectionSystem:
                             dist = math.dist(new_center, existing_center)
                             if dist < self.DISTANCE_THRESHOLD:
                                 tracked_face.position_update(gx, gy, gw, gh)
+                                tracked_face.tracker_miscount +=1
                                 is_known_face = True
                                 break
 

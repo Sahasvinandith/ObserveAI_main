@@ -121,7 +121,7 @@
        <item>
         <widget class="QStackedWidget" name="Content_stack">
          <property name="currentIndex">
-          <number>3</number>
+          <number>0</number>
          </property>
          <widget class="QWidget" name="cam_settings_page">
           <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -186,6 +186,13 @@
                  </size>
                 </property>
                </spacer>
+              </item>
+              <item>
+               <widget class="QPushButton" name="update_btn">
+                <property name="text">
+                 <string>Update</string>
+                </property>
+               </widget>
               </item>
               <item>
                <widget class="QPushButton" name="save_map_btn">

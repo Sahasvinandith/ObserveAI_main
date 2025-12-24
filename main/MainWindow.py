@@ -30,7 +30,7 @@ class MainWindow(QMainWindow):
         #  ADD TRACKERS ---
         # These will keep track of all items for saving
         self.feed_widgets = {}    # Tracks QListWidget items
-        self.scene_cameras = {}   # Tracks QGraphicsScene cameras (name -> item)
+        self.scene_cameras:dict[str,CameraItem] = {}   # Tracks QGraphicsScene cameras (name -> item)
         self.scene_walls = []     # Tracks QGraphicsScene walls
         self.grid_feed_widgets = {} # name -> GridFeedWidget
         
@@ -69,6 +69,7 @@ class MainWindow(QMainWindow):
         self.cam_feed_btn.clicked.connect(lambda: self.Content_stack.setCurrentIndex(1))       
         self.db_btn.clicked.connect(lambda: self.Content_stack.setCurrentIndex(2))
         self.add_camera_btn.clicked.connect(self.add_camera)
+        self.update_btn.clicked.connect(self.update_camera)
         self.add_wall_btn.clicked.connect(self.add_a_wall)
         self.save_map_btn.clicked.connect(self.save_layout)
         self.load_map_btn.clicked.connect(self.load_layout)
@@ -283,7 +284,14 @@ class MainWindow(QMainWindow):
             # Re-enable scrolling
             self.scrollArea.setHorizontalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
             self.scrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
-        
+
+    def update_camera(self):
+        for name, cam_item in self.scene_cameras.items():
+            pos = cam_item.scenePos()
+            cam_item.position=[pos.x(),pos.y()]
+            cam_item.rotation_degree = cam_item.rotation()
+            cam_item.print()
+
     def save_layout(self):
         """
         Saves the current scene layout to a JSON file.
