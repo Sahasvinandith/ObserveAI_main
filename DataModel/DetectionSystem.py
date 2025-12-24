@@ -5,16 +5,17 @@ import math
 import threading
 import time
 import queue
-import numpy as np
 import psutil
+import numpy as np
 
 # --- IMPORTS ---
-from DataModel.face_detection import * 
+from DataModel.face_detection import update_user_faces
 from DataModel.Reid_model import ReIDModel
 from ultralytics import YOLO
 from deep_sort_realtime.deepsort_tracker import DeepSort
 import torch
 from torchvision.transforms import transforms
+from DataModel.EmbeddingCache import EmbeddingCache
 
 class Person:
     def __init__(self, person_id, x, y, w, h, confidence):
@@ -42,10 +43,12 @@ class Person:
         # Prioritize faces that are NOT scanning and NOT unknown if possible
         valid_faces = [f for f in self.faces.values() if f.name != "Scanning..." and f.name != "Unknown"]
         if valid_faces:
-            return valid_faces[0].name
+            # Choose the face with highest confidence among valid faces
+            best_valid = max(valid_faces, key=lambda f: f.confidence)
+            return best_valid.name
             
-        # Fallback
-        best_face = min(self.faces.values(), key=lambda f: f.confidence)
+        # Fallback: pick the most confident face overall
+        best_face = max(self.faces.values(), key=lambda f: f.confidence)
         return best_face.name
 
 
@@ -62,6 +65,7 @@ class Face:
         self.person_id = person_id
         self.last_seen = time.time()
         self.is_recognizing = False # Flag for async queue
+        self.tracker_miscount: int = 0  # Count of consecutive tracker failures
 
     def position_update(self, x, y, w, h):
         self.x = x
@@ -83,17 +87,23 @@ class Face:
         return (self.x + self.w // 2, self.y + self.h // 2)
 
 class DetectionSystem:
-    def __init__(self, camera_name, db_path="Faces_db", camera_buffer=None, output_callback=None):
+    def __init__(self, camera_name, db_path="Faces_db", camera_buffer=None, output_callback=None, frame_skip_interval=3, gui_fps_limit=15):
         print("[INFO] Initializing Detection System...")
 
         self.camera_name = camera_name
         self.db_path = db_path
         os.makedirs(self.db_path, exist_ok=True)
         
-        self.process = psutil.Process(os.getpid())
+        self.EmbeddingCache = None  # Placeholder for EmbeddingCache instance
         
         self.camera_buffer = camera_buffer
         self.output_callback = output_callback 
+        
+        self.process = psutil.Process(os.getpid())
+        # Performance Parameters (user-configurable)
+        self.frame_skip_interval = frame_skip_interval  # Skip N frames between detections (default 3)
+        self.gui_fps_limit = gui_fps_limit  # GUI refresh rate limit in FPS (default 15)
+        self.gui_frame_delay = 1.0 / gui_fps_limit if gui_fps_limit > 0 else 0.067  # Calculate delay from FPS
 
         # Configuration
         self.CONFIDENCE_THRESHOLD = 0.3
@@ -144,7 +154,7 @@ class DetectionSystem:
         self.watchdog_thread = None
 
         print("[INFO] System initialized successfully.")
-    
+
     def log_resource_usage(self):
         # CPU usage of the process (as a percentage of one CPU core)
         cpu_percent = self.process.cpu_percent(interval=None) 
@@ -158,13 +168,21 @@ class DetectionSystem:
         print(f"[RESOURCE USAGE] {log_message}")
 
     def initialize_models(self):
+        
         self.yolo_model = YOLO("yolov8n.pt")
         self.yolo_face_model = YOLO("yolov11n-face.pt")
+        
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+        
+        # Initialize EmbeddingCache
+        self.EmbeddingCache = EmbeddingCache(db_path=self.db_path)  # Initialize EmbeddingCache
         self.reid_model = ReIDModel().to(device)
         self.reid_model.eval()
+        
         self.person_tracker = DeepSort(max_age=self.PERSON_TRACKING_MAX_AGE, n_init=self.PERSON_TRACKING_N_INIT)
         print("[INFO] Models loaded.")
+        time.sleep(3.0)
+        self.log_resource_usage()
 
     def get_next_available_face_id(self):
         """Scans Faces_db to find the next 'User_X' ID"""
@@ -180,25 +198,67 @@ class DetectionSystem:
         except: return 1
         return highest_id + 1
 
+    def _create_tracker(self):
+        """Create a tracker using multiple fallbacks. Returns a tracker instance or None.
+        Tries CSRT first (preferred), then falls back to KCF, MOSSE, or the generic factory.
+        """
+        # Preferred: CSRT
+        try:
+            # Newer OpenCV: cv2.TrackerCSRT_create()
+            return cv2.TrackerCSRT_create()
+        except Exception:
+            pass
+        try:
+            # Another variant: cv2.TrackerCSRT.create()
+            return cv2.TrackerCSRT.create()
+        except Exception:
+            pass
+        try:
+            # Some builds expose it under legacy
+            return cv2.legacy.TrackerCSRT_create()
+        except Exception:
+            pass
+
+        # Fallbacks: try KCF, MOSSE, or generic factory
+        try:
+            return cv2.TrackerKCF_create()
+        except Exception:
+            pass
+        try:
+            return cv2.TrackerMOSSE_create()
+        except Exception:
+            pass
+        try:
+            # Older OpenCV had a generic factory
+            return cv2.Tracker_create('CSRT')
+        except Exception:
+            pass
+
+        print('[TRACKER] No suitable tracker factory found. Please install opencv-contrib-python or use a build with trackers enabled.')
+        return None
+
     def start(self):
         print("[INFO] Starting all threads...")
-        self.stop_event.clear()
+        try:    
+            self.stop_event.clear()
 
-        self.cam_thread = threading.Thread(target=self.camera_thread_function, daemon=True)
-        self.cam_thread.start()
+            self.cam_thread = threading.Thread(target=self.camera_thread_function, daemon=True)
+            self.cam_thread.start()
 
-        self.proc_thread = threading.Thread(target=self.processing_thread_function, daemon=True)
-        self.proc_thread.start()
+            self.proc_thread = threading.Thread(target=self.processing_thread_function, daemon=True)
+            self.proc_thread.start()
 
-        # RESTORED: Recognition Worker Thread
-        self.recog_thread = threading.Thread(target=self.recognition_worker_function, daemon=True)
-        self.recog_thread.start()
+            # RESTORED: Recognition Worker Thread
+            self.recog_thread = threading.Thread(target=self.recognition_worker_function, daemon=True)
+            self.recog_thread.start()
 
-        self.disp_thread = threading.Thread(target=self.display_thread_function, daemon=True)
-        self.disp_thread.start()
+            self.disp_thread = threading.Thread(target=self.display_thread_function, daemon=True)
+            self.disp_thread.start()
 
-        self.watchdog_thread = threading.Thread(target=self.watchdog_thread_function, daemon=True)
-        self.watchdog_thread.start()
+            self.watchdog_thread = threading.Thread(target=self.watchdog_thread_function, daemon=True)
+            self.watchdog_thread.start()
+        except Exception as e:
+            print(f"[ERROR] Failed to start threads: {e}")
 
     def stop(self):
         print("[INFO] Stopping all threads...")
@@ -224,41 +284,50 @@ class DetectionSystem:
                 task = self.recognition_queue.get(timeout=1.0)
                 face_id_key, face_img = task
                 
-                name, confidence = recognize_face(face_img=face_img)
+                name, confidence = self.EmbeddingCache.find_match(face_img)
                 # face_id, confidence = "Unknown", 1.0  # Placeholder for actual recognition
                 
                 # 2. Update Logic
                 with self.lock:
-                    if face_id_key in self.identified_faces:
-                        face_obj = self.identified_faces[face_id_key]
-                    else:
+                    face_obj = self.identified_faces.get(face_id_key)
+                    if face_obj is None:
                         print(f"[RECOG WORKER] Face ID {face_id_key} not found in identified_faces.")
-                        print(f"[RECOG WORKER] Identifaed Faces Keys: {list(self.identified_faces.keys())}")
-                        
+                        print(f"[RECOG WORKER] Identified Faces Keys: {list(self.identified_faces.keys())}")
+                # If the face was removed while queued for recognition, skip it
+                if face_obj is None:
+                    continue
+
                 # --- LOGIC: Handle New User ---
-                
                 if name == "Unknown":
                     try:
                         # Generate next ID safely
                         new_id_num = self.get_next_available_face_id()
                         new_folder_name = f"User_{new_id_num}"
                         print(f"[STORAGE] Assigning New User ID: {new_folder_name}")
-                        
-                        update_user_faces(new_folder_name,face_img=face_img)
-                        
-                        # Update live object name
-                        face_obj.name = new_folder_name
-                        
-                        # Increment internal counter to reduce scanning conflict
-                        # (Though get_next_available is safest)
+
+                        update_user_faces(new_folder_name, face_img=face_img)
+
+                        self.EmbeddingCache.add_new_user(new_folder_name, face_img)
+
+                        # Update live object name under lock
+                        with self.lock:
+                            face_obj.name = new_folder_name
+
                     except Exception as e:
                         print(f"[ERROR] Failed to save new user: {e}")
-                        face_obj.name = "Unknown"
+                        with self.lock:
+                            face_obj.name = "Unknown"
                 else:
-                    # Known match
-                    face_obj.name = name
-                    face_obj.confidence = confidence
-                face_obj.is_recognizing = False # Unlock flag
+                    # Known match: update under lock
+                    with self.lock:
+                        face_obj.name = name
+                        face_obj.confidence = confidence
+
+                        # Add a feature based database update here if needed
+
+                # Unlock flag under lock
+                with self.lock:
+                    face_obj.is_recognizing = False
                     
             except queue.Empty:
                 continue
@@ -268,12 +337,9 @@ class DetectionSystem:
     # --- 2. CAMERA THREAD ---
     def camera_thread_function(self):
         print("[THREAD] Camera thread started")
-        print(f"stop event is set: {self.stop_event.is_set()}")
         while not self.stop_event.is_set():
             try:
-                print(f"[CAM THREAD] trying to access camera buffer")
                 with self.lock:
-                    print(f"[CAM THREAD] camera buffer accessible")
                     if self.camera_buffer and not self.camera_buffer.empty():
                         frame = self.camera_buffer.get()
                     else:
@@ -304,7 +370,12 @@ class DetectionSystem:
         active_tracked_faces = []
         
         for face_obj in person_faces:
-            success, bbox = face_obj.tracker.update(frame)
+            try:
+                success, bbox = face_obj.tracker.update(frame)
+            except Exception as e:
+                # Tracker failed; skip this face for now
+                print(f"[TRACKER ERROR] face_id {face_obj.face_id}: {e}")
+                continue
             if success:
                 x, y, w, h = [int(v) for v in bbox]
                 face_obj.position_update(x, y, w, h)
@@ -337,6 +408,7 @@ class DetectionSystem:
                             dist = math.dist(new_center, existing_center)
                             if dist < self.DISTANCE_THRESHOLD:
                                 tracked_face.position_update(gx, gy, gw, gh)
+                                tracked_face.tracker_miscount +=1
                                 is_known_face = True
                                 break
 
@@ -353,11 +425,28 @@ class DetectionSystem:
                                 face_id = str(self.next_face_id)
                                 
                                 # Initialize Tracker
+                                # Create tracker using helper with robust fallbacks
+                                tracker = self._create_tracker()
+                                if tracker is None:
+                                    print(f"[TRACKER] Could not create a tracker for face {face_id}; skipping face.")
+                                    continue
                                 try:
-                                    tracker = cv2.TrackerCSRT_create()
-                                except:
-                                    tracker = cv2.legacy.TrackerCSRT_create()
-                                tracker.init(frame, (gx, gy, gw, gh))
+                                    tracker.init(frame, (gx, gy, gw, gh))
+                                except Exception as e:
+                                    print(f"[TRACKER INIT ERROR] face_id {face_id}: {e}")
+                                    # If init fails, try a different tracker once
+                                    alt = None
+                                    try:
+                                        alt = cv2.TrackerKCF_create()
+                                    except Exception:
+                                        pass
+                                    if alt is not None:
+                                        try:
+                                            alt.init(frame, (gx, gy, gw, gh))
+                                            tracker = alt
+                                        except Exception as e2:
+                                            print(f"[TRACKER INIT ERROR] alternative tracker failed: {e2}")
+                                            continue
                                 
                                 # Create Face Object
                                 new_face = Face("Scanning...", gx, gy, gw, gh, face_id, 0.0, tracker, person_id)
@@ -450,9 +539,10 @@ class DetectionSystem:
                     # 4. Process faces (The new Async Logic)
                     face_ids = self.process_faces_in_person(frame, (l, t, w, h), tid)
 
-                    # Link faces to person
-                    self.tracked_persons[tid].faces = {fid: self.identified_faces[fid] for fid in face_ids if
-                                                       fid in self.identified_faces}
+                    # Link faces to person (read under lock to avoid races with recognition worker)
+                    with self.lock:
+                        self.tracked_persons[tid].faces = {fid: self.identified_faces[fid] for fid in face_ids if
+                                                           fid in self.identified_faces}
 
                 # 5. Cleanup
                 with self.lock:
@@ -474,15 +564,25 @@ class DetectionSystem:
     # --- 4. DISPLAY THREAD ---
     def display_thread_function(self):
         print("[THREAD] Display thread started")
+        last_display_time = 0
         
         while not self.stop_event.is_set():
+            current_time = time.time()
+            
+            # --- FPS THROTTLING: Skip frames to limit display refresh rate ---
+            if current_time - last_display_time < self.gui_frame_delay:
+                time.sleep(0.001)  # Sleep briefly to avoid busy-waiting
+                continue
+            
+            last_display_time = current_time
+            
             # Get Frame
             frame = None
             with self.lock:
                 if self.last_frame_buffer["frame"] is not None:
                     frame = self.last_frame_buffer["frame"].copy()
             
-            if frame is None: time.sleep(0.05); continue
+            if frame is None: time.sleep(0.01); continue
 
             # 2. Snapshot Data (Safe Copy)
             with self.lock:
@@ -525,8 +625,6 @@ class DetectionSystem:
             # Send to PyQt
             if self.output_callback:
                 self.output_callback(self.camera_name, frame)
-            
-            time.sleep(0.03)
 
     def extract_person_features(self, person_crop):
         """Extract Re-ID features from person crop"""

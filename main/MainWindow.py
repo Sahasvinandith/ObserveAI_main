@@ -13,7 +13,7 @@ from components.Camera_worker import CameraWorker
 from components.Database_viewer import DatabaseViewer
 import queue
 from PyQt6.QtGui import QImage
-from DataModel.DetectionSystem_test import DetectionSystem
+from DataModel.DetectionSystem import DetectionSystem
 
 
 class MainWindow(QMainWindow):
@@ -239,12 +239,15 @@ class MainWindow(QMainWindow):
         # =========================================================
         print(f"Initializing AI System for Camera{name}...")
         
-        # Create the AI System
+        # Create the AI System with performance tuning parameters
+        # These can be modified later via UI or config
         ai_sys = DetectionSystem(
             camera_name=name,
             db_path="Faces_db",
             camera_buffer=frame_buffer,
-            output_callback=self.ai_frame_processed_signal.emit
+            output_callback=self.ai_frame_processed_signal.emit,
+            frame_skip_interval=3,  # Skip detection every 3 frames (30fps -> ~10fps detection)
+            gui_fps_limit=15  # Limit GUI display refresh to 15 FPS
         )
         
         # Store it
