@@ -1,7 +1,7 @@
 import time
 import threading  # Import threading to run the DetectionSystem in a separate thread
 from DataModel.DetectionSystem import DetectionSystem
-
+# HE
 def run_detection_system():
     """Function to run the DetectionSystem in a separate thread."""
     print("[THREAD] Starting detection system...")

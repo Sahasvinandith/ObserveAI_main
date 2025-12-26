@@ -1,0 +1,1 @@
+so now the hard part. upto now we have seperate detectionsystems in each camera feed trying to identify individuals seperately. for now i need to upgrade the system.
