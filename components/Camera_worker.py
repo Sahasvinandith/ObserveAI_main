@@ -104,6 +104,7 @@ class CameraWorker(QObject):
                     bytes_per_line = ch * w
                     qt_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
                     self.frameReady.emit(qt_image)
+
                 except Exception as e:
                     print(f"Error converting frame for display: {e}")
                 
