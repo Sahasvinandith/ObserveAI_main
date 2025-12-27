@@ -87,7 +87,7 @@ class Face:
         return (self.x + self.w // 2, self.y + self.h // 2)
 
 class DetectionSystem:
-    def __init__(self, camera_name, db_path="Faces_db", camera_buffer=None, output_callback=None, frame_skip_interval=3, gui_fps_limit=15):
+    def __init__(self, camera_name, db_path="Faces_db", camera_buffer=None, output_callback=None, frame_skip_interval=3, gui_fps_limit=15, global_person_tracker=None, cross_camera_reid=None, camera_graph=None):
         print("[INFO] Initializing Detection System...")
 
         self.camera_name = camera_name
@@ -98,6 +98,14 @@ class DetectionSystem:
         
         self.camera_buffer = camera_buffer
         self.output_callback = output_callback 
+        
+        # NEW: Global tracking systems
+        self.global_person_tracker = global_person_tracker
+        self.cross_camera_reid = cross_camera_reid
+        self.camera_graph = camera_graph
+        
+        # Mapping of local person ID to global person ID
+        self.local_to_global_mapping = {}  # local_person_id → global_person_id
         
         self.process = psutil.Process(os.getpid())
         # Performance Parameters (user-configurable)
@@ -324,6 +332,28 @@ class DetectionSystem:
                         face_obj.confidence = confidence
 
                         # Add a feature based database update here if needed
+                
+                # NEW: Propagate identification to global tracker
+                if name != "Unknown":
+                    person_id = face_obj.person_id
+                    if person_id not in self.local_to_global_mapping:
+                        # Create new global person
+                        gid = self.global_person_tracker.link_local_to_global(
+                            self.camera_name,
+                            person_id,
+                            self.tracked_persons[person_id].feature_vector if person_id in self.tracked_persons else None
+                        )
+                        self.local_to_global_mapping[person_id] = gid
+                    
+                    gid = self.local_to_global_mapping.get(person_id)
+                    if gid:
+                        # Propagate identification across all cameras
+                        self.cross_camera_reid.propagate_identification(
+                            gid,
+                            name,
+                            confidence,
+                            self.camera_name
+                        )
 
                 # Unlock flag under lock
                 with self.lock:
@@ -485,10 +515,12 @@ class DetectionSystem:
                 # --- LAG FIX: Queue Draining ---
                 # Get the freshest frame possible, discard old backlog
                 frame = None
+                print(f"frame_queue: {self.frame_queue.qsize()}")
                 while not self.frame_queue.empty():
                     try:
                         frame = self.frame_queue.get_nowait()
                     except queue.Empty:
+                        print("Queue empty during draining")
                         pass
 
                 # If queue was empty, wait for a new frame
@@ -560,6 +592,30 @@ class DetectionSystem:
                     for pid in list(self.tracked_persons.keys()):
                         if pid not in current_tracked_ids:
                             if time.time() - self.tracked_persons[pid].last_seen > 2.0:
+                                # NEW: Try to match person in neighboring cameras
+                                person_obj = self.tracked_persons[pid]
+                                if self.cross_camera_reid and person_obj.feature_vector is not None:
+                                    match = self.cross_camera_reid.match_person_across_cameras(
+                                        self.camera_name,
+                                        pid,
+                                        person_obj.feature_vector,
+                                        (person_obj.x, person_obj.y, person_obj.w, person_obj.h)
+                                    )
+                                    
+                                    if match:
+                                        neighbor_cam, neighbor_local_id, confidence = match
+                                        # Link to same global person
+                                        if pid not in self.local_to_global_mapping:
+                                            gid = self.global_person_tracker.link_local_to_global(
+                                                self.camera_name,
+                                                pid,
+                                                person_obj.feature_vector
+                                            )
+                                            self.local_to_global_mapping[pid] = gid
+                                        
+                                        print(f"[CROSS-CAM] Person {pid} exiting {self.camera_name}")
+                                        print(f"  → Matched in {neighbor_cam} with confidence {confidence:.2f}")
+                                
                                 # Also remove faces
                                 faces_to_del = [fid for fid, f in self.identified_faces.items() if f.person_id == pid]
                                 for fid in faces_to_del:

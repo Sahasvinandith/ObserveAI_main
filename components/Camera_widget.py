@@ -35,6 +35,9 @@ class CameraItem(QGraphicsObject):
         self.url = url
         self.position = position
         self.rotation_degree = rotation_degree
+        
+        # NEW: Global person tracking linkage
+        self.global_person_id = None  # Will be set when linked to global tracker
 
         # 2. CHILD ITEMS
         # --- The camera icon ---

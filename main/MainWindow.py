@@ -14,6 +14,9 @@ from components.Database_viewer import DatabaseViewer
 import queue
 from PyQt6.QtGui import QImage
 from DataModel.DetectionSystem import DetectionSystem
+from DataModel.GlobalPersonTracker import GlobalPersonTracker
+from DataModel.CameraGraph import CameraGraph
+from DataModel.CrossCameraReID import CrossCameraReID
 
 
 class MainWindow(QMainWindow):
@@ -47,7 +50,15 @@ class MainWindow(QMainWindow):
         
         self.maximized_widget = None # Tracks which widget is maximized, if any
         self.COLUMNS_IN_GRID = 3     # Set how many columns you want
-
+        
+        # --- NEW: GLOBAL PERSON TRACKING SYSTEM ---
+        self.global_person_tracker = GlobalPersonTracker()
+        self.camera_graph = CameraGraph()
+        self.cross_camera_reid = CrossCameraReID(
+            self.global_person_tracker,
+            self.camera_graph,
+            feature_distance_threshold=0.4
+        )
         # 2. Tell your 'drag_area' (the QGraphicsView) to look at this new scene
         self.drag_area.setScene(self.graphics_scene)
 
@@ -159,6 +170,7 @@ class MainWindow(QMainWindow):
         """
         --- 5. THIS IS THE NEW REFACTORED FUNCTION ---
         Creates and connects all objects for a new camera.
+        Now includes spatial mapping for cross-camera tracking.
         """
         
         # --- 1. Create Data Objects ---
@@ -172,6 +184,30 @@ class MainWindow(QMainWindow):
         list_widget = CameraFeedWidget(name)
         grid_widget = GridFeedWidget(name)
         cam_item = CameraItem(name=name, url=url)
+        
+        # Set position and rotation
+        if pos:
+            cam_item.setPos(pos)
+            cam_item.position = [pos.x(), pos.y()]
+        else:
+            cam_item.setPos(30, 30)
+            cam_item.position = [30, 30]
+        
+        if rot is not None:
+            cam_item.setRotation(rot)
+            cam_item.rotation_degree = rot
+        
+        # --- NEW: Add to CameraGraph for spatial mapping ---
+        self.camera_graph.add_camera(
+            name=name,
+            position=tuple(cam_item.position),
+            rotation_degree=cam_item.rotation_degree,
+            view_range=cam_item.view_range,
+            fov=cam_item.view_angle
+        )
+        
+        # --- NEW: Create and link global person ID ---
+        cam_item.global_person_id = None  # Will be set when persons are linked
         
         # --- 3. Pass Worker References to Widgets (for refresh capability) ---
         list_widget.worker = worker
@@ -207,9 +243,6 @@ class MainWindow(QMainWindow):
         self.cam_list.setItemWidget(item, list_widget)
         
         # Add to Scene (drag_area)
-        if pos: cam_item.setPos(pos)
-        else: cam_item.setPos(30, 30)
-        if rot is not None: cam_item.setRotation(rot)
         self.graphics_scene.addItem(cam_item)
         
         # Add to Grid (feed_grid_layout)
@@ -245,6 +278,9 @@ class MainWindow(QMainWindow):
             camera_name=name,
             db_path="Faces_db",
             camera_buffer=frame_buffer,
+            global_person_tracker=self.global_person_tracker,
+            cross_camera_reid=self.cross_camera_reid,
+            camera_graph=self.camera_graph,
             output_callback=self.ai_frame_processed_signal.emit,
             frame_skip_interval=3,  # Skip detection every 3 frames (30fps -> ~10fps detection)
             gui_fps_limit=15  # Limit GUI display refresh to 15 FPS
@@ -293,11 +329,31 @@ class MainWindow(QMainWindow):
             self.scrollArea.setVerticalScrollBarPolicy(Qt.ScrollBarPolicy.ScrollBarAsNeeded)
 
     def update_camera(self):
+        """Update camera positions and rotations, sync with camera graph"""
         for name, cam_item in self.scene_cameras.items():
             pos = cam_item.scenePos()
-            cam_item.position=[pos.x(),pos.y()]
+            cam_item.position = [pos.x(), pos.y()]
             cam_item.rotation_degree = cam_item.rotation()
             cam_item.print()
+            
+            # NEW: Update camera graph with new pose
+            self.camera_graph.update_camera_pose(
+                name,
+                position=tuple(cam_item.position),
+                rotation_degree=cam_item.rotation_degree
+            )
+            
+            print(f"[CAMERA GRAPH] Updated {name}: pos={cam_item.position}, rot={cam_item.rotation_degree}")
+            
+            # Log camera relationships
+            neighbors = self.camera_graph.get_neighbors(name)
+            if neighbors:
+                print(f"  → Neighbors: {neighbors}")
+                for neighbor in neighbors:
+                    direction = self.camera_graph.get_direction(name, neighbor)
+                    overlaps = self.camera_graph.overlaps_with(name, neighbor)
+                    print(f"    - {neighbor}: direction={direction}, overlaps={overlaps}")
+
 
     def save_layout(self):
         """
@@ -509,3 +565,88 @@ class MainWindow(QMainWindow):
             cv2.destroyWindow(window_name)
         except:
             pass # Window might already be closed
+    
+    # =========================================================
+    # --- NEW: GLOBAL PERSON TRACKING & STATISTICS ---
+    # =========================================================
+    
+    def print_global_person_statistics(self):
+        """Print statistics about globally tracked persons"""
+        stats = self.global_person_tracker.get_person_statistics()
+        print("\n" + "="*60)
+        print("GLOBAL PERSON TRACKER STATISTICS")
+        print("="*60)
+        print(f"Total persons tracked: {stats['total_persons']}")
+        print(f"Identified persons: {stats['identified_persons']}")
+        print(f"Unique cameras: {stats['unique_cameras']}")
+        print(f"Next global ID: {stats['next_global_id']}")
+        print("="*60 + "\n")
+    
+    def print_camera_graph_info(self):
+        """Print camera relationships and coverage"""
+        print("\n" + "="*60)
+        print("CAMERA GRAPH INFORMATION")
+        print("="*60)
+        info = self.camera_graph.get_all_cameras_info()
+        
+        for cam_name, cam_info in info.items():
+            print(f"\n{cam_name}:")
+            print(f"  Position: {cam_info['position']}")
+            print(f"  Rotation: {cam_info['rotation']}°")
+            print(f"  View Range: {cam_info['view_range']}px")
+            print(f"  FOV: {cam_info['fov']}°")
+            print(f"  Neighbors: {cam_info['neighbors']}")
+            
+            if cam_info['neighbors']:
+                for neighbor in cam_info['neighbors']:
+                    direction = self.camera_graph.get_direction(cam_name, neighbor)
+                    overlaps = self.camera_graph.overlaps_with(cam_name, neighbor)
+                    print(f"    - {neighbor}: direction={direction}, overlaps={overlaps}")
+        
+        print("\n" + "="*60 + "\n")
+    
+    def print_person_trails(self):
+        """Print movement trails of all identified persons"""
+        identified = self.global_person_tracker.get_identified_persons()
+        
+        if not identified:
+            print("\n[INFO] No identified persons yet.\n")
+            return
+        
+        print("\n" + "="*60)
+        print("IDENTIFIED PERSONS & TRAILS")
+        print("="*60)
+        
+        for person in identified:
+            trail_str = self.cross_camera_reid.get_person_trajectory_string(person.global_id)
+            cameras = person.get_cameras_seen_in()
+            
+            print(f"\n{person.name} (ID: {person.global_id})")
+            print(f"  Confidence: {person.confidence:.2f}")
+            print(f"  Seen in cameras: {cameras}")
+            print(f"  Trail: {trail_str}")
+        
+        print("\n" + "="*60 + "\n")
+    
+    def get_person_by_name(self, name: str):
+        """Search for a person by name"""
+        for person in self.global_person_tracker.global_persons.values():
+            if person.name.lower() == name.lower():
+                return person
+        return None
+    
+    def get_persons_in_camera(self, camera_name: str):
+        """Get all persons currently in a specific camera"""
+        return self.global_person_tracker.get_active_persons_in_camera(camera_name)
+    
+    def log_cross_camera_reid_statistics(self):
+        """Log cross-camera ReID statistics"""
+        stats = self.cross_camera_reid.get_statistics()
+        print("\n" + "="*60)
+        print("CROSS-CAMERA ReID STATISTICS")
+        print("="*60)
+        print(f"Matches found: {stats['matches_found']}")
+        print(f"False positives: {stats['false_positives']}")
+        print(f"Feature distance threshold: {stats['feature_threshold']:.2f}")
+        print(f"Temporal threshold: {stats['temporal_threshold']}s")
+        print("="*60 + "\n")
