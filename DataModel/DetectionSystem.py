@@ -524,14 +524,10 @@ class DetectionSystem:
                 print(f"frame_queue: {self.frame_queue.qsize()}")
                 while not self.frame_queue.empty():
                     try:
-                        print("Draining1 frame queue...")
                         frame = self.frame_queue.get_nowait()
-                        print("Draining2 frame queue...")
-                        cv2.imshow("Debug Frame", frame)  # Debug display
-                        print("Draininged1 frame queue...")
                         cv2.waitKey(1)
                     except queue.Empty:
-                        print("Queue empty during draining")
+                        
                         pass
 
                 # If queue was empty, wait for a new frame
@@ -546,11 +542,7 @@ class DetectionSystem:
 
                 self.frame_count += 1
 
-                should_run_yolo_detection = 1
-
-                # --- FRAME SKIP: Only run heavy YOLO detection every N frames ---
-                should_run_yolo_detection = (self.frame_count % self.frame_skip_interval) == 0
-
+                should_run_yolo_detection = True
                 
                 # 1. Detect persons using YOLO (with frame skipping for efficiency)
                 detections = []

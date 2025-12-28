@@ -14,9 +14,9 @@ from components.Database_viewer import DatabaseViewer
 import queue
 from PyQt6.QtGui import QImage
 from DataModel.DetectionSystem import DetectionSystem
-# from DataModel.GlobalPersonTracker import GlobalPersonTracker
-# from DataModel.CameraGraph import CameraGraph
-# from DataModel.CrossCameraReID import CrossCameraReID
+from DataModel.GlobalPersonTracker import GlobalPersonTracker
+from DataModel.CameraGraph import CameraGraph
+from DataModel.CrossCameraReID import CrossCameraReID
 
 
 class MainWindow(QMainWindow):
