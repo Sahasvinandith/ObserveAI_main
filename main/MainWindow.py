@@ -52,13 +52,13 @@ class MainWindow(QMainWindow):
         self.COLUMNS_IN_GRID = 3     # Set how many columns you want
         
         # --- NEW: GLOBAL PERSON TRACKING SYSTEM ---
-        # self.global_person_tracker = GlobalPersonTracker()
-        # self.camera_graph = CameraGraph()
-        # self.cross_camera_reid = CrossCameraReID(
-        #     self.global_person_tracker,
-        #     self.camera_graph,
-        #     feature_distance_threshold=0.4
-        # )
+        self.global_person_tracker = GlobalPersonTracker()
+        self.camera_graph = CameraGraph()
+        self.cross_camera_reid = CrossCameraReID(
+            self.global_person_tracker,
+            self.camera_graph,
+            feature_distance_threshold=0.4
+        )
         # 2. Tell your 'drag_area' (the QGraphicsView) to look at this new scene
         self.drag_area.setScene(self.graphics_scene)
 
@@ -197,14 +197,14 @@ class MainWindow(QMainWindow):
             cam_item.setRotation(rot)
             cam_item.rotation_degree = rot
         
-        # # --- NEW: Add to CameraGraph for spatial mapping ---
-        # self.camera_graph.add_camera(
-        #     name=name,
-        #     position=tuple(cam_item.position),
-        #     rotation_degree=cam_item.rotation_degree,
-        #     view_range=cam_item.view_range,
-        #     fov=cam_item.view_angle
-        # )
+        # --- NEW: Add to CameraGraph for spatial mapping ---
+        self.camera_graph.add_camera(
+            name=name,
+            position=tuple(cam_item.position),
+            rotation_degree=cam_item.rotation_degree,
+            view_range=cam_item.view_range,
+            fov=cam_item.view_angle
+        )
         
         # --- NEW: Create and link global person ID ---
         cam_item.global_person_id = None  # Will be set when persons are linked
@@ -280,7 +280,10 @@ class MainWindow(QMainWindow):
             camera_buffer=frame_buffer,
             output_callback=self.ai_frame_processed_signal.emit,
             frame_skip_interval=3,  # Skip detection every 3 frames (30fps -> ~10fps detection)
-            gui_fps_limit=15  # Limit GUI display refresh to 15 FPS
+            gui_fps_limit=15,  # Limit GUI display refresh to 15 FPS
+            global_person_tracker=self.global_person_tracker,
+            cross_camera_reid=self.cross_camera_reid,
+            camera_graph=self.camera_graph
         )
         
         # Store it
