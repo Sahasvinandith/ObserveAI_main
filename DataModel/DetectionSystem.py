@@ -14,6 +14,7 @@ from DataModel.Reid_model import ReIDModel
 from ultralytics import YOLO
 from deep_sort_realtime.deepsort_tracker import DeepSort
 import torch
+from DataModel.CrossCameraReID import CrossCameraReID
 from torchvision.transforms import transforms
 from DataModel.EmbeddingCache import EmbeddingCache
 
@@ -104,7 +105,7 @@ class Face:
         return (self.x + self.w // 2, self.y + self.h // 2)
 
 class DetectionSystem:
-    def __init__(self, camera_name, db_path="Faces_db", camera_buffer=None, output_callback=None, frame_skip_interval=3, gui_fps_limit=15, global_person_tracker=None, cross_camera_reid=None, camera_graph=None):
+    def __init__(self, camera_name, db_path="Faces_db", camera_buffer=None, output_callback=None, frame_skip_interval=3, gui_fps_limit=15, global_person_tracker=None, cross_camera_reid:CrossCameraReID=None, camera_graph=None):
         print("[INFO] Initializing Detection System...")
 
         self.camera_name = camera_name
@@ -306,7 +307,6 @@ class DetectionSystem:
         while not self.stop_event.is_set():
             try:
                 # Get task: (temp_face_id, face_image)
-                print(f"recognition_queue size: {self.recognition_queue.qsize()}")
                 task = self.recognition_queue.get(timeout=1.0)
                 face_id_key, face_img = task
                 
@@ -373,6 +373,7 @@ class DetectionSystem:
                                 confidence,
                                 self.camera_name
                             )
+
                     except Exception as e:
                         print(f"[RECOG] Error propagating identification: {e}")
 
@@ -551,8 +552,6 @@ class DetectionSystem:
                     except queue.Empty:
                         print("Frame queue timeout")
                         continue
-                
-                print('processing frame')
 
                 self.frame_count += 1
 
@@ -681,7 +680,6 @@ class DetectionSystem:
                 q_size = self.recognition_queue.qsize()
 
             # 3. Drawing Loop
-            print("display persons:", len(display_persons))
             for person_obj in display_persons:
                 pid = int(person_obj.person_id)
                 px, py, pw, ph = person_obj.x, person_obj.y, person_obj.w, person_obj.h
@@ -695,24 +693,6 @@ class DetectionSystem:
                 prim_face = person_obj.get_primary_face_name()
                 cv2.putText(frame, f"ID:{pid} {prim_face}", (px, py - 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
-
-                # # Draw Faces
-                # try:
-                #     for face_obj in person_obj.faces.values():
-                #         fx, fy, fw, fh = face_obj.x, face_obj.y, face_obj.w, face_obj.h
-
-                #         if face_obj.is_recognizing:
-                #             f_color = (0, 255, 255)  # Yellow
-                #             label = "Scanning..."
-                #         else:
-                #             f_color = (0, 0, 255)  # Red
-                #             label = f"{face_obj.name} ({face_obj.confidence:.2f})"
-
-                #         cv2.rectangle(frame, (fx, fy), (fx + fw, fy + fh), f_color, 2)
-                #         cv2.putText(frame, label, (fx, fy - 10),
-                #                     cv2.FONT_HERSHEY_SIMPLEX, 0.5, f_color, 1)
-                # except RuntimeError:
-                #     pass
             
             # Send to PyQt
             if self.output_callback:

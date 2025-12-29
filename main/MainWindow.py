@@ -13,7 +13,7 @@ from components.Camera_worker import CameraWorker
 from components.Database_viewer import DatabaseViewer
 import queue
 from PyQt6.QtGui import QImage
-from DataModel.DetectionSystem import DetectionSystem ,Ai_System_thread
+from DataModel.DetectionSystem import Ai_System_thread
 from DataModel.GlobalPersonTracker import GlobalPersonTracker
 from DataModel.CameraGraph import CameraGraph
 from DataModel.CrossCameraReID import CrossCameraReID
@@ -263,33 +263,13 @@ class MainWindow(QMainWindow):
         self.grid_feed_widgets[name] = grid_widget
         self.scene_cameras[name] = cam_item
 
-        
         # --- 8. Start the Thread ---
-        print(f"Starting camera worker thread for: {name}")
         qt_thread.start()
         
         # =========================================================
         # --- 9. AUTO-START AI DETECTION SYSTEM ---
         # =========================================================
         print(f"Initializing AI System for Camera{name}...")
-        
-        # Create the AI System with performance tuning parameters
-        # These can be modified later via UI or config
-        # ai_sys = DetectionSystem(
-        #     camera_name=name,
-        #     db_path="Faces_db",
-        #     camera_buffer=frame_buffer,
-        #     output_callback=self.ai_frame_processed_signal.emit,
-        #     frame_skip_interval=3,  # Skip detection every 3 frames (30fps -> ~10fps detection)
-        #     gui_fps_limit=15,  # Limit GUI display refresh to 15 FPS
-        #     global_person_tracker=self.global_person_tracker,
-        #     cross_camera_reid=self.cross_camera_reid,
-        #     camera_graph=self.camera_graph
-        # )
-        
-        # Store it
-        # self.ai_instances[name] = ai_sys
-        
         
         # Create and Start the AI Thread
         ai_thread = threading.Thread(target=Ai_System_thread, args=(name, "Faces_db", frame_buffer, self.ai_frame_processed_signal.emit, 3, 15, self.global_person_tracker, self.cross_camera_reid, self.camera_graph,self.ai_instances), daemon=True)
@@ -612,7 +592,7 @@ class MainWindow(QMainWindow):
         if not identified:
             print("\n[INFO] No identified persons yet.\n")
             return
-        
+
         print("\n" + "="*60)
         print("IDENTIFIED PERSONS & TRAILS")
         print("="*60)

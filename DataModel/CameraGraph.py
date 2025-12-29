@@ -67,7 +67,7 @@ class CameraGraph:
     def __init__(self):
         self.cameras: Dict[str, CameraConfig] = {}
         self.adjacency: Dict[str, Set[str]] = {}  # cam_name → set of neighboring cameras
-        self.overlaps: Dict[Tuple[str, str], bool] = {}  # (cam1, cam2) → overlaps?
+        self.overlaps: Dict[Tuple[str, str], bool] = {}  # (cam1, cam2) → overlaps? Stores combinations of cameras if they are overlapped in the other cameras view
         self.directions: Dict[Tuple[str, str], str] = {}  # (cam1, cam2) → direction
     
     def add_camera(
@@ -208,7 +208,8 @@ class CameraGraph:
         """Check if two cameras overlap"""
         if cam1_name not in self.cameras or cam2_name not in self.cameras:
             return False
-        return self.overlaps.get((cam1_name, cam2_name), False)
+        cameras_overlapping:bool = self.overlaps.get((cam1_name, cam2_name), False)
+        return cameras_overlapping
     
     def get_direction(self, from_cam: str, to_cam: str) -> Optional[str]:
         """Get direction from one camera to another"""
