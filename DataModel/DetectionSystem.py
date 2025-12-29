@@ -17,6 +17,23 @@ import torch
 from torchvision.transforms import transforms
 from DataModel.EmbeddingCache import EmbeddingCache
 
+def Ai_System_thread(camera_name, db_path="Faces_db", camera_buffer=None, output_callback=None, frame_skip_interval=3, gui_fps_limit=15, global_person_tracker=None, cross_camera_reid=None, camera_graph=None,Main_Detection_system=None):
+    detection_system = DetectionSystem(
+        camera_name=camera_name,
+        db_path=db_path,
+        camera_buffer=camera_buffer,
+        output_callback=output_callback,
+        frame_skip_interval=frame_skip_interval,
+        gui_fps_limit=gui_fps_limit,
+        global_person_tracker=global_person_tracker,
+        cross_camera_reid=cross_camera_reid,
+        camera_graph=camera_graph
+    )
+    Main_Detection_system[camera_name] = detection_system
+    detection_system.start()
+    return detection_system
+
+
 class Person:
     def __init__(self, person_id, x, y, w, h, confidence):
         self.person_id = person_id
@@ -515,12 +532,10 @@ class DetectionSystem:
         self.log_resource_usage()
         
         while not self.stop_event.is_set():
-            print('wtf')
             try:
                 # --- LAG FIX: Queue Draining ---
                 # Get the freshest frame possible, discard old backlog
                 frame = None
-                print(f"frame_queue: {self.frame_queue.qsize()}")
                 while not self.frame_queue.empty():
                     try:
                         frame = self.frame_queue.get_nowait()
