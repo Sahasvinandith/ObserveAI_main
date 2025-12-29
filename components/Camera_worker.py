@@ -98,23 +98,30 @@ class CameraWorker(QObject):
                         
                         
                 # adding the captured frame as a Qimage and outputing in cameralist widget
+                # adding the captured frame as a Qimage and outputing in cameralist widget
                 try:
+                    # Convert to RGB for Qt Display
                     rgb_image = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
                     h, w, ch = rgb_image.shape
                     bytes_per_line = ch * w
-                    qt_image = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
-                    self.frameReady.emit(qt_image)
+                    
+                    # Create QImage from buffer
+                    qt_image_ref = QImage(rgb_image.data, w, h, bytes_per_line, QImage.Format.Format_RGB888)
+                    
+                    # 2. FIX: Create a deep copy to decouple from the local 'rgb_image' numpy array
+                    qt_image_safe = qt_image_ref.copy() 
+
+                    self.frameReady.emit(qt_image_safe)
 
                 except Exception as e:
                     print(f"Error converting frame for display: {e}")
+                    QThread.msleep(10) # ~100 FPS cap, adjust as needed
                 
-                QThread.msleep(10) # ~100 FPS cap, adjust as needed
-            
             # --- 3. Cleanup ---
             if cap:
                 cap.release()
             print(f"[{self.name}] Worker thread stopped.")
-            
+                
         except Exception as e:
             print(f"[{self.name}] Worker thread error: {e}")
 
