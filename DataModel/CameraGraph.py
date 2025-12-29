@@ -6,6 +6,12 @@ import math
 from typing import Dict, List, Tuple, Set, Optional
 from dataclasses import dataclass
 import numpy as np
+try:
+    from shapely.geometry import Polygon
+    SHAPELY_AVAILABLE = True
+except Exception:
+    Polygon = None
+    SHAPELY_AVAILABLE = False
 
 
 @dataclass
@@ -153,14 +159,56 @@ class CameraGraph:
                     self.adjacency[cam2_name].discard(cam1_name)
     
     def _cameras_overlap(self, cam1: CameraConfig, cam2: CameraConfig) -> bool:
-        """Check if two camera view cones overlap"""
-        # Simple check: does cam1's view contain cam2's center?
-        cam2_in_cam1 = cam1.contains_point(cam2.position)
-        
-        # Does cam2's view contain cam1's center?
-        cam1_in_cam2 = cam2.contains_point(cam1.position)
-        
-        return cam2_in_cam1 or cam1_in_cam2
+        """Check if two camera view cones overlap.
+
+        Preferred precise method: use Shapely polygon intersection when available.
+        Fallback: sample along camera rays and test containment.
+        """
+        # Quick center containment check (fast path)
+        if cam1.contains_point(cam2.position) or cam2.contains_point(cam1.position):
+            return True
+
+        # Precise polygon intersection using Shapely
+        if SHAPELY_AVAILABLE and Polygon is not None:
+            try:
+                pts1 = cam1.get_view_cone_points(num_rays=60)
+                pts2 = cam2.get_view_cone_points(num_rays=60)
+
+                # pts lists start with center point; build polygon as [center] + arc points
+                poly1 = Polygon(pts1)
+                poly2 = Polygon(pts2)
+
+                inter = poly1.intersection(poly2)
+                return (inter is not None) and (inter.area > 1e-6)
+            except Exception:
+                # Fall through to sampling if Shapely usage fails
+                pass
+
+        # Sampling fallback: sample along each camera's rays and check containment in the other
+        def _sample_cone(cam: CameraConfig, samples_per_ray: int = 4, num_rays: int = 60):
+            pts = cam.get_view_cone_points(num_rays=num_rays)
+            center = pts[0]
+            arc_pts = pts[1:]
+            samples = []
+            for p in arc_pts:
+                for s in range(1, samples_per_ray + 1):
+                    t = s / (samples_per_ray + 1)
+                    x = center[0] + (p[0] - center[0]) * t
+                    y = center[1] + (p[1] - center[1]) * t
+                    samples.append((x, y))
+            return samples
+
+        samples1 = _sample_cone(cam1)
+        hits1 = sum(1 for p in samples1 if cam2.contains_point(p))
+        if hits1 >= 3:
+            return True
+
+        samples2 = _sample_cone(cam2)
+        hits2 = sum(1 for p in samples2 if cam1.contains_point(p))
+        if hits2 >= 3:
+            return True
+
+        return False
     
     def _cameras_close(self, cam1: CameraConfig, cam2: CameraConfig, threshold: float = 150.0) -> bool:
         """Check if cameras are close to each other"""
