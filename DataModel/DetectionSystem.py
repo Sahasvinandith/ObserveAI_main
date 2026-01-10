@@ -14,21 +14,17 @@ from DataModel.Reid_model import ReIDModel
 from ultralytics import YOLO
 from deep_sort_realtime.deepsort_tracker import DeepSort
 import torch
-from DataModel.CrossCameraReID import CrossCameraReID
 from torchvision.transforms import transforms
 from DataModel.EmbeddingCache import EmbeddingCache
 
-def Ai_System_thread(camera_name, db_path="Faces_db", camera_buffer=None, output_callback=None, frame_skip_interval=3, gui_fps_limit=15, global_person_tracker=None, cross_camera_reid=None, camera_graph=None,Main_Detection_system=None):
+def Ai_System_thread(camera_name, db_path="Faces_db", camera_buffer=None, output_callback=None, frame_skip_interval=3, gui_fps_limit=15, Main_Detection_system=None):
     detection_system = DetectionSystem(
         camera_name=camera_name,
         db_path=db_path,
         camera_buffer=camera_buffer,
         output_callback=output_callback,
         frame_skip_interval=frame_skip_interval,
-        gui_fps_limit=gui_fps_limit,
-        global_person_tracker=global_person_tracker,
-        cross_camera_reid=cross_camera_reid,
-        camera_graph=camera_graph
+        gui_fps_limit=gui_fps_limit
     )
     Main_Detection_system[camera_name] = detection_system
     detection_system.start()
@@ -105,7 +101,7 @@ class Face:
         return (self.x + self.w // 2, self.y + self.h // 2)
 
 class DetectionSystem:
-    def __init__(self, camera_name, db_path="Faces_db", camera_buffer=None, output_callback=None, frame_skip_interval=3, gui_fps_limit=15, global_person_tracker=None, cross_camera_reid:CrossCameraReID=None, camera_graph=None):
+    def __init__(self, camera_name, db_path="Faces_db", camera_buffer=None, output_callback=None, frame_skip_interval=3, gui_fps_limit=15):
         print("[INFO] Initializing Detection System...")
 
         self.camera_name = camera_name
@@ -116,14 +112,6 @@ class DetectionSystem:
         
         self.camera_buffer = camera_buffer
         self.output_callback = output_callback 
-        
-        # NEW: Global tracking systems
-        self.global_person_tracker = global_person_tracker
-        self.cross_camera_reid = cross_camera_reid
-        self.camera_graph = camera_graph
-        
-        # Mapping of local person ID to global person ID
-        self.local_to_global_mapping = {}  # local_person_id → global_person_id
         
         self.process = psutil.Process(os.getpid())
         # Performance Parameters (user-configurable)
@@ -181,18 +169,6 @@ class DetectionSystem:
 
         print("[INFO] System initialized successfully.")
 
-    def log_resource_usage(self):
-        # CPU usage of the process (as a percentage of one CPU core)
-        cpu_percent = self.process.cpu_percent(interval=None) 
-        
-        # RAM usage of the process (Resident Set Size - non-swapped physical memory)
-        ram_bytes = self.process.memory_info().rss
-        ram_mb = ram_bytes / (1024 * 1024) 
-        
-        # Log the data
-        log_message = f"CPU: {cpu_percent:.2f}%, RAM: {ram_mb:.2f} MB"
-        print(f"[RESOURCE USAGE] {log_message}")
-
     def initialize_models(self):
         
         self.yolo_model = YOLO("yolov8n.pt")
@@ -208,7 +184,6 @@ class DetectionSystem:
         self.person_tracker = DeepSort(max_age=self.PERSON_TRACKING_MAX_AGE, n_init=self.PERSON_TRACKING_N_INIT)
         print("[INFO] Models loaded.")
         time.sleep(3.0)
-        self.log_resource_usage()
 
     def get_next_available_face_id(self):
         """Scans Faces_db to find the next 'User_X' ID"""
@@ -287,12 +262,13 @@ class DetectionSystem:
             print(f"[ERROR] Failed to start threads: {e}")
 
     def stop(self):
-        print("[INFO] Stopping all threads...")
+        print("[INFO] Stopping Detection System...")
         self.stop_event.set()
-        if self.cam_thread: self.cam_thread.join(timeout=1.0)
-        if self.proc_thread: self.proc_thread.join(timeout=1.0)
-        if self.recog_thread: self.recog_thread.join(timeout=1.0)
-        if self.disp_thread: self.disp_thread.join(timeout=1.0)
+        
+        # Wait for threads to finish
+        for t in [self.proc_thread, self.disp_thread, self.recog_thread, self.watchdog_thread, self.cam_thread]:
+            if t and t.is_alive():
+                t.join(timeout=2.0)
         cv2.destroyAllWindows()
         print("[INFO] System shut down.")
 
@@ -349,33 +325,8 @@ class DetectionSystem:
                         face_obj.name = name
                         face_obj.confidence = confidence
 
-                        # Add a feature based database update here if needed
-                
-                # NEW: Propagate identification to global tracker (only if systems available)
-                if name != "Unknown" and self.global_person_tracker and self.cross_camera_reid:
-                    try:
-                        person_id = face_obj.person_id
-                        if person_id not in self.local_to_global_mapping:
-                            # Create new global person
-                            gid = self.global_person_tracker.link_local_to_global(
-                                self.camera_name,
-                                person_id,
-                                self.tracked_persons[person_id].feature_vector if person_id in self.tracked_persons else None
-                            )
-                            self.local_to_global_mapping[person_id] = gid
-                        
-                        gid = self.local_to_global_mapping.get(person_id)
-                        if gid:
-                            # Propagate identification across all cameras
-                            self.cross_camera_reid.propagate_identification(
-                                gid,
-                                name,
-                                confidence,
-                                self.camera_name
-                            )
 
-                    except Exception as e:
-                        print(f"[RECOG] Error propagating identification: {e}")
+                        # Add a feature based database update here if needed
 
                 # Unlock flag under lock
                 with self.lock:
@@ -530,7 +481,6 @@ class DetectionSystem:
 
     def processing_thread_function(self):
         print("[THREAD] Processing thread started")
-        self.log_resource_usage()
         
         while not self.stop_event.is_set():
             try:
@@ -564,9 +514,9 @@ class DetectionSystem:
                     for r in results:
                         for box in r.boxes:
                             if int(box.cls[0]) == 0:
-                                x1, y1, x2, y2 = map(int, box.xyxy[0])
                                 conf = float(box.conf[0])
                                 if conf >= self.PERSON_CONFIDENCE_THRESHOLD:
+                                    x1, y1, x2, y2 = map(int, box.xyxy[0])
                                     detections.append(([x1, y1, x2 - x1, y2 - y1], conf, 0))
                     # Only update tracker when we have fresh detections
                     tracks = self.person_tracker.update_tracks(detections, frame=frame)
@@ -611,35 +561,6 @@ class DetectionSystem:
                     for pid in list(self.tracked_persons.keys()):
                         if pid not in current_tracked_ids:
                             if time.time() - self.tracked_persons[pid].last_seen > 2.0:
-                                # NEW: Try to match person in neighboring cameras
-                                person_obj = self.tracked_persons[pid]
-                                # Only try cross-camera matching if ALL systems are available
-                                if (self.cross_camera_reid and self.global_person_tracker and 
-                                    person_obj.feature_vector is not None):
-                                    try:
-                                        match = self.cross_camera_reid.match_person_across_cameras(
-                                            self.camera_name,
-                                            pid,
-                                            person_obj.feature_vector,
-                                            (person_obj.x, person_obj.y, person_obj.w, person_obj.h)
-                                        )
-                                        
-                                        if match:
-                                            neighbor_cam, neighbor_local_id, confidence = match
-                                            # Link to same global person
-                                            if pid not in self.local_to_global_mapping:
-                                                gid = self.global_person_tracker.link_local_to_global(
-                                                    self.camera_name,
-                                                    pid,
-                                                    person_obj.feature_vector
-                                                )
-                                                self.local_to_global_mapping[pid] = gid
-                                            
-                                            print(f"[CROSS-CAM] Person {pid} exiting {self.camera_name}")
-                                            print(f"  → Matched in {neighbor_cam} with confidence {confidence:.2f}")
-                                    except Exception as e:
-                                        print(f"[CROSS-CAM ERROR] Failed to match person: {e}")
-                                
                                 # Also remove faces
                                 faces_to_del = [fid for fid, f in self.identified_faces.items() if f.person_id == pid]
                                 for fid in faces_to_del:
@@ -691,7 +612,8 @@ class DetectionSystem:
 
                 # Person Label
                 prim_face = person_obj.get_primary_face_name()
-                cv2.putText(frame, f"ID:{pid} {prim_face}", (px, py - 30),
+                label = f"ID:{pid} {prim_face}"
+                cv2.putText(frame, label, (px, py - 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
             
             # Send to PyQt
