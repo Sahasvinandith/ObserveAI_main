@@ -16,15 +16,17 @@ from deep_sort_realtime.deepsort_tracker import DeepSort
 import torch
 from torchvision.transforms import transforms
 from DataModel.EmbeddingCache import EmbeddingCache
+from DataModel.GlobalPersonTracker import GlobalPersonTracker
 
-def Ai_System_thread(camera_name, db_path="Faces_db", camera_buffer=None, output_callback=None, frame_skip_interval=3, gui_fps_limit=15, Main_Detection_system=None):
+def Ai_System_thread(camera_name, db_path="Faces_db", camera_buffer=None, output_callback=None, frame_skip_interval=3, gui_fps_limit=15, global_tracker=None, Main_Detection_system=None):
     detection_system = DetectionSystem(
         camera_name=camera_name,
         db_path=db_path,
         camera_buffer=camera_buffer,
         output_callback=output_callback,
         frame_skip_interval=frame_skip_interval,
-        gui_fps_limit=gui_fps_limit
+        gui_fps_limit=gui_fps_limit,
+        global_tracker=global_tracker
     )
     Main_Detection_system[camera_name] = detection_system
     detection_system.start()
@@ -42,6 +44,7 @@ class Person:
         self.faces = {}  
         self.last_seen = time.time()
         self.feature_vector = None
+        self.global_id = None  # Global ID from GlobalPersonTracker
 
     def update_position(self, x, y, w, h, confidence):
         self.x = x
@@ -101,12 +104,15 @@ class Face:
         return (self.x + self.w // 2, self.y + self.h // 2)
 
 class DetectionSystem:
-    def __init__(self, camera_name, db_path="Faces_db", camera_buffer=None, output_callback=None, frame_skip_interval=3, gui_fps_limit=15):
+    def __init__(self, camera_name, db_path="Faces_db", camera_buffer=None, output_callback=None, frame_skip_interval=3, gui_fps_limit=15, global_tracker:GlobalPersonTracker=None):
         print("[INFO] Initializing Detection System...")
 
         self.camera_name = camera_name
         self.db_path = db_path
         os.makedirs(self.db_path, exist_ok=True)
+        
+        # Global person tracking
+        self.global_tracker = global_tracker
         
         self.EmbeddingCache = None  # Placeholder for EmbeddingCache instance
         
@@ -147,8 +153,8 @@ class DetectionSystem:
         # YOLO Configs
         self.PERSON_CONFIDENCE_THRESHOLD = 0.5
         self.MIN_PERSON_SIZE = (50, 100)
-        self.PERSON_TRACKING_MAX_AGE = 30
-        self.PERSON_TRACKING_N_INIT = 3
+        self.PERSON_TRACKING_MAX_AGE = 30  # Increased from 30 - keep tracks alive longer
+        self.PERSON_TRACKING_N_INIT = 3     # Decreased from 3 - confirm tracks immediately
 
         self.yolo_model = None
         self.yolo_face_model = None
@@ -490,10 +496,8 @@ class DetectionSystem:
                 while not self.frame_queue.empty():
                     try:
                         frame = self.frame_queue.get_nowait()
-                        cv2.waitKey(1)
                     except queue.Empty:
-                        
-                        pass
+                        break
 
                 # If queue was empty, wait for a new frame
                 if frame is None:
@@ -505,11 +509,13 @@ class DetectionSystem:
 
                 self.frame_count += 1
 
+                # 1. Detect persons using YOLO (with frame skipping for efficiency)
+               
                 should_run_yolo_detection = True
                 
-                # 1. Detect persons using YOLO (with frame skipping for efficiency)
                 detections = []
                 if should_run_yolo_detection:
+                    self.frame_count=0
                     results = self.yolo_model(frame, verbose=False)
                     for r in results:
                         for box in r.boxes:
@@ -529,6 +535,8 @@ class DetectionSystem:
                 current_tracked_ids = []
 
                 for track in tracks:
+                    # Process only confirmed tracks
+                    # With n_init=1, tracks confirm immediately after first detection
                     if not track.is_confirmed():
                         continue
 
@@ -539,13 +547,34 @@ class DetectionSystem:
 
                     # Update/Create Person
                     if tid in self.tracked_persons:
-                        self.tracked_persons[tid].update_position(l, t, w, h, 0.9)
+                        person_obj = self.tracked_persons[tid]
+                        person_obj.update_position(l, t, w, h, 0.9)
+                        
+                        # Update global tracker if we have features but no global ID yet
+                        if self.global_tracker and person_obj.feature_vector is not None and person_obj.global_id is None:
+                            global_id = self.global_tracker.create_or_update(
+                                camera_name=self.camera_name,
+                                local_id=tid,
+                                feature_vector=person_obj.feature_vector,
+                                bbox=(l, t, w, h)
+                            )
+                            person_obj.global_id = global_id
                     else:
                         person_obj = Person(tid, l, t, w, h, 0.9)
-                        # Optional: Extract features once
+                        # Extract features once
                         crop = frame[t:t + h, l:l + w]
                         person_obj.feature_vector = self.extract_person_features(crop)
                         self.tracked_persons[tid] = person_obj
+                        
+                        # Register with global tracker
+                        if self.global_tracker and person_obj.feature_vector is not None:
+                            global_id = self.global_tracker.create_or_update(
+                                camera_name=self.camera_name,
+                                local_id=tid,
+                                feature_vector=person_obj.feature_vector,
+                                bbox=(l, t, w, h)
+                            )
+                            person_obj.global_id = global_id
 
                     # 4. Process faces (The new Async Logic)
                     face_ids = self.process_faces_in_person(frame, (l, t, w, h), tid)
@@ -612,7 +641,8 @@ class DetectionSystem:
 
                 # Person Label
                 prim_face = person_obj.get_primary_face_name()
-                label = f"ID:{pid} {prim_face}"
+                gid = person_obj.global_id if person_obj.global_id else "-"
+                label = f"G:{gid} L:{pid} {prim_face}"
                 cv2.putText(frame, label, (px, py - 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
             

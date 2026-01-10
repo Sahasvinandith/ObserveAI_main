@@ -48,6 +48,10 @@ class MainWindow(QMainWindow):
         self.maximized_widget = None # Tracks which widget is maximized, if any
         self.COLUMNS_IN_GRID = 3     # Set how many columns you want
         
+        # --- Global Person Tracking System ---
+        from DataModel.GlobalPersonTracker import GlobalPersonTracker
+        self.global_tracker = GlobalPersonTracker(feature_threshold=0.5)
+        
         # 2. Tell your 'drag_area' (the QGraphicsView) to look at this new scene
         self.drag_area.setScene(self.graphics_scene)
 
@@ -250,7 +254,7 @@ class MainWindow(QMainWindow):
         print(f"Initializing AI System for Camera{name}...")
         
         # Create and Start the AI Thread
-        ai_thread = threading.Thread(target=Ai_System_thread, args=(name, "Faces_db", frame_buffer, self.ai_frame_processed_signal.emit, 3, 15, self.ai_instances), daemon=True)
+        ai_thread = threading.Thread(target=Ai_System_thread, args=(name, "Faces_db", frame_buffer, self.ai_frame_processed_signal.emit, 3, 15, self.global_tracker, self.ai_instances), daemon=True)
         self.ai_threads[name] = ai_thread
         ai_thread.start()
         
