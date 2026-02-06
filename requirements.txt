@@ -1,0 +1,10 @@
+opencv-contrib-python
+PyQt6
+psutil
+ultralytics
+deep-sort-realtime
+deepface
+torch
+torchvision
+tensorflow
+tf_keras

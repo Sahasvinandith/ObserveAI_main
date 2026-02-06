@@ -1,2 +1,6 @@
 *.pyc
 *.jpg
+.venv
+.venv/*
+.python-version
+*.qrc
