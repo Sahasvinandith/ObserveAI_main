@@ -556,7 +556,8 @@ class DetectionSystem:
                                 camera_name=self.camera_name,
                                 local_id=tid,
                                 feature_vector=person_obj.feature_vector,
-                                bbox=(l, t, w, h)
+                                bbox=(l, t, w, h),
+                                frame_shape=(frame.shape[1], frame.shape[0])  # (width, height)
                             )
                             person_obj.global_id = global_id
                     else:
@@ -572,7 +573,8 @@ class DetectionSystem:
                                 camera_name=self.camera_name,
                                 local_id=tid,
                                 feature_vector=person_obj.feature_vector,
-                                bbox=(l, t, w, h)
+                                bbox=(l, t, w, h),
+                                frame_shape=(frame.shape[1], frame.shape[0])  # (width, height)
                             )
                             person_obj.global_id = global_id
 
