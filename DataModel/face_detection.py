@@ -190,7 +190,18 @@ def match_face_features(new_descriptor, stored_descriptors, threshold=0.75):
 
 
 def calculate_face_quality(face_img):
-    """Calculate a quality score for a face image based on clarity and lighting."""
+    """
+    Calculate a quality score for a face image based on clarity, lighting, and frontality.
+    
+    Quality factors:
+    - Laplacian variance: Sharpness/blur (higher = sharper)
+    - Histogram entropy: Lighting balance (higher = better exposure)
+    - Face size: Larger faces score higher
+    - Aspect ratio: Close to 1.0 suggests frontal face (profile faces are elongated)
+    
+    Returns:
+        float: Quality score (higher is better, typically 50-200 range)
+    """
     # Convert to grayscale if not already
     if len(face_img.shape) > 2:
         gray = cv2.cvtColor(face_img, cv2.COLOR_BGR2GRAY)
@@ -207,9 +218,21 @@ def calculate_face_quality(face_img):
 
     # 3. Calculate face size ratio (larger is better)
     face_size_ratio = (face_img.shape[0] * face_img.shape[1]) / (640 * 480)
+    
+    # 4. Aspect ratio check (frontal faces are roughly square, ~0.8-1.2)
+    height, width = face_img.shape[:2]
+    aspect_ratio = width / height if height > 0 else 0
+    # Score 1.0 for perfect square, penalty for deviation
+    frontal_score = max(0, 1.0 - abs(aspect_ratio - 1.0) * 0.5)
 
     # Combine the measures into a quality score
-    quality_score = (laplacian_var * 0.5) + (hist_distribution * 50) + (face_size_ratio * 50)
+    # Weights: sharpness 40%, lighting 30%, size 15%, frontality 15%
+    quality_score = (
+        laplacian_var * 0.4 + 
+        hist_distribution * 30 + 
+        face_size_ratio * 30 + 
+        frontal_score * 30
+    )
 
     return quality_score
 
@@ -320,24 +343,94 @@ def recognize_face(face_img):
 #     except Exception as e:
 #         print(f"Error updating user faces: {e}")
         
-def update_user_faces(user_folder, face_img):
-    """Update a user's face database with better quality images."""
+def update_user_faces(user_folder, face_img, quality_score=None, max_faces=5, min_quality=50):
+    """
+    Update a user's face database with quality-based image management.
+    
+    - Stores up to max_faces images per user
+    - Each image includes quality score in filename
+    - When at capacity, replaces lowest quality if new is better
+    - Skips save if new image quality is below threshold or worse than all existing
+    
+    Args:
+        user_folder: User identifier/folder name
+        face_img: Face image (numpy array)
+        quality_score: Pre-calculated quality score (calculates if None)
+        max_faces: Maximum images to store per user (default: 5)
+        min_quality: Minimum quality threshold to save (default: 50)
+    
+    Returns:
+        bool: True if image was saved, False otherwise
+    """
     print("Inside update_user_faces function")
     
     global DB_UPDATED
     
+    # Calculate quality if not provided
+    if quality_score is None:
+        quality_score = calculate_face_quality(face_img)
+    
+    # Check minimum quality threshold
+    if quality_score < min_quality:
+        print(f"[SKIP] Face quality {quality_score:.1f} below threshold {min_quality}")
+        return False
+    
     try:
-        print("updating user folder: ",user_folder)
+        print(f"Updating user folder: {user_folder} (quality: {quality_score:.1f})")
         user_path = os.path.join(db_path, str(user_folder))
         os.makedirs(user_path, exist_ok=True)
+
+        # Get existing images and their quality scores
+        images = []
+        for filename in os.listdir(user_path):
+            if not filename.endswith(('.jpg', '.jpeg', '.png')):
+                continue
+
+            file_path = os.path.join(user_path, filename)
+
+            # Extract quality from filename if available (format: face_TIMESTAMP_qSCORE.jpg)
+            file_quality = 0
+            if '_q' in filename:
+                try:
+                    # Extract number after '_q' and before '.'
+                    q_part = filename.split('_q')[1].split('.')[0]
+                    file_quality = float(q_part)
+                except (IndexError, ValueError):
+                    file_quality = 0
+
+            images.append((file_path, file_quality))
+
+        # Sort by quality (lowest first)
+        images.sort(key=lambda x: x[1])
+
+        # Check if we should save this image
+        if len(images) >= max_faces:
+            # At capacity - only replace if new is better than worst
+            if quality_score <= images[0][1]:
+                print(f"[SKIP] New quality {quality_score:.1f} not better than worst existing {images[0][1]:.1f}")
+                return False
+            
+            # Check if all images are already high quality (all > 150)
+            if all(img[1] > 150 for img in images):
+                print(f"[SKIP] All {max_faces} images are already high quality")
+                return False
+            
+            # Replace the worst one
+            os.remove(images[0][0])
+            print(f"[REPLACED] Removed low quality face ({images[0][1]:.1f})")
         
-        save_path = os.path.join(user_path, "1.jpg")
+        # Save new image with quality score in filename
+        timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+        new_filename = f"face_{timestamp}_q{quality_score:.1f}.jpg"
+        save_path = os.path.join(user_path, new_filename)
         
         cv2.imwrite(save_path, face_img)
-        print(f"[ADDED] New face image for {user_folder}")
+        print(f"[SAVED] Face image for {user_folder} (quality: {quality_score:.1f})")
         
-        DB_UPDATED = True  # Set the flag to indicate DB was updated
+        DB_UPDATED = True  # Set flag to refresh embeddings
+        return True
 
     except Exception as e:
         print(f"Error updating user faces: {e}")
+        return False
 

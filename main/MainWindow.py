@@ -185,6 +185,8 @@ class MainWindow(QMainWindow):
         self.spatial_weight_spinbox.setValue(self.settings.get("spatial_weight"))
         self.fov_spinbox.setValue(self.settings.get("default_fov"))
         self.dot_radius_spinbox.setValue(self.settings.get("dot_radius"))
+        self.min_quality_spinbox.setValue(self.settings.get("min_quality_threshold"))
+        self.max_faces_spinbox.setValue(self.settings.get("max_faces_per_user"))
         
         # Connect save and reset buttons
         self.save_settings_btn.clicked.connect(self._save_settings)
@@ -208,6 +210,8 @@ class MainWindow(QMainWindow):
         self.settings.set("spatial_weight", self.spatial_weight_spinbox.value())
         self.settings.set("default_fov", self.fov_spinbox.value())
         self.settings.set("dot_radius", self.dot_radius_spinbox.value())
+        self.settings.set("min_quality_threshold", self.min_quality_spinbox.value())
+        self.settings.set("max_faces_per_user", self.max_faces_spinbox.value())
         
         if self.settings.save():
             print("[SETTINGS] Settings saved successfully!")
@@ -224,6 +228,8 @@ class MainWindow(QMainWindow):
         self.spatial_weight_spinbox.setValue(defaults["spatial_weight"])
         self.fov_spinbox.setValue(defaults["default_fov"])
         self.dot_radius_spinbox.setValue(defaults["dot_radius"])
+        self.min_quality_spinbox.setValue(defaults["min_quality_threshold"])
+        self.max_faces_spinbox.setValue(defaults["max_faces_per_user"])
         
         # Apply to tracker
         self.global_tracker.feature_threshold = defaults["feature_threshold"]

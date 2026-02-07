@@ -9,13 +9,13 @@ import psutil
 import numpy as np
 
 # --- IMPORTS ---
-from DataModel.face_detection import update_user_faces
+from DataModel.face_detection import update_user_faces, calculate_face_quality
 from DataModel.Reid_model import ReIDModel
 from ultralytics import YOLO
 from deep_sort_realtime.deepsort_tracker import DeepSort
 import torch
 from torchvision.transforms import transforms
-from DataModel.EmbeddingCache import EmbeddingCache
+from DataModel.EmbeddingCache import get_embedding_cache
 from DataModel.GlobalPersonTracker import GlobalPersonTracker
 
 def Ai_System_thread(camera_name, db_path="Faces_db", camera_buffer=None, output_callback=None, frame_skip_interval=3, gui_fps_limit=15, global_tracker=None, Main_Detection_system=None):
@@ -182,8 +182,8 @@ class DetectionSystem:
         
         device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
         
-        # Initialize EmbeddingCache
-        self.EmbeddingCache = EmbeddingCache(db_path=self.db_path)  # Initialize EmbeddingCache
+        # Initialize EmbeddingCache (singleton - shared across all DetectionSystem instances)
+        self.EmbeddingCache = get_embedding_cache(db_path=self.db_path)
         self.reid_model = ReIDModel().to(device)
         self.reid_model.eval()
         
@@ -308,18 +308,27 @@ class DetectionSystem:
                 # --- LOGIC: Handle New User ---
                 if name == "Unknown":
                     try:
+                        # Calculate face quality before saving
+                        quality_score = calculate_face_quality(face_img)
+                        
                         # Generate next ID safely
                         new_id_num = self.get_next_available_face_id()
                         new_folder_name = f"User_{new_id_num}"
-                        print(f"[STORAGE] Assigning New User ID: {new_folder_name}")
+                        print(f"[STORAGE] Assigning New User ID: {new_folder_name} (quality: {quality_score:.1f})")
 
-                        update_user_faces(new_folder_name, face_img=face_img)
+                        # Save with quality check (may skip if quality too low)
+                        saved = update_user_faces(new_folder_name, face_img=face_img, quality_score=quality_score)
 
-                        self.EmbeddingCache.add_new_user(new_folder_name, face_img)
+                        if saved:
+                            self.EmbeddingCache.add_new_user(new_folder_name, face_img)
 
-                        # Update live object name under lock
-                        with self.lock:
-                            face_obj.name = new_folder_name
+                            # Update live object name under lock
+                            with self.lock:
+                                face_obj.name = new_folder_name
+                        else:
+                            print(f"[STORAGE] Skipped saving - quality below threshold")
+                            with self.lock:
+                                face_obj.name = "Unknown"
 
                     except Exception as e:
                         print(f"[ERROR] Failed to save new user: {e}")
@@ -331,8 +340,12 @@ class DetectionSystem:
                         face_obj.name = name
                         face_obj.confidence = confidence
 
-
-                        # Add a feature based database update here if needed
+                    # Try to improve stored images with higher quality captures
+                    try:
+                        quality_score = calculate_face_quality(face_img)
+                        update_user_faces(name, face_img=face_img, quality_score=quality_score)
+                    except Exception as e:
+                        print(f"[QUALITY UPDATE] Error updating {name}: {e}")
 
                 # Unlock flag under lock
                 with self.lock:

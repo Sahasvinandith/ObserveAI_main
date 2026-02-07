@@ -25,11 +25,15 @@ class SettingsManager:
     
     # Default values for all settings
     DEFAULTS: Dict[str, Any] = {
+        # Global Tracker Settings
         "feature_threshold": 0.5,
         "reid_weight": 0.7,
         "spatial_weight": 0.3,
         "default_fov": 70,
-        "dot_radius": 8
+        "dot_radius": 8,
+        # Face Quality Settings
+        "min_quality_threshold": 50,
+        "max_faces_per_user": 5
     }
     
     def __init__(self, settings_file: Optional[str] = None):
