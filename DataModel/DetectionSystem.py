@@ -54,7 +54,23 @@ class Person:
         self.confidence = confidence
         self.last_seen = time.time()
 
-    def get_primary_face_name(self):
+    def get_primary_face_name(self, global_tracker=None):
+        """
+        Get the primary face name for this person.
+        If global_tracker is provided, uses consolidated name across cameras.
+        """
+        # First, check if we have a global ID and can get consolidated name
+        if global_tracker and self.global_id:
+            consolidated = global_tracker.get_consolidated_name(self.global_id)
+            if consolidated and consolidated not in ("Unknown", "Scanning..."):
+                # DEBUG: Log when consolidated name is used
+                print(f"[DISPLAY] Person L:{self.person_id} G:{self.global_id} -> consolidated: {consolidated}")
+                return consolidated
+            else:
+                print(f"[DISPLAY] Person L:{self.person_id} G:{self.global_id} consolidated='{consolidated}', falling back to local")
+        else:
+            print(f"[DISPLAY] Person L:{self.person_id} no global_tracker={global_tracker is not None} global_id={self.global_id}")
+        
         if not self.faces:
             return "Unknown"
         # Prioritize faces that are NOT scanning and NOT unknown if possible
@@ -209,8 +225,8 @@ class DetectionSystem:
         self.last_frame_buffer = {"frame": None, "timestamp": 0.0}
 
         # Data
-        self.tracked_persons = {}
-        self.identified_faces = {}
+        self.tracked_persons:dict[int, Person] = {}
+        self.identified_faces:dict[int, Face] = {}
         self.next_face_id = 0 
 
         # YOLO Configs
@@ -361,8 +377,8 @@ class DetectionSystem:
                 face_id_key, face_img = task
                 
                 name, confidence = self.EmbeddingCache.find_match(face_img)
-                # face_id, confidence = "Unknown", 1.0  # Placeholder for actual recognition
-                
+                print(f"[RECOG] Face {face_id_key} matched: name='{name}', conf={confidence:.3f}")
+
                 # 2. Update Logic
                 with self.lock:
                     face_obj = self.identified_faces.get(face_id_key)
@@ -393,6 +409,20 @@ class DetectionSystem:
                             # Update live object name under lock
                             with self.lock:
                                 face_obj.name = new_folder_name
+                                face_obj.locked_identity = new_folder_name  # Immediately lock new user
+                                face_obj.avg_confidence = 0.5  # Default confidence for new user
+                                
+                                # Report new user to global tracker for consolidation
+                                person_id = face_obj.person_id
+                                if person_id and person_id in self.tracked_persons:
+                                    person = self.tracked_persons[person_id]
+                                    if person.global_id and self.global_tracker:
+                                        consolidated = self.global_tracker.update_face_identity(
+                                            person.global_id,
+                                            new_folder_name,
+                                            0.5  # Default confidence for new user
+                                        )
+                                        print(f"[NEW USER] Reported {new_folder_name} to global tracker -> {consolidated}")
                         else:
                             print(f"[STORAGE] Skipped saving - quality below threshold")
                             with self.lock:
@@ -419,6 +449,31 @@ class DetectionSystem:
                         )
                         face_obj.name = verified_name
                         face_obj.confidence = confidence
+                        
+                        # DEBUG: Log the state after update_identity
+                        print(f"[KNOWN MATCH] Face {face_id_key}: verified={verified_name}, locked={face_obj.locked_identity}, person_id={face_obj.person_id}")
+                        
+                        # If identity is locked, report to global tracker for consolidation
+                        if face_obj.locked_identity and face_obj.locked_identity not in ("Unknown", "Scanning..."):
+                            # Find the global_id via the person object
+                            person_id = face_obj.person_id
+                            if person_id and person_id in self.tracked_persons:
+                                person = self.tracked_persons[person_id]
+                                if person.global_id and self.global_tracker:
+                                    # Update global tracker and get consolidated name
+                                    print(f"[CONSOLIDATE CALL] global_id={person.global_id}, user={face_obj.locked_identity}, conf={face_obj.avg_confidence:.3f}")
+                                    consolidated_name = self.global_tracker.update_face_identity(
+                                        person.global_id, 
+                                        face_obj.locked_identity, 
+                                        face_obj.avg_confidence
+                                    )
+                                    # Use consolidated name
+                                    face_obj.name = consolidated_name
+                                    face_obj.locked_identity = consolidated_name
+                                else:
+                                    print(f"[CONSOLIDATE SKIP] person.global_id={person.global_id}, global_tracker={self.global_tracker is not None}")
+                            else:
+                                print(f"[CONSOLIDATE SKIP] person_id={person_id} not in tracked_persons")
 
                     # Only push to DB update queue if identity is LOCKED (confirmed)
                     if face_obj.locked_identity and face_obj.locked_identity not in ("Unknown", "Scanning..."):
@@ -599,7 +654,10 @@ class DetectionSystem:
                 x, y, w, h = [int(v) for v in bbox]
                 face_obj.position_update(x, y, w, h)
                 detected_face_ids.append(face_obj.face_id)
-                active_tracked_faces.append(face_obj)
+                # Only add to active_tracked_faces if identity is LOCKED
+                # This allows unlocked faces to be re-queued for recognition
+                if face_obj.locked_identity and face_obj.locked_identity not in ("Unknown", "Scanning..."):
+                    active_tracked_faces.append(face_obj)
                 
          # --- PHASE 2: DETECT NEW FACES ---
         # Check if we need to run detection (if no faces tracked or periodically)
@@ -620,27 +678,42 @@ class DetectionSystem:
                         gh = ly2 - ly1
                         new_center = (gx + gw // 2, gy + gh // 2)
 
-                        # Match with existing
-                        is_known_face = False
-                        for tracked_face in active_tracked_faces:
-                            existing_center = tracked_face.get_center()
+                        # --- MATCH WITH ALL EXISTING FACES (locked AND unlocked) ---
+                        matched_face = None
+                        for face_obj in person_faces:
+                            existing_center = face_obj.get_center()
                             dist = math.dist(new_center, existing_center)
                             if dist < self.DISTANCE_THRESHOLD:
-                                tracked_face.position_update(gx, gy, gw, gh)
-                                tracked_face.tracker_miscount +=1
-                                is_known_face = True
+                                matched_face = face_obj
                                 break
 
-                        if is_known_face:
-                            # Only push to DB update queue if identity is LOCKED (confirmed)
-                            if tracked_face.locked_identity and tracked_face.locked_identity not in ("Unknown", "Scanning..."):
+                        if matched_face:
+                            # Update position
+                            matched_face.position_update(gx, gy, gw, gh)
+                            matched_face.tracker_miscount += 1
+                            
+                            # If LOCKED, just update DB queue
+                            if matched_face.locked_identity and matched_face.locked_identity not in ("Unknown", "Scanning..."):
                                 try:
                                     face_img = frame[gy:gy + gh, gx:gx + gw].copy()
                                     if face_img.size > 0:
                                         quality_score = calculate_face_quality(face_img)
-                                        self._push_db_update(tracked_face.locked_identity, face_img, quality_score)
+                                        self._push_db_update(matched_face.locked_identity, face_img, quality_score)
                                 except Exception as e:
                                     pass  # Non-critical, silently skip
+                            else:
+                                # UNLOCKED: Re-queue for recognition to accumulate history
+                                if not matched_face.is_recognizing:
+                                    try:
+                                        face_img = frame[gy:gy + gh, gx:gx + gw].copy()
+                                        if face_img.size > 0:
+                                            matched_face.is_recognizing = True
+                                            self.recognition_queue.put((matched_face.face_id, face_img), block=False)
+                                            print(f"[QUEUE] Re-queued unlocked Face {matched_face.face_id} for recognition")
+                                    except queue.Full:
+                                        pass  # Queue full, try next time
+                                    except Exception as e:
+                                        pass
                             continue
 
                         # --- PHASE 4: NEW FACE FOUND ---
@@ -861,10 +934,19 @@ class DetectionSystem:
 
                 cv2.rectangle(frame, (px, py), (px + pw, py + ph), color, 3)
 
-                # Person Label
-                prim_face = person_obj.get_primary_face_name()
+                # Person Label - use global_tracker for consolidated name
+                prim_face = person_obj.get_primary_face_name(self.global_tracker)
                 gid = person_obj.global_id if person_obj.global_id else "-"
-                label = f"G:{gid} L:{pid} {prim_face}"
+                
+                # Check if any face has locked identity
+                is_confirmed = any(
+                    f.locked_identity and f.locked_identity not in ("Unknown", "Scanning...")
+                    for f in person_obj.faces.values()
+                ) if person_obj.faces else False
+                
+                # Show confirmed/unconfirmed status (use ASCII - OpenCV doesn't support Unicode)
+                status = "[OK]" if is_confirmed else "[?]"
+                label = f"G:{gid} L:{pid} {prim_face} {status}"
                 cv2.putText(frame, label, (px, py - 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
             

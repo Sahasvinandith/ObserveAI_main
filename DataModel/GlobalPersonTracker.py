@@ -56,13 +56,38 @@ class GlobalPerson:
     feature_vector: Optional[np.ndarray] = None  # Most recent/best features
     camera_tracks: Dict[str, LocalTrack] = field(default_factory=dict)
     
-    # Face recognition results
+    # Face recognition results (legacy fields kept for compatibility)
     name: str = "Unknown"
     confidence: float = 0.0
+    
+    # Consolidated user identity (best match across all cameras)
+    local_user_id: str = "Unknown"  # The winner ID (e.g., "User_3")
+    best_confidence: float = 1.0    # Lower is better (distance)
     
     # Lifecycle tracking
     first_seen: float = field(default_factory=time.time)
     last_seen: float = field(default_factory=time.time)
+    
+    def update_face_identity(self, user_id: str, confidence: float) -> str:
+        """
+        Update face identity for this global person.
+        Keeps the best match (lowest confidence/distance).
+        
+        Returns: The consolidated (winner) user ID
+        """
+        if user_id in ("Unknown", "Scanning..."):
+            return self.local_user_id
+        
+        # If this is a better match (lower distance), update
+        if confidence < self.best_confidence:
+            print(f"[CONSOLIDATE] Global {self.global_id}: {self.local_user_id} ({self.best_confidence:.2f}) -> {user_id} ({confidence:.2f})")
+            self.local_user_id = user_id
+            self.best_confidence = confidence
+            # Also update legacy fields
+            self.name = user_id
+            self.confidence = confidence
+        
+        return self.local_user_id
     
     def update_from_camera(self, camera_name: str, local_id: int,
                           feature_vector: Optional[np.ndarray] = None,
@@ -93,6 +118,7 @@ class GlobalPerson:
     def is_in_camera(self, camera_name: str) -> bool:
         """Check if person is currently tracked in a camera"""
         return camera_name in self.camera_tracks
+
 
 
 class GlobalPersonTracker:
@@ -139,6 +165,42 @@ class GlobalPersonTracker:
         
         print(f"[GLOBAL TRACKER] Initialized with threshold={feature_threshold}, "
               f"weights: reid={reid_weight}, spatial={spatial_weight}")
+    
+    # =========================================================================
+    # Face Identity Consolidation
+    # =========================================================================
+    
+    def update_face_identity(self, global_id: int, user_id: str, confidence: float) -> str:
+        """
+        Update face identity for a global person. If multiple cameras report
+        different IDs for the same global person, keep the best (lowest distance).
+        
+        Args:
+            global_id: The global person ID
+            user_id: The local user ID from face recognition (e.g., "User_3")
+            confidence: The match confidence/distance (lower = better)
+            
+        Returns:
+            The consolidated (winner) user ID for this global person
+        """
+        with self.lock:
+            if global_id not in self.global_persons:
+                return user_id  # No global person, return as-is
+            
+            person = self.global_persons[global_id]
+            return person.update_face_identity(user_id, confidence)
+    
+    def get_consolidated_name(self, global_id: int) -> str:
+        """
+        Get the consolidated/best name for a global person.
+        
+        Returns:
+            The best user ID for this global person, or "Unknown" if not found
+        """
+        with self.lock:
+            if global_id not in self.global_persons:
+                return "Unknown"
+            return self.global_persons[global_id].local_user_id
     
     # =========================================================================
     # Camera Registration
