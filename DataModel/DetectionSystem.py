@@ -83,6 +83,11 @@ class Face:
         self.last_seen = time.time()
         self.is_recognizing = False # Flag for async queue
         self.tracker_miscount: int = 0  # Count of consecutive tracker failures
+        
+        # Identity verification fields
+        self.identity_history = []  # List of (user_name, confidence) tuples
+        self.locked_identity = None  # Locked after N consistent matches
+        self.avg_confidence = 0.0  # Average confidence for locked identity
 
     def position_update(self, x, y, w, h):
         self.x = x
@@ -102,6 +107,58 @@ class Face:
     # --- THIS WAS MISSING ---
     def get_center(self):
         return (self.x + self.w // 2, self.y + self.h // 2)
+    
+    def update_identity(self, new_name: str, new_confidence: float, 
+                        confirm_frames: int = 3, 
+                        confidence_threshold: float = 0.6,
+                        change_margin: float = 0.15) -> str:
+        """
+        Update face identity with verification logic.
+        
+        Returns the final identity name (may reject the new_name if locked).
+        """
+        # Reject low confidence matches
+        if new_confidence > confidence_threshold:  # Note: lower distance = better match
+            return self.locked_identity if self.locked_identity else "Unknown"
+        
+        # Add to history
+        self.identity_history.append((new_name, new_confidence))
+        
+        # Keep only last N entries
+        if len(self.identity_history) > confirm_frames * 2:
+            self.identity_history = self.identity_history[-confirm_frames * 2:]
+        
+        # If already locked
+        if self.locked_identity:
+            # Check if new identity is significantly better
+            if new_name != self.locked_identity:
+                # Require margin improvement to change identity
+                if new_confidence < (self.avg_confidence - change_margin):
+                    # Strong evidence for new identity - unlock and re-evaluate
+                    print(f"[IDENTITY] Strong evidence: {new_name} ({new_confidence:.2f}) vs locked {self.locked_identity} ({self.avg_confidence:.2f})")
+                    self.locked_identity = None
+                    self.identity_history = [(new_name, new_confidence)]
+                else:
+                    # Keep locked identity
+                    return self.locked_identity
+            else:
+                # Same identity, update confidence
+                self.avg_confidence = (self.avg_confidence + new_confidence) / 2
+                return self.locked_identity
+        
+        # Check for consistent matches to lock identity
+        recent = self.identity_history[-confirm_frames:]
+        if len(recent) >= confirm_frames:
+            names = [r[0] for r in recent]
+            if all(n == names[0] and n not in ("Unknown", "Scanning...") for n in names):
+                # All recent matches are consistent - lock identity
+                self.locked_identity = names[0]
+                self.avg_confidence = sum(r[1] for r in recent) / len(recent)
+                print(f"[IDENTITY] Locked {self.locked_identity} (avg_conf={self.avg_confidence:.2f})")
+                return self.locked_identity
+        
+        # Not yet locked, return current match
+        return new_name
 
 class DetectionSystem:
     def __init__(self, camera_name, db_path="Faces_db", camera_buffer=None, output_callback=None, frame_skip_interval=3, gui_fps_limit=15, global_tracker:GlobalPersonTracker=None):
@@ -132,6 +189,7 @@ class DetectionSystem:
         
         self.FRAME_QUEUE_SIZE = 20
         self.RECOGNITION_QUEUE_SIZE = 20 # Buffer for async recognition
+        self.DB_UPDATE_QUEUE_SIZE = 30   # Buffer for async database updates
         self.DISTANCE_THRESHOLD = 50
         
         self.frame_count = 0
@@ -139,6 +197,11 @@ class DetectionSystem:
         # Shared resources
         self.frame_queue = queue.Queue(maxsize=self.FRAME_QUEUE_SIZE)
         self.recognition_queue = queue.Queue(maxsize=self.RECOGNITION_QUEUE_SIZE) # RESTORED QUEUE
+        self.db_update_queue = queue.Queue(maxsize=self.DB_UPDATE_QUEUE_SIZE)  # Async DB updates
+        
+        # Quality cache: user_name -> min_quality_on_disk (avoids disk reads)
+        self.quality_cache = {}
+        self.quality_cache_lock = threading.Lock()
         
         self.stop_event = threading.Event()
         self.lock = threading.Lock()
@@ -171,6 +234,7 @@ class DetectionSystem:
         self.proc_thread = None
         self.disp_thread = None
         self.recog_thread = None # RESTORED WORKER
+        self.db_update_thread = None  # Database update worker
         self.watchdog_thread = None
 
         print("[INFO] System initialized successfully.")
@@ -262,6 +326,10 @@ class DetectionSystem:
             self.disp_thread = threading.Thread(target=self.display_thread_function, daemon=True)
             self.disp_thread.start()
 
+            # Database Update Worker Thread
+            self.db_update_thread = threading.Thread(target=self.db_update_worker, daemon=True)
+            self.db_update_thread.start()
+
             self.watchdog_thread = threading.Thread(target=self.watchdog_thread_function, daemon=True)
             self.watchdog_thread.start()
         except Exception as e:
@@ -272,7 +340,7 @@ class DetectionSystem:
         self.stop_event.set()
         
         # Wait for threads to finish
-        for t in [self.proc_thread, self.disp_thread, self.recog_thread, self.watchdog_thread, self.cam_thread]:
+        for t in [self.proc_thread, self.disp_thread, self.recog_thread, self.db_update_thread, self.watchdog_thread, self.cam_thread]:
             if t and t.is_alive():
                 t.join(timeout=2.0)
         cv2.destroyAllWindows()
@@ -335,17 +403,30 @@ class DetectionSystem:
                         with self.lock:
                             face_obj.name = "Unknown"
                 else:
-                    # Known match: update under lock
+                    # Known match: use identity verification
+                    # Get settings (use defaults if not available)
+                    confirm_frames = 3  # TODO: get from settings
+                    confidence_threshold = 0.6
+                    change_margin = 0.15
+                    
                     with self.lock:
-                        face_obj.name = name
+                        # Use update_identity to verify and possibly lock identity
+                        verified_name = face_obj.update_identity(
+                            name, confidence,
+                            confirm_frames=confirm_frames,
+                            confidence_threshold=confidence_threshold,
+                            change_margin=change_margin
+                        )
+                        face_obj.name = verified_name
                         face_obj.confidence = confidence
 
-                    # Try to improve stored images with higher quality captures
-                    try:
-                        quality_score = calculate_face_quality(face_img)
-                        update_user_faces(name, face_img=face_img, quality_score=quality_score)
-                    except Exception as e:
-                        print(f"[QUALITY UPDATE] Error updating {name}: {e}")
+                    # Only push to DB update queue if identity is LOCKED (confirmed)
+                    if face_obj.locked_identity and face_obj.locked_identity not in ("Unknown", "Scanning..."):
+                        try:
+                            quality_score = calculate_face_quality(face_img)
+                            self._push_db_update(face_obj.locked_identity, face_img, quality_score)
+                        except Exception as e:
+                            print(f"[QUALITY UPDATE] Error: {e}")
 
                 # Unlock flag under lock
                 with self.lock:
@@ -355,6 +436,122 @@ class DetectionSystem:
                 continue
             except Exception as e:
                 print(f"[RECOG WORKER ERROR] {e}")
+
+    # --- 1.5 DATABASE UPDATE WORKER ---
+    def db_update_worker(self):
+        """
+        Background thread that processes face quality updates.
+        Saves better quality images and refreshes embeddings.
+        """
+        print("[THREAD] DB Update Worker started")
+        
+        while not self.stop_event.is_set():
+            try:
+                # Get task: (user_name, face_img, quality_score)
+                task = self.db_update_queue.get(timeout=1.0)
+                user_name, face_img, quality_score = task
+                
+                # Save image (update_user_faces handles the disk comparison)
+                saved = update_user_faces(user_name, face_img=face_img, quality_score=quality_score)
+                
+                if saved:
+                    # Update our cache with new minimum
+                    new_min = self._get_min_quality_from_disk(user_name)
+                    self._update_quality_cache(user_name, new_min)
+                    
+                    # Refresh embedding with best quality image
+                    self.EmbeddingCache.refresh_user(user_name)
+                    print(f"[DB WORKER] Updated {user_name} and refreshed embedding")
+                
+            except queue.Empty:
+                continue
+            except Exception as e:
+                print(f"[DB WORKER ERROR] {e}")
+        
+        print("[THREAD] DB Update Worker stopped")
+    
+    # --- Quality Cache Helpers ---
+    def _get_cached_min_quality(self, user_name: str) -> float:
+        """
+        Get cached minimum quality for a user.
+        Returns 0 if not cached (cache miss - will need disk read).
+        """
+        with self.quality_cache_lock:
+            return self.quality_cache.get(user_name, 0)
+    
+    def _update_quality_cache(self, user_name: str, min_quality: float):
+        """Update the cached minimum quality for a user."""
+        with self.quality_cache_lock:
+            self.quality_cache[user_name] = min_quality
+            print(f"[CACHE] Updated {user_name} min_quality={min_quality:.1f}")
+    
+    def _get_min_quality_from_disk(self, user_name: str) -> float:
+        """
+        Read minimum quality from disk for a user.
+        Called on cache miss or after save to refresh cache.
+        """
+        user_path = os.path.join(self.db_path, str(user_name))
+        if not os.path.isdir(user_path):
+            return 0
+        
+        min_quality = float('inf')
+        for filename in os.listdir(user_path):
+            if not filename.endswith(('.jpg', '.jpeg', '.png')):
+                continue
+            
+            # Extract quality from filename (format: face_TIMESTAMP_qSCORE.jpg)
+            if '_q' in filename:
+                try:
+                    q_part = filename.split('_q')[1].split('.')[0]
+                    file_quality = float(q_part)
+                    min_quality = min(min_quality, file_quality)
+                except (IndexError, ValueError):
+                    min_quality = 0  # Old format images have quality 0
+            else:
+                min_quality = 0  # Old format without quality score
+        
+        return min_quality if min_quality != float('inf') else 0
+    
+    def _push_db_update(self, user_name: str, face_img, quality_score: float, max_faces: int = 5):
+        """
+        Push a face to db_update_queue.
+        - If user has < max_faces images: always push (filling phase)
+        - If user has >= max_faces: only push if quality is better (replacement phase)
+        Non-blocking: skips if queue is full.
+        """
+        # Get image count and min quality from disk (one-time read per user)
+        user_path = os.path.join(self.db_path, str(user_name))
+        if os.path.isdir(user_path):
+            images = [f for f in os.listdir(user_path) if f.endswith(('.jpg', '.jpeg', '.png'))]
+            num_images = len(images)
+        else:
+            num_images = 0
+        
+        # PHASE 1: Filling - always push if under capacity
+        if num_images < max_faces:
+            try:
+                self.db_update_queue.put_nowait((user_name, face_img.copy(), quality_score))
+                print(f"[DB QUEUE] Pushed {user_name} for filling ({num_images + 1}/{max_faces})")
+            except queue.Full:
+                pass
+            return
+        
+        # PHASE 2: Replacement - only push if quality is better than cached minimum
+        cached_min = self._get_cached_min_quality(user_name)
+        
+        # If not in cache, do a one-time disk read to populate cache
+        if cached_min == 0:
+            cached_min = self._get_min_quality_from_disk(user_name)
+            self._update_quality_cache(user_name, cached_min)
+        
+        # Only push if quality is better than cached minimum
+        if quality_score > cached_min:
+            try:
+                self.db_update_queue.put_nowait((user_name, face_img.copy(), quality_score))
+                print(f"[DB QUEUE] Pushed {user_name} (q={quality_score:.1f} > min={cached_min:.1f})")
+            except queue.Full:
+                pass  # Queue full, skip this update (non-blocking)
+        # else: silently skip - not better than existing
 
     # --- 2. CAMERA THREAD ---
     def camera_thread_function(self):
@@ -434,7 +631,17 @@ class DetectionSystem:
                                 is_known_face = True
                                 break
 
-                        if is_known_face: continue
+                        if is_known_face:
+                            # Only push to DB update queue if identity is LOCKED (confirmed)
+                            if tracked_face.locked_identity and tracked_face.locked_identity not in ("Unknown", "Scanning..."):
+                                try:
+                                    face_img = frame[gy:gy + gh, gx:gx + gw].copy()
+                                    if face_img.size > 0:
+                                        quality_score = calculate_face_quality(face_img)
+                                        self._push_db_update(tracked_face.locked_identity, face_img, quality_score)
+                                except Exception as e:
+                                    pass  # Non-critical, silently skip
+                            continue
 
                         # --- PHASE 4: NEW FACE FOUND ---
                         # Try to push to queue FIRST. If full, skip this face entirely for now.

@@ -370,11 +370,6 @@ def update_user_faces(user_folder, face_img, quality_score=None, max_faces=5, mi
     if quality_score is None:
         quality_score = calculate_face_quality(face_img)
     
-    # Check minimum quality threshold
-    if quality_score < min_quality:
-        print(f"[SKIP] Face quality {quality_score:.1f} below threshold {min_quality}")
-        return False
-    
     try:
         print(f"Updating user folder: {user_folder} (quality: {quality_score:.1f})")
         user_path = os.path.join(db_path, str(user_folder))
@@ -402,22 +397,36 @@ def update_user_faces(user_folder, face_img, quality_score=None, max_faces=5, mi
 
         # Sort by quality (lowest first)
         images.sort(key=lambda x: x[1])
+        
+        num_images = len(images)
 
-        # Check if we should save this image
-        if len(images) >= max_faces:
-            # At capacity - only replace if new is better than worst
-            if quality_score <= images[0][1]:
-                print(f"[SKIP] New quality {quality_score:.1f} not better than worst existing {images[0][1]:.1f}")
-                return False
+        # PHASE 1: Fill up to max_faces without quality check
+        if num_images < max_faces:
+            # Just save - no quality check needed yet
+            timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+            new_filename = f"face_{timestamp}_q{quality_score:.1f}.jpg"
+            save_path = os.path.join(user_path, new_filename)
             
-            # Check if all images are already high quality (all > 150)
-            if all(img[1] > 150 for img in images):
-                print(f"[SKIP] All {max_faces} images are already high quality")
-                return False
+            cv2.imwrite(save_path, face_img)
+            print(f"[SAVED] Face image {num_images + 1}/{max_faces} for {user_folder} (quality: {quality_score:.1f})")
             
-            # Replace the worst one
-            os.remove(images[0][0])
-            print(f"[REPLACED] Removed low quality face ({images[0][1]:.1f})")
+            DB_UPDATED = True
+            return True
+        
+        # PHASE 2: At capacity - quality-based replacement
+        # Check minimum quality threshold for replacement
+        if quality_score < min_quality:
+            print(f"[SKIP] Quality {quality_score:.1f} below threshold {min_quality}")
+            return False
+        
+        # Only replace if new is better than worst existing
+        if quality_score <= images[0][1]:
+            print(f"[SKIP] Quality {quality_score:.1f} not better than worst {images[0][1]:.1f}")
+            return False
+        
+        # Replace the worst one
+        os.remove(images[0][0])
+        print(f"[REPLACED] Removed low quality face ({images[0][1]:.1f})")
         
         # Save new image with quality score in filename
         timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
@@ -427,7 +436,7 @@ def update_user_faces(user_folder, face_img, quality_score=None, max_faces=5, mi
         cv2.imwrite(save_path, face_img)
         print(f"[SAVED] Face image for {user_folder} (quality: {quality_score:.1f})")
         
-        DB_UPDATED = True  # Set flag to refresh embeddings
+        DB_UPDATED = True
         return True
 
     except Exception as e:

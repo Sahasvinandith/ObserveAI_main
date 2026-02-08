@@ -33,7 +33,11 @@ class SettingsManager:
         "dot_radius": 8,
         # Face Quality Settings
         "min_quality_threshold": 50,
-        "max_faces_per_user": 5
+        "max_faces_per_user": 5,
+        # Identity Verification Settings
+        "identity_confirm_frames": 3,       # Frames to confirm identity before locking
+        "identity_confidence_threshold": 0.6,  # Min confidence to accept recognition
+        "identity_change_margin": 0.15      # How much better new match must be to change
     }
     
     def __init__(self, settings_file: Optional[str] = None):

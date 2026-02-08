@@ -187,6 +187,10 @@ class MainWindow(QMainWindow):
         self.dot_radius_spinbox.setValue(self.settings.get("dot_radius"))
         self.min_quality_spinbox.setValue(self.settings.get("min_quality_threshold"))
         self.max_faces_spinbox.setValue(self.settings.get("max_faces_per_user"))
+        # Identity verification settings
+        self.identity_confirm_frames_spinbox.setValue(self.settings.get("identity_confirm_frames"))
+        self.identity_confidence_spinbox.setValue(self.settings.get("identity_confidence_threshold"))
+        self.identity_margin_spinbox.setValue(self.settings.get("identity_change_margin"))
         
         # Connect save and reset buttons
         self.save_settings_btn.clicked.connect(self._save_settings)
@@ -212,6 +216,10 @@ class MainWindow(QMainWindow):
         self.settings.set("dot_radius", self.dot_radius_spinbox.value())
         self.settings.set("min_quality_threshold", self.min_quality_spinbox.value())
         self.settings.set("max_faces_per_user", self.max_faces_spinbox.value())
+        # Identity verification settings
+        self.settings.set("identity_confirm_frames", self.identity_confirm_frames_spinbox.value())
+        self.settings.set("identity_confidence_threshold", self.identity_confidence_spinbox.value())
+        self.settings.set("identity_change_margin", self.identity_margin_spinbox.value())
         
         if self.settings.save():
             print("[SETTINGS] Settings saved successfully!")
@@ -230,6 +238,10 @@ class MainWindow(QMainWindow):
         self.dot_radius_spinbox.setValue(defaults["dot_radius"])
         self.min_quality_spinbox.setValue(defaults["min_quality_threshold"])
         self.max_faces_spinbox.setValue(defaults["max_faces_per_user"])
+        # Identity verification settings
+        self.identity_confirm_frames_spinbox.setValue(defaults["identity_confirm_frames"])
+        self.identity_confidence_spinbox.setValue(defaults["identity_confidence_threshold"])
+        self.identity_margin_spinbox.setValue(defaults["identity_change_margin"])
         
         # Apply to tracker
         self.global_tracker.feature_threshold = defaults["feature_threshold"]
