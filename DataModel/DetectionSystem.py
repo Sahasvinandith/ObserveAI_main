@@ -105,6 +105,7 @@ class Face:
         self.identity_history = []  # List of (user_name, confidence) tuples
         self.locked_identity = None  # Locked after N consistent matches
         self.avg_confidence = 0.0  # Average confidence for locked identity
+        self.unknown_count = 0  # Count of consecutive "Unknown" results (for new user creation threshold)
 
     def position_update(self, x, y, w, h):
         self.x = x
@@ -389,8 +390,6 @@ class DetectionSystem:
                 
                 name, confidence = self.EmbeddingCache.find_match(face_img)
                 print(f"[RECOG] Face {face_id_key} matched: name='{name}', conf={confidence:.3f}")
-                if name == "User_3":
-                    print("user_3 happened")
 
                 # 2. Update Logic
                 with self.lock:
@@ -404,6 +403,23 @@ class DetectionSystem:
 
                 # --- LOGIC: Handle New User ---
                 if name == "Unknown":
+                    # Increment unknown counter for this face
+                    with self.lock:
+                        face_obj.unknown_count = getattr(face_obj, 'unknown_count', 0) + 1
+                        unknown_count = face_obj.unknown_count
+                    
+                    # Require 3 consecutive Unknown results before creating new user
+                    unknown_threshold = 3  # TODO: Add to settings
+                    
+                    if unknown_count < unknown_threshold:
+                        print(f"[RECOG] Face {face_id_key} Unknown ({unknown_count}/{unknown_threshold}) - waiting for more frames")
+                        with self.lock:
+                            face_obj.name = "Scanning..."
+                        continue  # Don't create new user yet
+                    
+                    # Threshold reached - create new user
+                    print(f"[RECOG] Face {face_id_key} confirmed Unknown after {unknown_count} frames - creating new user")
+                    
                     try:
                         # Calculate face quality before saving
                         quality_score = calculate_face_quality(face_img)
@@ -431,6 +447,7 @@ class DetectionSystem:
                                 face_obj.name = new_folder_name
                                 face_obj.locked_identity = new_folder_name  # Immediately lock new user
                                 face_obj.avg_confidence = initial_confidence
+                                face_obj.unknown_count = 0  # Reset counter
                                 
                                 # Report new user to global tracker for consolidation
                                 person_id = face_obj.person_id
@@ -446,7 +463,8 @@ class DetectionSystem:
                         else:
                             print(f"[STORAGE] Skipped saving - quality below threshold")
                             with self.lock:
-                                face_obj.name = "Unknown"
+                                face_obj.name = "Scanning..."
+                                # Don't reset unknown_count to allow retry
 
                     except Exception as e:
                         print(f"[ERROR] Failed to save new user: {e}")
@@ -454,6 +472,10 @@ class DetectionSystem:
                             face_obj.name = "Unknown"
                 else:
                     # Known match: use identity verification
+                    # Reset unknown counter since we found a match
+                    with self.lock:
+                        face_obj.unknown_count = 0
+                    
                     # Get settings (use defaults if not available)
                     confirm_frames = 3  # TODO: get from settings
                     confidence_threshold = 0.6
@@ -857,12 +879,7 @@ class DetectionSystem:
                 detections = []
                 if should_run_yolo_detection:
                     self.frame_count=0
-                    # DEBUG: Time the person detection
-                    import time as _time
-                    _person_start = _time.perf_counter()
                     results = self.yolo_model(frame, verbose=False)
-                    _person_elapsed = (_time.perf_counter() - _person_start) * 1000
-                    print(f"[TIMING] yolov8n (person): {_person_elapsed:.1f}ms")
                     for r in results:
                         for box in r.boxes:
                             if int(box.cls[0]) == 0:
@@ -871,19 +888,20 @@ class DetectionSystem:
                                     x1, y1, x2, y2 = map(int, box.xyxy[0])
                                     detections.append(([x1, y1, x2 - x1, y2 - y1], conf, 0))
                     # Only update tracker when we have fresh detections
-                    tracks = self.person_tracker.update_tracks(detections, frame=frame)
+                    tracks = self.person_tracker.update_tracks(detections, frame=frame) #check the track of user. i think this is local id
                 else:
                     # Between detection frames, still update tracker with empty detections
                     # This keeps existing tracks alive
-                    tracks = self.person_tracker.update_tracks([], frame=frame)
+                    tracks = self.person_tracker.update_tracks([], frame=frame) 
 
                 # 3. Process tracked persons
-                current_tracked_ids = []
+                current_tracked_ids = [] #check the track of user. i think this is local id
 
                 for track in tracks:
                     # Process only confirmed tracks
                     # With n_init=1, tracks confirm immediately after first detection
                     if not track.is_confirmed():
+                        print(f"deepsort track for user in {self.camera_name} is not yet confirmed")
                         continue
 
                     tid = track.track_id
@@ -893,7 +911,7 @@ class DetectionSystem:
 
                     # Update/Create Person
                     if tid in self.tracked_persons:
-                        person_obj = self.tracked_persons[tid]
+                        person_obj = self.tracked_persons[tid] 
                         person_obj.update_position(l, t, w, h, 0.9)
                         
                         # Update global tracker if we have features but no global ID yet
@@ -907,7 +925,7 @@ class DetectionSystem:
                             )
                             person_obj.global_id = global_id
                     else:
-                        person_obj = Person(tid, l, t, w, h, 0.9)
+                        person_obj = Person(tid, l, t, w, h, 0.9) #new tracking. creating a new Person object
                         # Extract features once
                         crop = frame[t:t + h, l:l + w]
                         person_obj.feature_vector = self.extract_person_features(crop)
@@ -922,7 +940,7 @@ class DetectionSystem:
                                 bbox=(l, t, w, h),
                                 frame_shape=(frame.shape[1], frame.shape[0])  # (width, height)
                             )
-                            person_obj.global_id = global_id
+                            person_obj.global_id = global_id # assigning global id for user. check the camera name. 
 
                     # 4. Process faces (The new Async Logic)
                     face_ids = self.process_faces_in_person(frame, (l, t, w, h), tid)

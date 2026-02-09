@@ -68,18 +68,21 @@ class GlobalPerson:
     first_seen: float = field(default_factory=time.time)
     last_seen: float = field(default_factory=time.time)
     
-    def update_face_identity(self, user_id: str, confidence: float) -> str:
+    def update_face_identity(self, user_id: str, confidence: float) -> tuple:
         """
         Update face identity for this global person.
         Keeps the best match (lowest confidence/distance).
         
-        Returns: The consolidated (winner) user ID
+        Returns: Tuple of (winner_user_id, old_user_id_if_changed or None)
+                 old_user_id is set when identity CHANGES to a different user
         """
         if user_id in ("Unknown", "Scanning..."):
-            return self.local_user_id
+            return (self.local_user_id, None)
         
         # Log the incoming identity report
         print(f"[ID REPORT] Global {self.global_id}: Received '{user_id}' (conf={confidence:.3f}), current='{self.local_user_id}' (best={self.best_confidence:.3f})")
+        
+        old_id_for_merge = None  # Track if we need to merge
         
         # If this is a better match (lower distance), update
         if confidence < self.best_confidence:
@@ -92,9 +95,10 @@ class GlobalPerson:
             self.name = user_id
             self.confidence = confidence
             
-            # Log the identity change
+            # Log the identity change - mark for merge if changing to different user
             if old_id != "Unknown" and old_id != user_id:
                 print(f"[ID CHANGE] Global {self.global_id}: SWITCHED from '{old_id}' ({old_conf:.3f}) to '{user_id}' ({confidence:.3f}) - lower distance wins!")
+                old_id_for_merge = old_id  # Return old_id so tracker can merge folders
             else:
                 print(f"[ID SET] Global {self.global_id}: Set to '{user_id}' ({confidence:.3f})")
         else:
@@ -102,7 +106,7 @@ class GlobalPerson:
             if user_id != self.local_user_id:
                 print(f"[ID REJECT] Global {self.global_id}: Rejected '{user_id}' ({confidence:.3f}) - current '{self.local_user_id}' ({self.best_confidence:.3f}) is better")
         
-        return self.local_user_id
+        return (self.local_user_id, old_id_for_merge)
     
     def update_from_camera(self, camera_name: str, local_id: int,
                           feature_vector: Optional[np.ndarray] = None,
@@ -190,6 +194,9 @@ class GlobalPersonTracker:
         Update face identity for a global person. If multiple cameras report
         different IDs for the same global person, keep the best (lowest distance).
         
+        When identity CHANGES (e.g., User_2 -> User_1), automatically merges
+        the old user folder into the new user folder.
+        
         Args:
             global_id: The global person ID
             user_id: The local user ID from face recognition (e.g., "User_3")
@@ -203,7 +210,21 @@ class GlobalPersonTracker:
                 return user_id  # No global person, return as-is
             
             person = self.global_persons[global_id]
-            return person.update_face_identity(user_id, confidence)
+            winner_id, old_id_to_merge = person.update_face_identity(user_id, confidence)
+            
+            # If identity changed, merge the old user folder into the winner
+            if old_id_to_merge is not None:
+                print(f"[MERGE TRIGGER] Identity changed from '{old_id_to_merge}' to '{winner_id}', merging folders...")
+                # Import and get embedding cache singleton
+                try:
+                    from DataModel.EmbeddingCache import get_embedding_cache
+                    cache = get_embedding_cache()
+                    # Merge old folder INTO winner folder (old folder will be deleted)
+                    cache.merge_users(old_id_to_merge, winner_id)
+                except Exception as e:
+                    print(f"[MERGE ERROR] Failed to merge folders: {e}")
+            
+            return winner_id
     
     def get_consolidated_name(self, global_id: int) -> str:
         """
