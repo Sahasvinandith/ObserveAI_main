@@ -981,9 +981,7 @@ class DetectionSystem:
                 pid = int(person_obj.person_id)
                 px, py, pw, ph = person_obj.x, person_obj.y, person_obj.w, person_obj.h
 
-                # Color based on ID
-                color = ((pid * 50) % 255, (pid * 100) % 255, (pid * 150) % 255)
-
+                color=(0,0,129)
                 cv2.rectangle(frame, (px, py), (px + pw, py + ph), (0,0,139), 3)
 
                 # Person Label - use global_tracker for consolidated name
