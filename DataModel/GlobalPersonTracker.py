@@ -78,14 +78,29 @@ class GlobalPerson:
         if user_id in ("Unknown", "Scanning..."):
             return self.local_user_id
         
+        # Log the incoming identity report
+        print(f"[ID REPORT] Global {self.global_id}: Received '{user_id}' (conf={confidence:.3f}), current='{self.local_user_id}' (best={self.best_confidence:.3f})")
+        
         # If this is a better match (lower distance), update
         if confidence < self.best_confidence:
-            print(f"[CONSOLIDATE] Global {self.global_id}: {self.local_user_id} ({self.best_confidence:.2f}) -> {user_id} ({confidence:.2f})")
+            old_id = self.local_user_id
+            old_conf = self.best_confidence
+            
             self.local_user_id = user_id
             self.best_confidence = confidence
             # Also update legacy fields
             self.name = user_id
             self.confidence = confidence
+            
+            # Log the identity change
+            if old_id != "Unknown" and old_id != user_id:
+                print(f"[ID CHANGE] Global {self.global_id}: SWITCHED from '{old_id}' ({old_conf:.3f}) to '{user_id}' ({confidence:.3f}) - lower distance wins!")
+            else:
+                print(f"[ID SET] Global {self.global_id}: Set to '{user_id}' ({confidence:.3f})")
+        else:
+            # Log when incoming identity was rejected
+            if user_id != self.local_user_id:
+                print(f"[ID REJECT] Global {self.global_id}: Rejected '{user_id}' ({confidence:.3f}) - current '{self.local_user_id}' ({self.best_confidence:.3f}) is better")
         
         return self.local_user_id
     

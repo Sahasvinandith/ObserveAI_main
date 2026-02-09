@@ -64,7 +64,6 @@ class Person:
             consolidated = global_tracker.get_consolidated_name(self.global_id)
             if consolidated and consolidated not in ("Unknown", "Scanning..."):
                 # DEBUG: Log when consolidated name is used
-                print(f"[DISPLAY] Person L:{self.person_id} G:{self.global_id} -> consolidated: {consolidated}")
                 return consolidated
             else:
                 print(f"[DISPLAY] Person L:{self.person_id} G:{self.global_id} consolidated='{consolidated}', falling back to local")
@@ -406,11 +405,18 @@ class DetectionSystem:
                         if saved:
                             self.EmbeddingCache.add_new_user(new_folder_name, face_img)
 
+                            # Calculate initial confidence based on image quality
+                            # Higher quality = lower confidence value = higher priority
+                            # Quality typically ranges 200-400, normalize to 0.1-0.5
+                            # quality 400 -> conf 0.1 (best), quality 200 -> conf 0.5 (worst)
+                            initial_confidence = max(0.1, min(0.5, 0.5 - (quality_score - 200) / 400))
+                            print(f"[NEW USER] Quality {quality_score:.1f} -> initial_confidence {initial_confidence:.3f}")
+
                             # Update live object name under lock
                             with self.lock:
                                 face_obj.name = new_folder_name
                                 face_obj.locked_identity = new_folder_name  # Immediately lock new user
-                                face_obj.avg_confidence = 0.5  # Default confidence for new user
+                                face_obj.avg_confidence = initial_confidence
                                 
                                 # Report new user to global tracker for consolidation
                                 person_id = face_obj.person_id
@@ -420,9 +426,9 @@ class DetectionSystem:
                                         consolidated = self.global_tracker.update_face_identity(
                                             person.global_id,
                                             new_folder_name,
-                                            0.5  # Default confidence for new user
+                                            initial_confidence  # Quality-based confidence
                                         )
-                                        print(f"[NEW USER] Reported {new_folder_name} to global tracker -> {consolidated}")
+                                        print(f"[NEW USER] Reported {new_folder_name} (conf={initial_confidence:.3f}) to global tracker -> {consolidated}")
                         else:
                             print(f"[STORAGE] Skipped saving - quality below threshold")
                             with self.lock:
