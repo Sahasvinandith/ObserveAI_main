@@ -415,6 +415,7 @@ class DetectionSystem:
                         print(f"[RECOG] Face {face_id_key} Unknown ({unknown_count}/{unknown_threshold}) - waiting for more frames")
                         with self.lock:
                             face_obj.name = "Scanning..."
+                            face_obj.is_recognizing = False  # CRITICAL: Reset so face can be re-queued!
                         continue  # Don't create new user yet
                     
                     # Threshold reached - create new user
@@ -464,12 +465,14 @@ class DetectionSystem:
                             print(f"[STORAGE] Skipped saving - quality below threshold")
                             with self.lock:
                                 face_obj.name = "Scanning..."
+                                face_obj.is_recognizing = False  # Reset so face can be re-queued
                                 # Don't reset unknown_count to allow retry
 
                     except Exception as e:
                         print(f"[ERROR] Failed to save new user: {e}")
                         with self.lock:
                             face_obj.name = "Unknown"
+                            face_obj.is_recognizing = False  # Reset so face can be re-queued
                 else:
                     # Known match: use identity verification
                     # Reset unknown counter since we found a match
