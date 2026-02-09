@@ -17,6 +17,7 @@ import torch
 from torchvision.transforms import transforms
 from DataModel.EmbeddingCache import get_embedding_cache
 from DataModel.GlobalPersonTracker import GlobalPersonTracker
+from DataModel.SettingsManager import get_settings
 
 def Ai_System_thread(camera_name, db_path="Faces_db", camera_buffer=None, output_callback=None, frame_skip_interval=3, gui_fps_limit=15, global_tracker=None, Main_Detection_system=None):
     detection_system = DetectionSystem(
@@ -185,6 +186,9 @@ class DetectionSystem:
         
         # Global person tracking
         self.global_tracker = global_tracker
+        
+        
+        self.settings = get_settings()
         
         self.EmbeddingCache = None  # Placeholder for EmbeddingCache instance
         
@@ -375,8 +379,17 @@ class DetectionSystem:
                 task = self.recognition_queue.get(timeout=1.0)
                 face_id_key, face_img = task
                 
+                # DEBUG: Save face image to temp file for inspection
+                try:
+                    cv2.imwrite("debug_face_temp.jpg", face_img)
+                    print(f"[DEBUG] Saved face {face_id_key} to debug_face_temp.jpg (shape={face_img.shape})")
+                except Exception as e:
+                    print(f"[DEBUG] Failed to save temp face: {e}")
+                
                 name, confidence = self.EmbeddingCache.find_match(face_img)
                 print(f"[RECOG] Face {face_id_key} matched: name='{name}', conf={confidence:.3f}")
+                if name == "User_3":
+                    print("user_3 happened")
 
                 # 2. Update Logic
                 with self.lock:
@@ -672,16 +685,44 @@ class DetectionSystem:
         if should_run_detection:
             person_crop = frame[py:py + ph, px:px + pw]
             if person_crop.size > 0:
+                # DEBUG: Time the face detection
+                import time as _time
+                _face_start = _time.perf_counter()
                 results = self.yolo_face_model(person_crop, verbose=False)
+                _face_elapsed = (_time.perf_counter() - _face_start) * 1000
+                print(f"[TIMING] yolo_face_model: {_face_elapsed:.1f}ms")
 
                 for r in results:
                     for box in r.boxes:
+                        # DEBUG: Log YOLO face detection confidence
+                        yolo_conf = float(box.conf[0]) if box.conf is not None else 0.0
+                        print(f"[YOLO FACE] Detected face with confidence: {yolo_conf:.3f}")
+                        
                         # Coords
                         lx1, ly1, lx2, ly2 = map(int, box.xyxy[0])
                         gx = px + lx1
                         gy = py + ly1
                         gw = lx2 - lx1
                         gh = ly2 - ly1
+                        
+                        # --- FACE VALIDATION FILTER ---
+                        # Get settings (with fallbacks)
+                        min_width = self.settings.get("min_face_width", 70) if self.settings else 70
+                        min_height = self.settings.get("min_face_height", 90) if self.settings else 90
+                        min_conf = self.settings.get("min_face_confidence", 0.5) if self.settings else 0.5
+                        
+                        # Check size requirements
+                        if gw < min_width or gh < min_height:
+                            print(f"[FACE REJECT] Size {gw}x{gh} < {min_width}x{min_height} minimum")
+                            continue
+                        
+                        # Check confidence requirement
+                        if yolo_conf < min_conf:
+                            print(f"[FACE REJECT] Confidence {yolo_conf:.3f} < {min_conf:.2f} minimum")
+                            continue
+                        
+                        print(f"[FACE ACCEPT] Size {gw}x{gh}, conf {yolo_conf:.3f} - valid face")
+                        
                         new_center = (gx + gw // 2, gy + gh // 2)
 
                         # --- MATCH WITH ALL EXISTING FACES (locked AND unlocked) ---
@@ -815,7 +856,12 @@ class DetectionSystem:
                 detections = []
                 if should_run_yolo_detection:
                     self.frame_count=0
+                    # DEBUG: Time the person detection
+                    import time as _time
+                    _person_start = _time.perf_counter()
                     results = self.yolo_model(frame, verbose=False)
+                    _person_elapsed = (_time.perf_counter() - _person_start) * 1000
+                    print(f"[TIMING] yolov8n (person): {_person_elapsed:.1f}ms")
                     for r in results:
                         for box in r.boxes:
                             if int(box.cls[0]) == 0:
@@ -938,7 +984,7 @@ class DetectionSystem:
                 # Color based on ID
                 color = ((pid * 50) % 255, (pid * 100) % 255, (pid * 150) % 255)
 
-                cv2.rectangle(frame, (px, py), (px + pw, py + ph), color, 3)
+                cv2.rectangle(frame, (px, py), (px + pw, py + ph), (0,0,139), 3)
 
                 # Person Label - use global_tracker for consolidated name
                 prim_face = person_obj.get_primary_face_name(self.global_tracker)

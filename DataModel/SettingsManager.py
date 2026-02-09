@@ -37,7 +37,11 @@ class SettingsManager:
         # Identity Verification Settings
         "identity_confirm_frames": 3,       # Frames to confirm identity before locking
         "identity_confidence_threshold": 0.6,  # Min confidence to accept recognition
-        "identity_change_margin": 0.15      # How much better new match must be to change
+        "identity_change_margin": 0.15,      # How much better new match must be to change
+        # Face Validation Settings (to filter bad detections)
+        "min_face_width": 70,               # Minimum face width in pixels
+        "min_face_height": 90,              # Minimum face height in pixels  
+        "min_face_confidence": 0.5          # Minimum YOLO face detection confidence
     }
     
     def __init__(self, settings_file: Optional[str] = None):

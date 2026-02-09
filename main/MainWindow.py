@@ -191,6 +191,10 @@ class MainWindow(QMainWindow):
         self.identity_confirm_frames_spinbox.setValue(self.settings.get("identity_confirm_frames"))
         self.identity_confidence_spinbox.setValue(self.settings.get("identity_confidence_threshold"))
         self.identity_margin_spinbox.setValue(self.settings.get("identity_change_margin"))
+        # Face validation settings
+        self.min_face_width_spinbox.setValue(self.settings.get("min_face_width"))
+        self.min_face_height_spinbox.setValue(self.settings.get("min_face_height"))
+        self.min_face_confidence_spinbox.setValue(self.settings.get("min_face_confidence"))
         
         # Connect save and reset buttons
         self.save_settings_btn.clicked.connect(self._save_settings)
@@ -220,6 +224,10 @@ class MainWindow(QMainWindow):
         self.settings.set("identity_confirm_frames", self.identity_confirm_frames_spinbox.value())
         self.settings.set("identity_confidence_threshold", self.identity_confidence_spinbox.value())
         self.settings.set("identity_change_margin", self.identity_margin_spinbox.value())
+        # Face validation settings
+        self.settings.set("min_face_width", self.min_face_width_spinbox.value())
+        self.settings.set("min_face_height", self.min_face_height_spinbox.value())
+        self.settings.set("min_face_confidence", self.min_face_confidence_spinbox.value())
         
         if self.settings.save():
             print("[SETTINGS] Settings saved successfully!")
@@ -242,6 +250,10 @@ class MainWindow(QMainWindow):
         self.identity_confirm_frames_spinbox.setValue(defaults["identity_confirm_frames"])
         self.identity_confidence_spinbox.setValue(defaults["identity_confidence_threshold"])
         self.identity_margin_spinbox.setValue(defaults["identity_change_margin"])
+        # Face validation settings
+        self.min_face_width_spinbox.setValue(defaults["min_face_width"])
+        self.min_face_height_spinbox.setValue(defaults["min_face_height"])
+        self.min_face_confidence_spinbox.setValue(defaults["min_face_confidence"])
         
         # Apply to tracker
         self.global_tracker.feature_threshold = defaults["feature_threshold"]
