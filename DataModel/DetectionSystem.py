@@ -1,3 +1,4 @@
+from DataModel.EmbeddingCache import EmbeddingCache
 import os
 import cv2
 import tkinter as tk
@@ -190,7 +191,7 @@ class DetectionSystem:
         
         self.settings = get_settings()
         
-        self.EmbeddingCache = None  # Placeholder for EmbeddingCache instance
+        self.EmbeddingCache:EmbeddingCache = None  # Placeholder for EmbeddingCache instance
         
         self.camera_buffer = camera_buffer
         self.output_callback = output_callback 
