@@ -7,7 +7,7 @@
     <x>0</x>
     <y>0</y>
     <width>888</width>
-    <height>655</height>
+    <height>959</height>
    </rect>
   </property>
   <property name="minimumSize">
@@ -134,7 +134,7 @@
        <item>
         <widget class="QStackedWidget" name="Content_stack">
          <property name="currentIndex">
-          <number>0</number>
+          <number>4</number>
          </property>
          <widget class="QWidget" name="cam_settings_page">
           <layout class="QVBoxLayout" name="verticalLayout_2">
@@ -332,14 +332,14 @@ border-color: rgb(34, 34, 34);</string>
           <layout class="QVBoxLayout" name="settings_layout">
            <item>
             <widget class="QLabel" name="settings_title">
+             <property name="styleSheet">
+              <string notr="true"> font-size: 14px;font-weight: bold; color: #888; margin-top: 5px;</string>
+             </property>
              <property name="text">
-              <string>Tracking Settings</string>
+              <string>──Tracking Settings──</string>
              </property>
              <property name="alignment">
               <set>Qt::AlignmentFlag::AlignCenter</set>
-             </property>
-             <property name="styleSheet">
-              <string notr="true">font-size: 18px; font-weight: bold; margin-bottom: 10px;</string>
              </property>
             </widget>
            </item>
@@ -349,285 +349,477 @@ border-color: rgb(34, 34, 34);</string>
               <enum>QFrame::Shape::StyledPanel</enum>
              </property>
              <layout class="QFormLayout" name="settings_form_layout">
-              <!-- Feature Threshold -->
               <item row="0" column="0">
                <widget class="QLabel" name="threshold_label">
-                <property name="text"><string>Feature Threshold:</string></property>
+                <property name="text">
+                 <string>Feature Threshold:</string>
+                </property>
                </widget>
               </item>
               <item row="0" column="1">
                <widget class="QDoubleSpinBox" name="threshold_spinbox">
-                <property name="minimum"><double>0.1</double></property>
-                <property name="maximum"><double>1.0</double></property>
-                <property name="singleStep"><double>0.05</double></property>
-                <property name="value"><double>0.5</double></property>
+                <property name="minimum">
+                 <double>0.100000000000000</double>
+                </property>
+                <property name="maximum">
+                 <double>1.000000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>0.050000000000000</double>
+                </property>
+                <property name="value">
+                 <double>0.500000000000000</double>
+                </property>
                </widget>
               </item>
               <item row="1" column="0" colspan="2">
                <widget class="QLabel" name="threshold_desc">
-                <property name="text"><string>Match distance threshold for person re-identification. Lower = stricter matching.</string></property>
-                <property name="styleSheet"><string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string></property>
-                <property name="wordWrap"><bool>true</bool></property>
+                <property name="styleSheet">
+                 <string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string>
+                </property>
+                <property name="text">
+                 <string>Match distance threshold for person re-identification. Lower = stricter matching.</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
                </widget>
               </item>
-              <!-- Re-ID Weight -->
               <item row="2" column="0">
                <widget class="QLabel" name="reid_weight_label">
-                <property name="text"><string>Re-ID Weight:</string></property>
+                <property name="text">
+                 <string>Re-ID Weight:</string>
+                </property>
                </widget>
               </item>
               <item row="2" column="1">
                <widget class="QDoubleSpinBox" name="reid_weight_spinbox">
-                <property name="minimum"><double>0.0</double></property>
-                <property name="maximum"><double>1.0</double></property>
-                <property name="singleStep"><double>0.05</double></property>
-                <property name="value"><double>0.7</double></property>
+                <property name="minimum">
+                 <double>0.000000000000000</double>
+                </property>
+                <property name="maximum">
+                 <double>1.000000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>0.050000000000000</double>
+                </property>
+                <property name="value">
+                 <double>0.700000000000000</double>
+                </property>
                </widget>
               </item>
               <item row="3" column="0" colspan="2">
                <widget class="QLabel" name="reid_desc">
-                <property name="text"><string>Weight for appearance features in person matching. Higher = rely more on visual similarity.</string></property>
-                <property name="styleSheet"><string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string></property>
-                <property name="wordWrap"><bool>true</bool></property>
+                <property name="styleSheet">
+                 <string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string>
+                </property>
+                <property name="text">
+                 <string>Weight for appearance features in person matching. Higher = rely more on visual similarity.</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
                </widget>
               </item>
-              <!-- Spatial Weight -->
               <item row="4" column="0">
                <widget class="QLabel" name="spatial_weight_label">
-                <property name="text"><string>Spatial Weight:</string></property>
+                <property name="text">
+                 <string>Spatial Weight:</string>
+                </property>
                </widget>
               </item>
               <item row="4" column="1">
                <widget class="QDoubleSpinBox" name="spatial_weight_spinbox">
-                <property name="minimum"><double>0.0</double></property>
-                <property name="maximum"><double>1.0</double></property>
-                <property name="singleStep"><double>0.05</double></property>
-                <property name="value"><double>0.3</double></property>
+                <property name="minimum">
+                 <double>0.000000000000000</double>
+                </property>
+                <property name="maximum">
+                 <double>1.000000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>0.050000000000000</double>
+                </property>
+                <property name="value">
+                 <double>0.300000000000000</double>
+                </property>
                </widget>
               </item>
               <item row="5" column="0" colspan="2">
                <widget class="QLabel" name="spatial_desc">
-                <property name="text"><string>Weight for position in cross-camera matching. Higher = rely more on map position.</string></property>
-                <property name="styleSheet"><string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string></property>
-                <property name="wordWrap"><bool>true</bool></property>
+                <property name="styleSheet">
+                 <string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string>
+                </property>
+                <property name="text">
+                 <string>Weight for position in cross-camera matching. Higher = rely more on map position.</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
                </widget>
               </item>
-              <!-- Camera FOV -->
               <item row="6" column="0">
                <widget class="QLabel" name="fov_label">
-                <property name="text"><string>Default Camera FOV:</string></property>
+                <property name="text">
+                 <string>Default Camera FOV:</string>
+                </property>
                </widget>
               </item>
               <item row="6" column="1">
                <widget class="QSpinBox" name="fov_spinbox">
-                <property name="minimum"><number>30</number></property>
-                <property name="maximum"><number>120</number></property>
-                <property name="value"><number>70</number></property>
+                <property name="minimum">
+                 <number>30</number>
+                </property>
+                <property name="maximum">
+                 <number>120</number>
+                </property>
+                <property name="value">
+                 <number>70</number>
+                </property>
                </widget>
               </item>
               <item row="7" column="0" colspan="2">
                <widget class="QLabel" name="fov_desc">
-                <property name="text"><string>Camera field of view in degrees. Used for map position calculation.</string></property>
-                <property name="styleSheet"><string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string></property>
-                <property name="wordWrap"><bool>true</bool></property>
+                <property name="styleSheet">
+                 <string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string>
+                </property>
+                <property name="text">
+                 <string>Camera field of view in degrees. Used for map position calculation.</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
                </widget>
               </item>
-              <!-- Person Dot Size -->
               <item row="8" column="0">
                <widget class="QLabel" name="dot_radius_label">
-                <property name="text"><string>Person Dot Size:</string></property>
+                <property name="text">
+                 <string>Person Dot Size:</string>
+                </property>
                </widget>
               </item>
               <item row="8" column="1">
                <widget class="QSpinBox" name="dot_radius_spinbox">
-                <property name="minimum"><number>4</number></property>
-                <property name="maximum"><number>20</number></property>
-                <property name="value"><number>8</number></property>
+                <property name="minimum">
+                 <number>4</number>
+                </property>
+                <property name="maximum">
+                 <number>20</number>
+                </property>
+                <property name="value">
+                 <number>8</number>
+                </property>
                </widget>
               </item>
               <item row="9" column="0" colspan="2">
                <widget class="QLabel" name="dot_desc">
-                <property name="text"><string>Size of person markers on the tracking map.</string></property>
-                <property name="styleSheet"><string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string></property>
-                <property name="wordWrap"><bool>true</bool></property>
+                <property name="styleSheet">
+                 <string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string>
+                </property>
+                <property name="text">
+                 <string>Size of person markers on the tracking map.</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
                </widget>
               </item>
-              <!-- Min Quality Threshold -->
               <item row="10" column="0">
                <widget class="QLabel" name="min_quality_label">
-                <property name="text"><string>Min Quality Threshold:</string></property>
+                <property name="text">
+                 <string>Min Quality Threshold:</string>
+                </property>
                </widget>
               </item>
               <item row="10" column="1">
                <widget class="QSpinBox" name="min_quality_spinbox">
-                <property name="minimum"><number>10</number></property>
-                <property name="maximum"><number>200</number></property>
-                <property name="value"><number>50</number></property>
+                <property name="minimum">
+                 <number>10</number>
+                </property>
+                <property name="maximum">
+                 <number>200</number>
+                </property>
+                <property name="value">
+                 <number>50</number>
+                </property>
                </widget>
               </item>
               <item row="11" column="0" colspan="2">
                <widget class="QLabel" name="quality_desc">
-                <property name="text"><string>Minimum face quality score to save. Only applies during quality replacement phase.</string></property>
-                <property name="styleSheet"><string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string></property>
-                <property name="wordWrap"><bool>true</bool></property>
+                <property name="styleSheet">
+                 <string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string>
+                </property>
+                <property name="text">
+                 <string>Minimum face quality score to save. Only applies during quality replacement phase.</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
                </widget>
               </item>
-              <!-- Max Faces Per User -->
               <item row="12" column="0">
                <widget class="QLabel" name="max_faces_label">
-                <property name="text"><string>Max Faces Per User:</string></property>
+                <property name="text">
+                 <string>Max Faces Per User:</string>
+                </property>
                </widget>
               </item>
               <item row="12" column="1">
                <widget class="QSpinBox" name="max_faces_spinbox">
-                <property name="minimum"><number>1</number></property>
-                <property name="maximum"><number>20</number></property>
-                <property name="value"><number>5</number></property>
+                <property name="minimum">
+                 <number>1</number>
+                </property>
+                <property name="maximum">
+                 <number>20</number>
+                </property>
+                <property name="value">
+                 <number>5</number>
+                </property>
                </widget>
               </item>
               <item row="13" column="0" colspan="2">
                <widget class="QLabel" name="max_faces_desc">
-                <property name="text"><string>Maximum face images stored per user. After limit, lowest quality is replaced.</string></property>
-                <property name="styleSheet"><string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string></property>
-                <property name="wordWrap"><bool>true</bool></property>
+                <property name="styleSheet">
+                 <string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string>
+                </property>
+                <property name="text">
+                 <string>Maximum face images stored per user. After limit, lowest quality is replaced.</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
                </widget>
               </item>
-              <!-- Identity Verification Section -->
               <item row="14" column="0" colspan="2">
                <widget class="QLabel" name="identity_section_label">
-                <property name="text"><string>── Identity Verification ──</string></property>
-                <property name="alignment"><set>Qt::AlignmentFlag::AlignCenter</set></property>
-                <property name="styleSheet"><string>font-weight: bold; color: #888; margin-top: 10px;</string></property>
+                <property name="styleSheet">
+                 <string>font-weight: bold; color: #888; margin-top: 10px;</string>
+                </property>
+                <property name="text">
+                 <string>── Identity Verification ──</string>
+                </property>
+                <property name="alignment">
+                 <set>Qt::AlignmentFlag::AlignCenter</set>
+                </property>
                </widget>
               </item>
-              <!-- Identity Confirm Frames -->
               <item row="15" column="0">
                <widget class="QLabel" name="identity_confirm_frames_label">
-                <property name="text"><string>Identity Confirm Frames:</string></property>
+                <property name="text">
+                 <string>Identity Confirm Frames:</string>
+                </property>
                </widget>
               </item>
               <item row="15" column="1">
                <widget class="QSpinBox" name="identity_confirm_frames_spinbox">
-                <property name="minimum"><number>1</number></property>
-                <property name="maximum"><number>10</number></property>
-                <property name="value"><number>3</number></property>
+                <property name="minimum">
+                 <number>1</number>
+                </property>
+                <property name="maximum">
+                 <number>10</number>
+                </property>
+                <property name="value">
+                 <number>3</number>
+                </property>
                </widget>
               </item>
               <item row="16" column="0" colspan="2">
                <widget class="QLabel" name="confirm_frames_desc">
-                <property name="text"><string>Consecutive frames a face must match same user to lock identity. Higher = more accurate, slower.</string></property>
-                <property name="styleSheet"><string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string></property>
-                <property name="wordWrap"><bool>true</bool></property>
+                <property name="styleSheet">
+                 <string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string>
+                </property>
+                <property name="text">
+                 <string>Consecutive frames a face must match same user to lock identity. Higher = more accurate, slower.</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
                </widget>
               </item>
-              <!-- Confidence Threshold -->
               <item row="17" column="0">
                <widget class="QLabel" name="identity_confidence_label">
-                <property name="text"><string>Confidence Threshold:</string></property>
+                <property name="text">
+                 <string>Confidence Threshold:</string>
+                </property>
                </widget>
               </item>
               <item row="17" column="1">
                <widget class="QDoubleSpinBox" name="identity_confidence_spinbox">
-                <property name="minimum"><double>0.1</double></property>
-                <property name="maximum"><double>1.0</double></property>
-                <property name="singleStep"><double>0.05</double></property>
-                <property name="value"><double>0.6</double></property>
+                <property name="minimum">
+                 <double>0.100000000000000</double>
+                </property>
+                <property name="maximum">
+                 <double>1.000000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>0.050000000000000</double>
+                </property>
+                <property name="value">
+                 <double>0.600000000000000</double>
+                </property>
                </widget>
               </item>
               <item row="18" column="0" colspan="2">
                <widget class="QLabel" name="confidence_desc">
-                <property name="text"><string>Max distance to accept face match. Lower = stricter. Matches above this are rejected.</string></property>
-                <property name="styleSheet"><string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string></property>
-                <property name="wordWrap"><bool>true</bool></property>
+                <property name="styleSheet">
+                 <string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string>
+                </property>
+                <property name="text">
+                 <string>Max distance to accept face match. Lower = stricter. Matches above this are rejected.</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
                </widget>
               </item>
-              <!-- Identity Change Margin -->
               <item row="19" column="0">
                <widget class="QLabel" name="identity_margin_label">
-                <property name="text"><string>Identity Change Margin:</string></property>
+                <property name="text">
+                 <string>Identity Change Margin:</string>
+                </property>
                </widget>
               </item>
               <item row="19" column="1">
                <widget class="QDoubleSpinBox" name="identity_margin_spinbox">
-                <property name="minimum"><double>0.05</double></property>
-                <property name="maximum"><double>0.5</double></property>
-                <property name="singleStep"><double>0.05</double></property>
-                <property name="value"><double>0.15</double></property>
+                <property name="minimum">
+                 <double>0.050000000000000</double>
+                </property>
+                <property name="maximum">
+                 <double>0.500000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>0.050000000000000</double>
+                </property>
+                <property name="value">
+                 <double>0.150000000000000</double>
+                </property>
                </widget>
               </item>
               <item row="20" column="0" colspan="2">
                <widget class="QLabel" name="margin_desc">
-                <property name="text"><string>How much better a new match must be to change a locked identity. Higher = more stable.</string></property>
-                <property name="styleSheet"><string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string></property>
-                <property name="wordWrap"><bool>true</bool></property>
+                <property name="styleSheet">
+                 <string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string>
+                </property>
+                <property name="text">
+                 <string>How much better a new match must be to change a locked identity. Higher = more stable.</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
                </widget>
               </item>
-              <!-- Face Validation Section Header -->
               <item row="21" column="0" colspan="2">
                <widget class="QLabel" name="face_validation_header">
-                <property name="text"><string>── Identity Verification ──</string></property>
-                <property name="styleSheet"><string>font-weight: bold; font-size: 14px; margin-top: 15px; color: #c0c0c0;</string></property>
+                <property name="styleSheet">
+                 <string notr="true"> font-size: 14px;font-weight: bold; color: #888; margin-top: 5px;</string>
+                </property>
+                <property name="text">
+                 <string>── Yolo face recognition ──</string>
+                </property>
+                <property name="alignment">
+                 <set>Qt::AlignmentFlag::AlignCenter</set>
+                </property>
                </widget>
               </item>
-              <!-- Min Face Width -->
               <item row="22" column="0">
                <widget class="QLabel" name="min_face_width_label">
-                <property name="text"><string>Min Face Width (px):</string></property>
+                <property name="text">
+                 <string>Min Face Width (px):</string>
+                </property>
                </widget>
               </item>
               <item row="22" column="1">
                <widget class="QSpinBox" name="min_face_width_spinbox">
-                <property name="minimum"><number>20</number></property>
-                <property name="maximum"><number>200</number></property>
-                <property name="value"><number>70</number></property>
+                <property name="minimum">
+                 <number>20</number>
+                </property>
+                <property name="maximum">
+                 <number>200</number>
+                </property>
+                <property name="value">
+                 <number>70</number>
+                </property>
                </widget>
               </item>
               <item row="23" column="0" colspan="2">
                <widget class="QLabel" name="min_width_desc">
-                <property name="text"><string>Minimum face width in pixels. Faces smaller than this are rejected.</string></property>
-                <property name="styleSheet"><string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string></property>
-                <property name="wordWrap"><bool>true</bool></property>
+                <property name="styleSheet">
+                 <string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string>
+                </property>
+                <property name="text">
+                 <string>Minimum face width in pixels. Faces smaller than this are rejected.</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
                </widget>
               </item>
-              <!-- Min Face Height -->
               <item row="24" column="0">
                <widget class="QLabel" name="min_face_height_label">
-                <property name="text"><string>Min Face Height (px):</string></property>
+                <property name="text">
+                 <string>Min Face Height (px):</string>
+                </property>
                </widget>
               </item>
               <item row="24" column="1">
                <widget class="QSpinBox" name="min_face_height_spinbox">
-                <property name="minimum"><number>20</number></property>
-                <property name="maximum"><number>200</number></property>
-                <property name="value"><number>90</number></property>
+                <property name="minimum">
+                 <number>20</number>
+                </property>
+                <property name="maximum">
+                 <number>200</number>
+                </property>
+                <property name="value">
+                 <number>90</number>
+                </property>
                </widget>
               </item>
               <item row="25" column="0" colspan="2">
                <widget class="QLabel" name="min_height_desc">
-                <property name="text"><string>Minimum face height in pixels. Faces smaller than this are rejected.</string></property>
-                <property name="styleSheet"><string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string></property>
-                <property name="wordWrap"><bool>true</bool></property>
+                <property name="styleSheet">
+                 <string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string>
+                </property>
+                <property name="text">
+                 <string>Minimum face height in pixels. Faces smaller than this are rejected.</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
                </widget>
               </item>
-              <!-- Min Face Confidence -->
               <item row="26" column="0">
                <widget class="QLabel" name="min_face_conf_label">
-                <property name="text"><string>Min Face Confidence:</string></property>
+                <property name="text">
+                 <string>Min Face Confidence:</string>
+                </property>
                </widget>
               </item>
               <item row="26" column="1">
                <widget class="QDoubleSpinBox" name="min_face_confidence_spinbox">
-                <property name="minimum"><double>0.1</double></property>
-                <property name="maximum"><double>1.0</double></property>
-                <property name="singleStep"><double>0.05</double></property>
-                <property name="value"><double>0.5</double></property>
+                <property name="minimum">
+                 <double>0.100000000000000</double>
+                </property>
+                <property name="maximum">
+                 <double>1.000000000000000</double>
+                </property>
+                <property name="singleStep">
+                 <double>0.050000000000000</double>
+                </property>
+                <property name="value">
+                 <double>0.500000000000000</double>
+                </property>
                </widget>
               </item>
               <item row="27" column="0" colspan="2">
                <widget class="QLabel" name="min_conf_desc">
-                <property name="text"><string>Minimum YOLO face detection confidence. Lower values allow more detections but may include false positives.</string></property>
-                <property name="styleSheet"><string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string></property>
-                <property name="wordWrap"><bool>true</bool></property>
+                <property name="styleSheet">
+                 <string>color: #888; font-size: 11px; font-style: italic; margin-bottom: 5px;</string>
+                </property>
+                <property name="text">
+                 <string>Minimum YOLO face detection confidence. Lower values allow more detections but may include false positives.</string>
+                </property>
+                <property name="wordWrap">
+                 <bool>true</bool>
+                </property>
                </widget>
               </item>
              </layout>
