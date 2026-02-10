@@ -912,7 +912,7 @@ class DetectionSystem:
                     l, t, r, b = map(int, track.to_ltrb())
                     w, h = r - l, b - t
 
-                    # Update/Create Person
+                    # Update/Create Person already tracked person
                     if tid in self.tracked_persons:
                         person_obj = self.tracked_persons[tid] 
                         person_obj.update_position(l, t, w, h, 0.9)

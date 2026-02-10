@@ -456,24 +456,24 @@ class GlobalPersonTracker:
         best_combined_distance = float('inf')
         
         # Note: NO LOCK HERE - assumes caller already has it!
-        for person in self.global_persons.values():
+        for global_person in self.global_persons.values():
             # Skip if person has no features
-            if person.feature_vector is None:
+            if global_person.feature_vector is None:
                 continue
             
             # Skip if we want to exclude this person's camera
-            if exclude_camera and person.is_in_camera(exclude_camera):
+            if exclude_camera and global_person.is_in_camera(exclude_camera):
                 continue
             
             # Calculate Re-ID distance (normalized to ~0-1 range)
-            reid_distance = self._cosine_distance(feature_vector, person.feature_vector)
+            reid_distance = self._cosine_distance(feature_vector, global_person.feature_vector)
             
             # Calculate Spatial distance (0-1 range)
             spatial_distance = 0.5  # Default neutral if no spatial data
             
             if current_bbox is not None and current_camera is not None:
                 # Find the person's most recent track in another camera
-                for cam_name, track in person.camera_tracks.items():
+                for cam_name, track in global_person.camera_tracks.items():
                     if cam_name != current_camera and track.bbox is not None:
                         spatial_distance = self._spatial_distance(
                             current_camera, current_bbox,
@@ -485,13 +485,13 @@ class GlobalPersonTracker:
             combined_distance = (self.reid_weight * reid_distance + 
                                 self.spatial_weight * spatial_distance)
             
-            print(f"[GLOBAL TRACKER] ID={person.global_id}: reid={reid_distance:.3f}, "
+            print(f"[GLOBAL TRACKER] ID={global_person.global_id}: reid={reid_distance:.3f}, "
                   f"spatial={spatial_distance:.3f}, combined={combined_distance:.3f}")
             
             # Track best match
             if combined_distance < best_combined_distance:
                 best_combined_distance = combined_distance
-                best_match_id = person.global_id
+                best_match_id = global_person.global_id
         
         print(f"[GLOBAL TRACKER] Best match: ID={best_match_id}, combined={best_combined_distance:.3f}")
         
