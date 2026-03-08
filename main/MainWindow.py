@@ -356,7 +356,7 @@ class MainWindow(QMainWindow):
         dialog = AddCameraDialog(self)
         
         if dialog.exec():
-            name, url = dialog.get_details()
+            name, url, fov, view_range = dialog.get_details()
             if name and url:
                 # Check if camera name already exists
                 if name in self.scene_cameras:
@@ -365,10 +365,10 @@ class MainWindow(QMainWindow):
                     return
                 
                 # --- 6. CALL THE NEW CENTRAL FUNCTION ---
-                self.create_camera_items(name, url)
-                print("Camera added.")
+                self.create_camera_items(name, url, fov=fov, view_range=view_range)
+                print(f"Camera added: {name} (fov={fov}°, range={view_range})")
     
-    def create_camera_items(self, name, url, pos=None, rot=None):
+    def create_camera_items(self, name, url, pos=None, rot=None, fov=70.0, view_range=200.0):
         """
         --- 5. THIS IS THE NEW REFACTORED FUNCTION ---
         Creates and connects all objects for a new camera.
@@ -385,7 +385,7 @@ class MainWindow(QMainWindow):
         # --- 2. Create UI Widgets ---
         list_widget = CameraFeedWidget(name)
         grid_widget = GridFeedWidget(name)
-        cam_item = CameraItem(name=name, url=url)
+        cam_item = CameraItem(name=name, url=url, view_angle=fov, view_range=view_range)
         
         # Set position and rotation
         if pos:
@@ -462,7 +462,8 @@ class MainWindow(QMainWindow):
                 name=name,
                 position=(cam_pos[0], cam_pos[1]),
                 rotation=cam_rot if cam_rot is not None else 0.0,
-                fov=self.DEFAULT_FOV  # Use configured default FOV
+                fov=fov,
+                view_range=view_range
             )
             print(f"[MAIN] Registered camera '{name}' with global tracker")
 
@@ -541,7 +542,9 @@ class MainWindow(QMainWindow):
                 "name": cam_item.name,
                 "url": cam_item.url,
                 "pos": [pos.x(), pos.y()],
-                "rot": cam_item.rotation()
+                "rot": cam_item.rotation(),
+                "fov": cam_item.view_angle,
+                "view_range": cam_item.view_range
             })
 
         # Save all walls
@@ -603,7 +606,9 @@ class MainWindow(QMainWindow):
                     cam_data["name"],
                     cam_data["url"],
                     QPointF(cam_data["pos"][0], cam_data["pos"][1]),
-                    cam_data["rot"]
+                    cam_data["rot"],
+                    fov=cam_data.get("fov", 70.0),
+                    view_range=cam_data.get("view_range", 200.0)
                 )
             except Exception as e:
                 

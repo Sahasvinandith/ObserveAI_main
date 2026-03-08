@@ -48,6 +48,9 @@ class Person:
         self.last_seen = time.time()
         self.feature_vector = None
         self.global_id = None  # Global ID from GlobalPersonTracker
+        # Cross-camera identity inheritance
+        self.inherited_identity = None      # Identity inherited from global tracker (e.g., "User_1")
+        self.inherited_confidence = None    # Confidence of the inherited identity
 
     def update_position(self, x, y, w, h, confidence):
         self.x = x
@@ -312,6 +315,38 @@ class DetectionSystem:
 
                 # --- LOGIC: Handle New User ---
                 if name == "Unknown":
+                    # Check if this face's person has an inherited identity from global tracker
+                    inherited_name = None
+                    with self.lock:
+                        person_id = face_obj.person_id
+                        if person_id and person_id in self.tracked_persons:
+                            person = self.tracked_persons[person_id]
+                            if person.inherited_identity and person.inherited_identity not in ("Unknown", "Scanning..."):
+                                inherited_name = person.inherited_identity
+                                inherited_conf = person.inherited_confidence or 0.5
+                    
+                    if inherited_name:
+                        # Use inherited identity instead of creating new user!
+                        print(f"[INHERIT] Face {face_id_key} Unknown from face recog, but inheriting '{inherited_name}' from global tracker")
+                        with self.lock:
+                            face_obj.name = inherited_name
+                            face_obj.locked_identity = inherited_name
+                            face_obj.avg_confidence = inherited_conf
+                            face_obj.unknown_count = 0
+                            face_obj.is_recognizing = False
+                            
+                            # Report to global tracker for consolidation
+                            if person_id and person_id in self.tracked_persons:
+                                person = self.tracked_persons[person_id]
+                                if person.global_id and self.global_tracker:
+                                    self.global_tracker.update_face_identity(
+                                        person.global_id,
+                                        inherited_name,
+                                        inherited_conf
+                                    )
+                        continue  # Skip Unknown threshold logic
+                    
+                    # No inherited identity - proceed with normal Unknown threshold logic
                     # Increment unknown counter for this face
                     with self.lock:
                         face_obj.unknown_count = getattr(face_obj, 'unknown_count', 0) + 1
@@ -833,11 +868,18 @@ class DetectionSystem:
                                 local_id=tid,
                                 feature_vector=person_obj.feature_vector,
                                 bbox=(l, t, w, h),
-                                frame_shape=(frame.shape[1], frame.shape[0])  # (width, height)
+                                frame_shape=(frame.shape[1], frame.shape[0])
                             )
                             person_obj.global_id = global_id
+                            
+                            # Check if this global person already has a known identity
+                            existing_name, existing_conf = self.global_tracker.get_person_identity(global_id)
+                            if existing_name not in ("Unknown", "Scanning..."):
+                                person_obj.inherited_identity = existing_name
+                                person_obj.inherited_confidence = existing_conf
+                                print(f"[INHERIT] Person L:{tid} inherited '{existing_name}' (conf={existing_conf:.3f}) from global G:{global_id}")
                     else:
-                        person_obj = Person(tid, l, t, w, h, 0.9) #new tracking. creating a new Person object
+                        person_obj = Person(tid, l, t, w, h, 0.9)
                         # Extract features once
                         crop = frame[t:t + h, l:l + w]
                         person_obj.feature_vector = self.extract_person_features(crop)
@@ -850,9 +892,16 @@ class DetectionSystem:
                                 local_id=tid,
                                 feature_vector=person_obj.feature_vector,
                                 bbox=(l, t, w, h),
-                                frame_shape=(frame.shape[1], frame.shape[0])  # (width, height)
+                                frame_shape=(frame.shape[1], frame.shape[0])
                             )
-                            person_obj.global_id = global_id # assigning global id for user. check the camera name. 
+                            person_obj.global_id = global_id
+                            
+                            # Check if this global person already has a known identity
+                            existing_name, existing_conf = self.global_tracker.get_person_identity(global_id)
+                            if existing_name not in ("Unknown", "Scanning..."):
+                                person_obj.inherited_identity = existing_name
+                                person_obj.inherited_confidence = existing_conf
+                                print(f"[INHERIT] New person L:{tid} inherited '{existing_name}' (conf={existing_conf:.3f}) from global G:{global_id}")
 
                     # 4. Process faces (The new Async Logic)
                     face_ids = self.process_faces_in_person(frame, (l, t, w, h), tid)

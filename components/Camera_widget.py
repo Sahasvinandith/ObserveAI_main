@@ -24,12 +24,12 @@ class CameraItem(QGraphicsObject):
     It contains a pixmap for the icon and a polygon for the FOV.
     It automatically updates its FOV by ray casting against WallItems.
     """
-    def __init__(self, parent=None,name="Webcam", url="0",position = [30,30],rotation_degree:float=0):
+    def __init__(self, parent=None,name="Webcam", url="0",position = [30,30],rotation_degree:float=0, view_angle:float=70.0, view_range:float=200.0):
         super().__init__(parent)
         
-        # 1. SETTINGS (You can change these)
-        self.view_angle = 70.0  # Field of View in degrees
-        self.view_range = 200.0 # Max range in pixels
+        # 1. SETTINGS (configurable per camera)
+        self.view_angle = view_angle  # Field of View in degrees
+        self.view_range = view_range  # Max range in pixels (blurry cameras = shorter range)
         self.view_rays = 90     # Number of rays to cast (more is smoother)
         self.name = name
         self.url = url

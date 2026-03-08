@@ -45,10 +45,15 @@ class AddCameraDialog(QDialog):
         super().__init__(parent)
         uic.loadUi("UIs/add_camera_dialog.ui", self)
         # Access widgets by their objectName:
-        # self.name_input, self.url_input, self.buttonBox
+        # self.name_input, self.url_input, self.fov_input, self.view_range_input, self.buttonBox
         self.buttonBox.accepted.connect(self.accept)
         self.buttonBox.rejected.connect(self.reject)
 
     def get_details(self):
-        """Helper function to return the entered text."""
-        return self.name_input.text(), self.url_input.text()
+        """Helper function to return camera configuration."""
+        return (
+            self.name_input.text(),
+            self.url_input.text(),
+            self.fov_input.value(),
+            self.view_range_input.value()
+        )

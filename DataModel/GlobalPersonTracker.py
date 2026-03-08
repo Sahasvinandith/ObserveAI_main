@@ -26,6 +26,7 @@ class CameraInfo:
     position: Tuple[float, float]  # (x, y) on floor plan
     rotation: float  # Degrees, 0 = pointing right, increases counter-clockwise
     fov: float = 70.0  # Field of view in degrees
+    view_range: float = 200.0  # Max effective detection range in floor plan units
     frame_width: int = 1920  # Frame width for bbox normalization
     frame_height: int = 1080  # Frame height
 
@@ -238,12 +239,28 @@ class GlobalPersonTracker:
                 return "Unknown"
             return self.global_persons[global_id].local_user_id
     
+    def get_person_identity(self, global_id: int) -> tuple:
+        """
+        Get the full identity info for a global person.
+        Used for cross-camera identity inheritance.
+        
+        Returns:
+            Tuple of (user_id, confidence) or ("Unknown", 1.0) if not found/identified
+        """
+        with self.lock:
+            if global_id not in self.global_persons:
+                return ("Unknown", 1.0)
+            person = self.global_persons[global_id]
+            if person.local_user_id in ("Unknown", "Scanning..."):
+                return ("Unknown", 1.0)
+            return (person.local_user_id, person.best_confidence)
+    
     # =========================================================================
     # Camera Registration
     # =========================================================================
     
     def register_camera(self, name: str, position: Tuple[float, float], 
-                       rotation: float, fov: float = 70.0,
+                       rotation: float, fov: float = 70.0, view_range: float = 200.0,
                        frame_width: int = 1920, frame_height: int = 1080):
         """
         Register a camera with its spatial information.
@@ -253,6 +270,7 @@ class GlobalPersonTracker:
             position: (x, y) position on floor plan
             rotation: Camera rotation in degrees (0 = pointing right)
             fov: Field of view in degrees (default 70)
+            view_range: Max effective detection range in floor plan units (default 200)
             frame_width: Frame width in pixels for bbox normalization
             frame_height: Frame height in pixels
         """
@@ -262,10 +280,11 @@ class GlobalPersonTracker:
                 position=position,
                 rotation=rotation,
                 fov=fov,
+                view_range=view_range,
                 frame_width=frame_width,
                 frame_height=frame_height
             )
-            print(f"[GLOBAL TRACKER] Registered camera '{name}' at pos={position}, rot={rotation}°, fov={fov}°")
+            print(f"[GLOBAL TRACKER] Registered camera '{name}' at pos={position}, rot={rotation}°, fov={fov}°, range={view_range}")
     
     def update_camera_frame_size(self, name: str, width: int, height: int):
         """Update frame dimensions for a camera (call when actual frame size is known)"""
@@ -322,17 +341,17 @@ class GlobalPersonTracker:
     
     def _estimate_person_position(self, camera_name: str, 
                                    bbox: Tuple[int, int, int, int],
-                                   distance_estimate: float = 100.0) -> Optional[Tuple[float, float]]:
+                                   distance_estimate: Optional[float] = None) -> Optional[Tuple[float, float]]:
         """
         Estimate person's world position based on camera location and viewing angle.
         
-        This is an approximation that projects the person along the viewing ray
-        at a fixed distance from the camera.
+        This is an approximation that projects the person along the viewing ray.
+        Uses the camera's configured view_range to scale the distance estimate.
         
         Args:
             camera_name: Name of the camera
             bbox: (x, y, w, h) bounding box
-            distance_estimate: Estimated distance from camera (in floor plan units)
+            distance_estimate: Override distance from camera. If None, uses half the camera's view_range.
             
         Returns:
             (x, y) estimated position on floor plan, or None
@@ -341,6 +360,11 @@ class GlobalPersonTracker:
             return None
         
         camera = self.cameras[camera_name]
+        
+        # Use camera's view_range if no explicit distance provided
+        if distance_estimate is None:
+            distance_estimate = camera.view_range * 0.5
+        
         world_angle = self._bbox_to_world_angle(camera_name, bbox)
         
         if world_angle is None:
@@ -396,9 +420,10 @@ class GlobalPersonTracker:
             (cam1.position[1] - cam2.position[1])**2
         )
         
-        # Normalize camera distance (assume max relevant distance is 500 units)
-        # Closer cameras = more likely to see same person
-        cam_score = min(cam_distance / 500.0, 1.0)
+        # Normalize camera distance using the cameras' view ranges
+        # Closer cameras relative to their range = more likely same person
+        max_relevant_distance = max(cam1.view_range, cam2.view_range)
+        cam_score = min(cam_distance / max_relevant_distance, 1.0)
         
         # Combine scores: weight angular alignment more heavily
         # If cameras are far apart, angular alignment matters less
