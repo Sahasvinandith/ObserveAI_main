@@ -463,32 +463,41 @@ class GlobalPersonTracker:
         
         **IMPORTANT:** This method assumes the lock is already held by the caller!
         Use only from within locked sections.
-        
-        Args:
-            feature_vector: Re-ID features to match against
-            exclude_camera: Optional camera to exclude from search
-                          (useful when looking for person in OTHER cameras)
-            current_bbox: Current bbox for spatial calculations
-            current_camera: Current camera name for spatial calculations
-        
-        Returns:
-            global_id if match found, None otherwise
         """
         if feature_vector is None:
+            print(f"[MATCH DEBUG] No feature vector provided, skipping match")
             return None
         
         best_match_id = None
         best_combined_distance = float('inf')
         
+        print(f"[MATCH DEBUG] === Searching for match from camera='{current_camera}', exclude='{exclude_camera}' ===")
+        print(f"[MATCH DEBUG] Total global persons: {len(self.global_persons)}, threshold: {self.feature_threshold}")
+        
         # Note: NO LOCK HERE - assumes caller already has it!
         for global_person in self.global_persons.values():
+            gid = global_person.global_id
+            cameras_in = list(global_person.camera_tracks.keys())
+            identity = global_person.local_user_id
+            
             # Skip if person has no features
             if global_person.feature_vector is None:
+                print(f"[MATCH DEBUG] G:{gid} ('{identity}') SKIP - no feature vector. cameras={cameras_in}")
                 continue
             
-            # Skip if we want to exclude this person's camera
+            # Skip if person is ACTIVELY tracked in the excluded camera
+            # BUT: if the track is stale (person left), still consider matching!
             if exclude_camera and global_person.is_in_camera(exclude_camera):
-                continue
+                track = global_person.camera_tracks[exclude_camera]
+                track_age = time.time() - track.last_seen
+                stale_threshold = 3.0  # seconds - if track older than this, person has left
+                if track_age < stale_threshold:
+                    print(f"[MATCH DEBUG] G:{gid} ('{identity}') SKIP - actively tracked in '{exclude_camera}' "
+                          f"(track age={track_age:.1f}s < {stale_threshold}s). cameras={cameras_in}")
+                    continue
+                else:
+                    print(f"[MATCH DEBUG] G:{gid} ('{identity}') STALE track in '{exclude_camera}' "
+                          f"(track age={track_age:.1f}s >= {stale_threshold}s) - considering for re-match. cameras={cameras_in}")
             
             # Calculate Re-ID distance (normalized to ~0-1 range)
             reid_distance = self._cosine_distance(feature_vector, global_person.feature_vector)
@@ -510,22 +519,67 @@ class GlobalPersonTracker:
             combined_distance = (self.reid_weight * reid_distance + 
                                 self.spatial_weight * spatial_distance)
             
-            print(f"[GLOBAL TRACKER] ID={global_person.global_id}: reid={reid_distance:.3f}, "
-                  f"spatial={spatial_distance:.3f}, combined={combined_distance:.3f}")
+            print(f"[MATCH DEBUG] G:{gid} ('{identity}'): reid={reid_distance:.3f}, "
+                  f"spatial={spatial_distance:.3f}, combined={combined_distance:.3f}, "
+                  f"cameras={cameras_in}")
             
             # Track best match
             if combined_distance < best_combined_distance:
                 best_combined_distance = combined_distance
                 best_match_id = global_person.global_id
         
-        print(f"[GLOBAL TRACKER] Best match: ID={best_match_id}, combined={best_combined_distance:.3f}")
+        print(f"[MATCH DEBUG] Best match: G:{best_match_id}, distance={best_combined_distance:.3f}, threshold={self.feature_threshold}")
         
         # Return match if below threshold
         if best_combined_distance < self.feature_threshold:
-            print(f"[GLOBAL TRACKER] Match found! ID={best_match_id}, distance={best_combined_distance:.3f}")
+            print(f"[MATCH DEBUG] ✓ MATCHED to G:{best_match_id}")
             return best_match_id
         
+        print(f"[MATCH DEBUG] ✗ NO MATCH (best distance {best_combined_distance:.3f} >= threshold {self.feature_threshold})")
         return None
+    
+    def update_person_position(self, global_id: int, camera_name: str,
+                                bbox: Tuple[int, int, int, int],
+                                feature_vector: Optional[np.ndarray] = None):
+        """
+        Lightweight position + feature update for an already-matched global person.
+        No match search — just updates bbox and fires position callback.
+        
+        Args:
+            global_id: The known global person ID
+            camera_name: Camera name
+            bbox: Current bounding box (x, y, w, h)
+            feature_vector: Optional updated Re-ID features
+        """
+        with self.lock:
+            if global_id not in self.global_persons:
+                return
+            
+            person = self.global_persons[global_id]
+            
+            # Update the camera track's bbox and last_seen
+            if camera_name in person.camera_tracks:
+                person.camera_tracks[camera_name].bbox = bbox
+                person.camera_tracks[camera_name].last_seen = time.time()
+            
+            # Update Re-ID features if provided
+            if feature_vector is not None:
+                person.feature_vector = feature_vector
+                if camera_name in person.camera_tracks:
+                    person.camera_tracks[camera_name].feature_vector = feature_vector
+            
+            person.last_seen = time.time()
+            person.last_camera = camera_name
+            person.last_bbox = bbox
+        
+        # Fire position callback (outside lock to avoid deadlocks)
+        if self.position_callback and bbox is not None:
+            estimated_pos = self._estimate_person_position(camera_name, bbox)
+            if estimated_pos:
+                try:
+                    self.position_callback(global_id, estimated_pos[0], estimated_pos[1], camera_name)
+                except Exception as e:
+                    print(f"[GLOBAL TRACKER] Position callback error: {e}")
     
     def create_or_update(self, camera_name: str, local_id: int,
                         feature_vector: Optional[np.ndarray] = None,
@@ -533,18 +587,8 @@ class GlobalPersonTracker:
                         frame_shape: Optional[Tuple[int, int]] = None) -> int:
         """
         Main entry point: Find matching person or create new one.
-        
-        Args:
-            camera_name: Name of the camera
-            local_id: Local person ID (DeepSORT track ID)
-            feature_vector: Re-ID features (optional but recommended)
-            bbox: Bounding box (x, y, w, h)
-            frame_shape: (width, height) of the frame for bbox normalization
-        
-        Returns:
-            global_id: The assigned global person ID
         """
-        print("[GLOBAL TRACKER] Creating or updating person...")
+        print(f"[GLOBAL TRACKER] === create_or_update called: camera='{camera_name}', local_id={local_id}, has_features={feature_vector is not None} ===")
         
         # Update frame dimensions if provided
         if frame_shape and camera_name in self.cameras:
@@ -561,13 +605,16 @@ class GlobalPersonTracker:
                     current_bbox=bbox,
                     current_camera=camera_name
                 )
+            else:
+                print(f"[GLOBAL TRACKER] No features, skipping match search")
             
             if matched_id is not None:
                 # Match found - update existing person
                 person = self.global_persons[matched_id]
+                old_cameras = list(person.camera_tracks.keys())
                 person.update_from_camera(camera_name, local_id, feature_vector, bbox)
                 global_id = matched_id
-                print(f"[GLOBAL TRACKER] Updated person {matched_id} in {camera_name}")
+                print(f"[GLOBAL TRACKER] ✓ Updated person G:{matched_id} in '{camera_name}' (was in cameras: {old_cameras})")
             else:
                 # No match - create new person
                 new_id = self.next_id
@@ -577,7 +624,7 @@ class GlobalPersonTracker:
                 person.update_from_camera(camera_name, local_id, feature_vector, bbox)
                 self.global_persons[new_id] = person
                 global_id = new_id
-                print(f"[GLOBAL TRACKER] Created new person {new_id} in {camera_name}")
+                print(f"[GLOBAL TRACKER] ✗ Created NEW person G:{new_id} in '{camera_name}' (no match found)")
             
             # Emit position callback for floor map visualization
             if self.position_callback and bbox is not None:

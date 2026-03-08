@@ -878,6 +878,31 @@ class DetectionSystem:
                                 person_obj.inherited_identity = existing_name
                                 person_obj.inherited_confidence = existing_conf
                                 print(f"[INHERIT] Person L:{tid} inherited '{existing_name}' (conf={existing_conf:.3f}) from global G:{global_id}")
+                        
+                        # --- POSITION UPDATE + FEATURE REFRESH for already-tracked persons ---
+                        elif self.global_tracker and person_obj.global_id is not None:
+                            # Track frame count for periodic feature refresh
+                            if not hasattr(person_obj, '_feature_refresh_counter'):
+                                person_obj._feature_refresh_counter = 0
+                            person_obj._feature_refresh_counter += 1
+                            
+                            # Every 30 frames: re-extract Re-ID features (heavier)
+                            refreshed_features = None
+                            if person_obj._feature_refresh_counter >= 30:
+                                person_obj._feature_refresh_counter = 0
+                                crop = frame[t:t + h, l:l + w]
+                                if crop.size > 0:
+                                    refreshed_features = self.extract_person_features(crop)
+                                    if refreshed_features is not None:
+                                        person_obj.feature_vector = refreshed_features
+                            
+                            # Every frame: update position on map (lightweight)
+                            self.global_tracker.update_person_position(
+                                person_obj.global_id,
+                                self.camera_name,
+                                bbox=(l, t, w, h),
+                                feature_vector=refreshed_features
+                            )
                     else:
                         person_obj = Person(tid, l, t, w, h, 0.9)
                         # Extract features once
