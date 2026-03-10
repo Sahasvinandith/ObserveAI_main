@@ -1,4 +1,5 @@
 {
+    "pixels_per_meter": 30.0,
     "cameras": [
         {
             "name": "Front_cam",

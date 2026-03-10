@@ -69,6 +69,10 @@ class GlobalPerson:
     first_seen: float = field(default_factory=time.time)
     last_seen: float = field(default_factory=time.time)
     
+    # Position smoothing (prevents dot from jumping when estimation method changes)
+    smoothed_position: Optional[Tuple[float, float]] = None
+    last_position_camera: Optional[str] = None
+    
     def update_face_identity(self, user_id: str, confidence: float) -> tuple:
         """
         Update face identity for this global person.
@@ -184,7 +188,8 @@ class GlobalPersonTracker:
     def __init__(self, feature_threshold: float = 0.47, 
                  reid_weight: float = 0.7, 
                  spatial_weight: float = 0.5,
-                 position_callback: Optional[Callable] = None):
+                 position_callback: Optional[Callable] = None,
+                 pixels_per_meter: float = 30.0):
         """
         Initialize the global person tracker with spatial awareness.
         
@@ -196,6 +201,8 @@ class GlobalPersonTracker:
             spatial_weight: Weight for spatial matching (default 0.3)
             position_callback: Optional callback(global_id, x, y, camera_name) 
                               for floor map visualization
+            pixels_per_meter: Scale factor for the map (how many pixels = 1 meter)
+                             Used to convert between real-world distances and map coordinates
         """
         self.global_persons: Dict[int, GlobalPerson] = {}
         self.next_id: int = 1
@@ -204,14 +211,21 @@ class GlobalPersonTracker:
         self.spatial_weight: float = spatial_weight
         self.lock = threading.Lock()
         
+        # Map scale: how many pixels on the map = 1 meter in real life
+        self.pixels_per_meter: float = pixels_per_meter
+        
         # Camera spatial data
         self.cameras: Dict[str, CameraInfo] = {}
         
         # Callback for position updates (for floor map visualization)
         self.position_callback = position_callback
         
+        # Position smoothing factor (0 = no smoothing, 1 = never update)
+        self.position_smoothing: float = 0.4
+        
         print(f"[GLOBAL TRACKER] Initialized with threshold={feature_threshold}, "
-              f"weights: reid={reid_weight}, spatial={spatial_weight}")
+              f"weights: reid={reid_weight}, spatial={spatial_weight}, "
+              f"pixels_per_meter={pixels_per_meter}")
     
     # =========================================================================
     # Face Identity Consolidation
@@ -468,7 +482,8 @@ class GlobalPersonTracker:
         iy = p1y + t1 * d1y
         
         # Sanity check: intersection shouldn't be absurdly far from either camera
-        max_range = max(cam1.view_range, cam2.view_range) * 2.0
+        # Use a generous limit — 5x view_range — to avoid rejecting valid positions
+        max_range = max(cam1.view_range, cam2.view_range) * 5.0
         if t1 > max_range or t2 > max_range:
             return None
         
@@ -483,9 +498,10 @@ class GlobalPersonTracker:
         1. If 2+ cameras are actively tracking this person, use stereo triangulation
            (pick the two most recent active cameras for best accuracy).
         2. If only 1 camera, fall back to single-camera depth estimate.
+        3. Apply exponential smoothing to prevent sudden dot jumps.
         
         Returns:
-            (x, y) estimated floor position, or None
+            (x, y) smoothed estimated floor position, or None
         """
         current_time = time.time()
         ACTIVE_THRESHOLD = 2.0  # seconds
@@ -499,30 +515,48 @@ class GlobalPersonTracker:
         # Also include the current update (it may not be in camera_tracks yet)
         current_in_list = any(c == camera_name for c, _ in active_tracks)
         if not current_in_list and camera_name in self.cameras:
-            # Create a temporary entry for the current observation
             active_tracks.append((camera_name, LocalTrack(
                 camera_name=camera_name, local_person_id=0,
                 bbox=bbox, last_seen=current_time
             )))
         
+        raw_position = None
+        
         # STEREO: If 2+ cameras, triangulate using the two with most recent data
         if len(active_tracks) >= 2:
-            # Sort by recency (most recent first)
             active_tracks.sort(key=lambda item: item[1].last_seen, reverse=True)
             
             cam1_name, track1 = active_tracks[0]
             cam2_name, track2 = active_tracks[1]
             
-            # Use current bbox if this camera is one of the two
             bbox1 = bbox if cam1_name == camera_name else track1.bbox
             bbox2 = bbox if cam2_name == camera_name else track2.bbox
             
-            result = self._triangulate_position(cam1_name, bbox1, cam2_name, bbox2)
-            if result is not None:
-                return result
+            raw_position = self._triangulate_position(cam1_name, bbox1, cam2_name, bbox2)
         
         # FALLBACK: Single-camera estimate
-        return self._estimate_person_position(camera_name, bbox)
+        if raw_position is None:
+            raw_position = self._estimate_person_position(camera_name, bbox)
+        
+        if raw_position is None:
+            return None
+        
+        # Apply exponential smoothing to prevent sudden jumps
+        if person.smoothed_position is not None:
+            alpha = self.position_smoothing  # 0.4 = blend 40% old + 60% new
+            sx = alpha * person.smoothed_position[0] + (1 - alpha) * raw_position[0]
+            sy = alpha * person.smoothed_position[1] + (1 - alpha) * raw_position[1]
+            smoothed = (sx, sy)
+        else:
+            # First position — no smoothing, place immediately
+            smoothed = raw_position
+        
+        # Store smoothed position for next frame
+        person.smoothed_position = smoothed
+        person.last_position_camera = camera_name
+        
+        return smoothed
+    
     
     
     def _spatial_distance(self, camera1: str, bbox1: Tuple[int, int, int, int],

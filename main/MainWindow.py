@@ -97,11 +97,13 @@ class MainWindow(QMainWindow):
         
         # --- Global Person Tracking System ---
         from DataModel.GlobalPersonTracker import GlobalPersonTracker
+        self.pixels_per_meter = 30.0  # Default scale: 30 pixels = 1 meter (overwritten by map JSON)
         self.global_tracker = GlobalPersonTracker(
             feature_threshold=self.settings.get("feature_threshold"),
             reid_weight=self.settings.get("reid_weight"),
             spatial_weight=self.settings.get("spatial_weight"),
-            position_callback=self._on_person_position_update
+            position_callback=self._on_person_position_update,
+            pixels_per_meter=self.pixels_per_meter
         )
         self.DEFAULT_FOV = self.settings.get("default_fov")  # Store for camera registration
         
@@ -574,6 +576,7 @@ class MainWindow(QMainWindow):
             return # User cancelled
 
         layout_data = {
+            "pixels_per_meter": self.pixels_per_meter,
             "cameras": [],
             "walls": []
         }
@@ -628,6 +631,12 @@ class MainWindow(QMainWindow):
 
         # --- CRUCIAL: Clear everything first ---
         self.clear_all()
+        
+        # Load scale factor
+        self.pixels_per_meter = layout_data.get("pixels_per_meter", 30.0)
+        if self.global_tracker:
+            self.global_tracker.pixels_per_meter = self.pixels_per_meter
+            print(f"[MAIN] Map scale set to {self.pixels_per_meter} pixels/meter")
 
         # Load walls
         for wall_data in layout_data.get("walls", []):
