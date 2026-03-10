@@ -702,6 +702,7 @@ class DetectionSystem:
                             dist = math.dist(new_center, existing_center)
                             if dist < self.DISTANCE_THRESHOLD:
                                 matched_face = face_obj
+                                # mathed face found
                                 break
 
                         if matched_face:
@@ -982,7 +983,12 @@ class DetectionSystem:
                 q_size = self.recognition_queue.qsize()
 
             # 3. Drawing Loop
+            current_time = time.time()
             for person_obj in display_persons:
+                # Skip drawing if person hasn't been seen recently
+                if current_time - person_obj.last_seen > 1.0:
+                    continue
+                
                 pid = int(person_obj.person_id)
                 px, py, pw, ph = person_obj.x, person_obj.y, person_obj.w, person_obj.h
 

@@ -109,6 +109,33 @@ class GlobalPerson:
         
         return (self.local_user_id, old_id_for_merge)
     
+    def _get_dominant_camera(self) -> Optional[str]:
+        """
+        Determines the single 'best' camera tracking this person right now.
+        Used to prevent a single global person from appearing in multiple
+        locations on the map at the same time.
+        
+        Logic:
+        1. Only consider cameras where the person was seen in the last 2 seconds.
+        2. Filter out cameras with no bounding box.
+        3. Pick the camera where the person's bounding box area is the largest 
+           (usually implies they are closer/clearer in that camera).
+        """
+        current_time = time.time()
+        active_tracks = []
+        
+        for cam_name, track in self.camera_tracks.items():
+            if current_time - track.last_seen < 2.0 and track.bbox is not None:
+                active_tracks.append((cam_name, track))
+                
+        if not active_tracks:
+            return None
+            
+        # Sort by bounding box area (width * height), largest first
+        active_tracks.sort(key=lambda item: item[1].bbox[2] * item[1].bbox[3], reverse=True)
+        return active_tracks[0][0]
+
+    
     def update_from_camera(self, camera_name: str, local_id: int,
                           feature_vector: Optional[np.ndarray] = None,
                           bbox: Optional[Tuple[int, int, int, int]] = None):
@@ -154,7 +181,7 @@ class GlobalPersonTracker:
     - Thread-safe for multi-camera use
     """
     
-    def __init__(self, feature_threshold: float = 0.5, 
+    def __init__(self, feature_threshold: float = 0.47, 
                  reid_weight: float = 0.7, 
                  spatial_weight: float = 0.5,
                  position_callback: Optional[Callable] = None):
@@ -425,9 +452,11 @@ class GlobalPersonTracker:
         max_relevant_distance = max(cam1.view_range, cam2.view_range)
         cam_score = min(cam_distance / max_relevant_distance, 1.0)
         
-        # Combine scores: weight angular alignment more heavily
-        # If cameras are far apart, angular alignment matters less
-        combined = 0.7 * angular_score + 0.3 * cam_score
+        # Penalize distant cameras more heavily (squaring makes closer scores better, distant worse)
+        cam_score = cam_score ** 0.8  
+        
+        # Combine scores: weight angular alignment vs physical distance
+        combined = 0.6 * angular_score + 0.4 * cam_score
         
         return combined
     
@@ -571,9 +600,10 @@ class GlobalPersonTracker:
             person.last_seen = time.time()
             person.last_camera = camera_name
             person.last_bbox = bbox
+            dominant_camera = person._get_dominant_camera()
         
-        # Fire position callback (outside lock to avoid deadlocks)
-        if self.position_callback and bbox is not None:
+        # Fire position callback ONLY if this camera is the dominant one
+        if self.position_callback and bbox is not None and camera_name == dominant_camera:
             estimated_pos = self._estimate_person_position(camera_name, bbox)
             if estimated_pos:
                 try:
@@ -626,8 +656,10 @@ class GlobalPersonTracker:
                 global_id = new_id
                 print(f"[GLOBAL TRACKER] ✗ Created NEW person G:{new_id} in '{camera_name}' (no match found)")
             
-            # Emit position callback for floor map visualization
-            if self.position_callback and bbox is not None:
+            dominant_camera = person._get_dominant_camera()
+            
+            # Emit position callback for floor map visualization ONLY if dominant
+            if self.position_callback and bbox is not None and camera_name == dominant_camera:
                 estimated_pos = self._estimate_person_position(camera_name, bbox)
                 if estimated_pos:
                     try:
