@@ -1,5 +1,5 @@
 import json
-from PyQt6.QtWidgets import (QListWidgetItem,QFileDialog,QGraphicsScene,QApplication, QMainWindow, QLabel, QVBoxLayout,QLineEdit,QDialogButtonBox,QDialog, QGraphicsRectItem, QGraphicsEllipseItem)
+from PyQt6.QtWidgets import (QListWidgetItem,QFileDialog,QGraphicsScene,QApplication, QMainWindow, QLabel, QVBoxLayout,QLineEdit,QDialogButtonBox,QDialog, QGraphicsRectItem, QGraphicsEllipseItem, QMenu, QWidget)
 from PyQt6.QtCore import (QPointF,QThread,Qt, pyqtSignal,pyqtSlot)
 from PyQt6.QtGui import QImage, QBrush, QPen, QColor
 import threading
@@ -14,6 +14,31 @@ from components.Camera_worker import CameraWorker
 from components.Database_viewer import DatabaseViewer
 import queue
 from DataModel.DetectionSystem import Ai_System_thread
+
+
+class PopOutWindow(QMainWindow):
+    """
+    A standalone window that hosts a page popped out from the main QStackedWidget.
+    When closed, it returns the page back to the main stack.
+    """
+    def __init__(self, page_widget, page_index, page_title, dock_callback, parent=None):
+        super().__init__(parent)
+        self.page_widget = page_widget
+        self.page_index = page_index
+        self.dock_callback = dock_callback
+        
+        self.setWindowTitle(f"ObserveAI — {page_title}")
+        self.setMinimumSize(600, 400)
+        self.setStyleSheet("background-color: rgb(39, 7, 40); color: rgb(255, 255, 255);")
+        
+        # Reparent the page widget into this window
+        self.setCentralWidget(page_widget)
+        page_widget.show()
+    
+    def closeEvent(self, event):
+        """When the pop-out window is closed, dock the page back into the main stack."""
+        self.dock_callback(self.page_widget, self.page_index)
+        super().closeEvent(event)
 
 
 class MainWindow(QMainWindow):
@@ -34,6 +59,9 @@ class MainWindow(QMainWindow):
         self.scene_cameras:dict[str,CameraItem] = {}   # Tracks QGraphicsScene cameras (name -> item)
         self.scene_walls = []     # Tracks QGraphicsScene walls
         self.grid_feed_widgets = {} # name -> GridFeedWidget
+        
+        # --- Pop-Out Window Management ---
+        self.popout_windows = {}  # page_index -> PopOutWindow
         
         self.camera_workers ={}
         self.camera_threads = {}
@@ -98,17 +126,32 @@ class MainWindow(QMainWindow):
         self.Content_stack.setCurrentIndex(0)
     
     def signal_setup(self):
-        self.cam_set_btn.clicked.connect(lambda: self.Content_stack.setCurrentIndex(0))
-        self.cam_feed_btn.clicked.connect(lambda: self.Content_stack.setCurrentIndex(1))       
-        self.db_btn.clicked.connect(lambda: self.Content_stack.setCurrentIndex(2))
+        # --- Page navigation (left-click switches in main window) ---
+        self.cam_set_btn.clicked.connect(lambda: self._switch_or_focus_page(0))
+        self.cam_feed_btn.clicked.connect(lambda: self._switch_or_focus_page(1))       
+        self.db_btn.clicked.connect(lambda: self._switch_or_focus_page(2))
         self.add_camera_btn.clicked.connect(self.add_camera)
         self.update_btn.clicked.connect(self.update_camera)
         self.add_wall_btn.clicked.connect(self.add_a_wall)
         self.save_map_btn.clicked.connect(self.save_layout)
         self.load_map_btn.clicked.connect(self.load_layout)
         self.db_btn.clicked.connect(self.show_database_page)
-        self.logs_btn.clicked.connect(lambda: self.Content_stack.setCurrentIndex(3))
+        self.logs_btn.clicked.connect(lambda: self._switch_or_focus_page(3))
         self.settings_btn.clicked.connect(self.show_settings_page)
+        
+        # --- Right-click context menus for pop-out ---
+        self._page_info = {
+            0: ("Camera Settings", self.cam_set_btn),
+            1: ("Camera Feed", self.cam_feed_btn),
+            2: ("Database", self.db_btn),
+            3: ("Logs", self.logs_btn),
+            4: ("Settings", self.settings_btn),
+        }
+        for page_idx, (title, btn) in self._page_info.items():
+            btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+            btn.customContextMenuRequested.connect(
+                lambda pos, idx=page_idx, t=title, b=btn: self._show_popout_menu(pos, idx, t, b)
+            )
         
         # Setup settings page controls
         self.setup_settings_page()
@@ -209,7 +252,7 @@ class MainWindow(QMainWindow):
     
     def show_settings_page(self):
         """Switch to settings page (index 4)"""
-        self.Content_stack.setCurrentIndex(4)
+        self._switch_or_focus_page(4)
     
     def _save_settings(self):
         """Save current spinbox values to settings file."""
@@ -307,7 +350,7 @@ class MainWindow(QMainWindow):
 
     def show_database_page(self):
         """Switch to DB page and refresh data"""
-        self.Content_stack.setCurrentIndex(2)
+        self._switch_or_focus_page(2)
         if hasattr(self, 'db_viewer'):
             self.db_viewer.refresh_database()
     
@@ -664,9 +707,96 @@ class MainWindow(QMainWindow):
         self.cam_list.clear()
         self.graphics_scene.clear()
                 
+    # =========================================================================
+    # Pop-Out Window Management
+    # =========================================================================
+    
+    def _show_popout_menu(self, pos, page_index, page_title, button):
+        """Show right-click context menu with pop-out option."""
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu { background-color: rgb(60, 30, 65); color: white; border: 1px solid #555; }
+            QMenu::item:selected { background-color: rgb(100, 50, 110); }
+        """)
+        
+        if page_index in self.popout_windows:
+            dock_action = menu.addAction("⬅ Dock Back")
+            dock_action.triggered.connect(lambda: self._dock_page_back_by_index(page_index))
+        else:
+            popout_action = menu.addAction("⎗ Open in New Window")
+            popout_action.triggered.connect(lambda: self._popout_page(page_index, page_title))
+        
+        menu.exec(button.mapToGlobal(pos))
+    
+    def _switch_or_focus_page(self, page_index):
+        """
+        Left-click behavior: if the page is popped out, bring that window to front.
+        Otherwise, switch the stacked widget to it.
+        """
+        if page_index in self.popout_windows:
+            win = self.popout_windows[page_index]
+            win.raise_()
+            win.activateWindow()
+        else:
+            self.Content_stack.setCurrentIndex(page_index)
+    
+    def _popout_page(self, page_index, page_title):
+        """Pop a page out of the QStackedWidget into its own window."""
+        if page_index in self.popout_windows:
+            return  # Already popped out
+        
+        page_widget = self.Content_stack.widget(page_index)
+        if page_widget is None:
+            return
+        
+        # Create the pop-out window (this reparents the widget)
+        win = PopOutWindow(
+            page_widget=page_widget,
+            page_index=page_index,
+            page_title=page_title,
+            dock_callback=self._dock_page_back,
+            parent=None  # No parent = independent window
+        )
+        
+        self.popout_windows[page_index] = win
+        win.resize(800, 600)
+        win.show()
+        
+        # Switch the main stack to the nearest available page
+        for i in range(self.Content_stack.count()):
+            if i not in self.popout_windows:
+                self.Content_stack.setCurrentIndex(i)
+                break
+        
+        print(f"[POP-OUT] '{page_title}' opened in new window")
+    
+    def _dock_page_back(self, page_widget, page_index):
+        """Return a popped-out page back into the QStackedWidget."""
+        if page_index in self.popout_windows:
+            del self.popout_windows[page_index]
+        
+        # Re-insert the widget at the correct position
+        self.Content_stack.insertWidget(page_index, page_widget)
+        self.Content_stack.setCurrentIndex(page_index)
+        
+        page_title = self._page_info.get(page_index, ("Page",))[0]
+        print(f"[POP-OUT] '{page_title}' docked back into main window")
+    
+    def _dock_page_back_by_index(self, page_index):
+        """Dock back from context menu (closes the pop-out window)."""
+        if page_index in self.popout_windows:
+            self.popout_windows[page_index].close()
+    
     def closeEvent(self, event):
         print("Window closing, stopping all threads...")
         self.is_running = False
+        
+        # Close all pop-out windows first
+        for win in list(self.popout_windows.values()):
+            win.dock_callback = lambda w, i: None  # Disable dock-back during shutdown
+            win.close()
+        self.popout_windows.clear()
+        
         self.clear_all()
         super().closeEvent(event)
     
