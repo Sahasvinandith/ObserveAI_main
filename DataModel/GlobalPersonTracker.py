@@ -406,6 +406,125 @@ class GlobalPersonTracker:
         
         return (est_x, est_y)
     
+    def _triangulate_position(self, cam1_name: str, bbox1: Tuple[int, int, int, int],
+                               cam2_name: str, bbox2: Tuple[int, int, int, int]) -> Optional[Tuple[float, float]]:
+        """
+        Stereo triangulation: find a person's floor position using 2 camera rays.
+        
+        Each camera gives us a ray (camera position + world angle from bbox).
+        The intersection of these two 2D rays is the person's actual position.
+        
+        Uses Cramer's rule on the system:
+            P1 + t1 * D1 = P2 + t2 * D2
+        
+        Returns:
+            (x, y) triangulated position, or None if rays are parallel/invalid
+        """
+        if cam1_name not in self.cameras or cam2_name not in self.cameras:
+            return None
+        
+        cam1 = self.cameras[cam1_name]
+        cam2 = self.cameras[cam2_name]
+        
+        # Get world angles for person in each camera
+        angle1 = self._bbox_to_world_angle(cam1_name, bbox1)
+        angle2 = self._bbox_to_world_angle(cam2_name, bbox2)
+        
+        if angle1 is None or angle2 is None:
+            return None
+        
+        # Ray directions
+        theta1 = math.radians(angle1)
+        theta2 = math.radians(angle2)
+        
+        d1x, d1y = math.cos(theta1), math.sin(theta1)
+        d2x, d2y = math.cos(theta2), math.sin(theta2)
+        
+        # Camera positions
+        p1x, p1y = cam1.position
+        p2x, p2y = cam2.position
+        
+        # Solve using Cramer's rule:
+        # t1 * d1x - t2 * d2x = p2x - p1x
+        # t1 * d1y - t2 * d2y = p2y - p1y
+        det = d1x * (-d2y) - (-d2x) * d1y  # = sin(theta1 - theta2)
+        
+        # If det ≈ 0, rays are nearly parallel — can't triangulate
+        if abs(det) < 0.01:
+            return None
+        
+        dx = p2x - p1x
+        dy = p2y - p1y
+        
+        t1 = (dx * (-d2y) - (-d2x) * dy) / det
+        t2 = (d1x * dy - d1y * dx) / det
+        
+        # Both t-values must be positive (intersection in FRONT of both cameras)
+        if t1 < 0 or t2 < 0:
+            return None
+        
+        # Compute intersection point using ray 1
+        ix = p1x + t1 * d1x
+        iy = p1y + t1 * d1y
+        
+        # Sanity check: intersection shouldn't be absurdly far from either camera
+        max_range = max(cam1.view_range, cam2.view_range) * 2.0
+        if t1 > max_range or t2 > max_range:
+            return None
+        
+        return (ix, iy)
+    
+    def _get_best_position(self, person: 'GlobalPerson', camera_name: str,
+                            bbox: Tuple[int, int, int, int]) -> Optional[Tuple[float, float]]:
+        """
+        Get the best position estimate for a person.
+        
+        Strategy:
+        1. If 2+ cameras are actively tracking this person, use stereo triangulation
+           (pick the two most recent active cameras for best accuracy).
+        2. If only 1 camera, fall back to single-camera depth estimate.
+        
+        Returns:
+            (x, y) estimated floor position, or None
+        """
+        current_time = time.time()
+        ACTIVE_THRESHOLD = 2.0  # seconds
+        
+        # Gather all active camera tracks with valid bboxes
+        active_tracks = []
+        for cam_name, track in person.camera_tracks.items():
+            if current_time - track.last_seen < ACTIVE_THRESHOLD and track.bbox is not None:
+                active_tracks.append((cam_name, track))
+        
+        # Also include the current update (it may not be in camera_tracks yet)
+        current_in_list = any(c == camera_name for c, _ in active_tracks)
+        if not current_in_list and camera_name in self.cameras:
+            # Create a temporary entry for the current observation
+            active_tracks.append((camera_name, LocalTrack(
+                camera_name=camera_name, local_person_id=0,
+                bbox=bbox, last_seen=current_time
+            )))
+        
+        # STEREO: If 2+ cameras, triangulate using the two with most recent data
+        if len(active_tracks) >= 2:
+            # Sort by recency (most recent first)
+            active_tracks.sort(key=lambda item: item[1].last_seen, reverse=True)
+            
+            cam1_name, track1 = active_tracks[0]
+            cam2_name, track2 = active_tracks[1]
+            
+            # Use current bbox if this camera is one of the two
+            bbox1 = bbox if cam1_name == camera_name else track1.bbox
+            bbox2 = bbox if cam2_name == camera_name else track2.bbox
+            
+            result = self._triangulate_position(cam1_name, bbox1, cam2_name, bbox2)
+            if result is not None:
+                return result
+        
+        # FALLBACK: Single-camera estimate
+        return self._estimate_person_position(camera_name, bbox)
+    
+    
     def _spatial_distance(self, camera1: str, bbox1: Tuple[int, int, int, int],
                           camera2: str, bbox2: Tuple[int, int, int, int]) -> float:
         """
@@ -601,15 +720,18 @@ class GlobalPersonTracker:
             person.last_camera = camera_name
             person.last_bbox = bbox
             dominant_camera = person._get_dominant_camera()
+            
+            # Compute position while we still hold the lock (accesses camera_tracks)
+            estimated_pos = None
+            if self.position_callback and bbox is not None and camera_name == dominant_camera:
+                estimated_pos = self._get_best_position(person, camera_name, bbox)
         
-        # Fire position callback ONLY if this camera is the dominant one
-        if self.position_callback and bbox is not None and camera_name == dominant_camera:
-            estimated_pos = self._estimate_person_position(camera_name, bbox)
-            if estimated_pos:
-                try:
-                    self.position_callback(global_id, estimated_pos[0], estimated_pos[1], camera_name)
-                except Exception as e:
-                    print(f"[GLOBAL TRACKER] Position callback error: {e}")
+        # Fire position callback outside lock to avoid deadlocks
+        if estimated_pos is not None:
+            try:
+                self.position_callback(global_id, estimated_pos[0], estimated_pos[1], camera_name)
+            except Exception as e:
+                print(f"[GLOBAL TRACKER] Position callback error: {e}")
     
     def create_or_update(self, camera_name: str, local_id: int,
                         feature_vector: Optional[np.ndarray] = None,
@@ -660,7 +782,7 @@ class GlobalPersonTracker:
             
             # Emit position callback for floor map visualization ONLY if dominant
             if self.position_callback and bbox is not None and camera_name == dominant_camera:
-                estimated_pos = self._estimate_person_position(camera_name, bbox)
+                estimated_pos = self._get_best_position(person, camera_name, bbox)
                 if estimated_pos:
                     try:
                         self.position_callback(global_id, estimated_pos[0], estimated_pos[1], camera_name)
