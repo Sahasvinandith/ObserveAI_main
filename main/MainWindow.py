@@ -1,5 +1,6 @@
 import json
-from PyQt6.QtWidgets import (QListWidgetItem,QFileDialog,QGraphicsScene,QApplication, QMainWindow, QLabel, QVBoxLayout,QLineEdit,QDialogButtonBox,QDialog, QGraphicsRectItem, QGraphicsEllipseItem, QMenu, QWidget)
+import time
+from PyQt6.QtWidgets import (QListWidgetItem,QFileDialog,QGraphicsScene,QApplication, QMainWindow, QLabel, QVBoxLayout,QLineEdit,QDialogButtonBox,QDialog, QGraphicsRectItem, QGraphicsEllipseItem, QMenu, QWidget, QGraphicsSimpleTextItem)
 from PyQt6.QtCore import (QPointF,QThread,Qt, pyqtSignal,pyqtSlot)
 from PyQt6.QtGui import QImage, QBrush, QPen, QColor
 import threading
@@ -75,6 +76,12 @@ class MainWindow(QMainWindow):
         self.FRAME_BUFFER_SIZE = 10 # Max frames to hold per camera
         
         self.maximized_widget = None # Tracks which widget is maximized, if any
+        
+        # --- Camera Calibration Mode ---
+        self._calibration_camera: str = None    # Camera name being calibrated, or None
+        self._calibration_points: list = []     # CalibrationPoint objects
+        self._calibration_markers: list = []    # Visual markers on scene
+        self._calibration_active = False
         self.COLUMNS_IN_GRID = 3     # Set how many columns you want
         
         # --- Settings Manager ---
@@ -439,6 +446,7 @@ class MainWindow(QMainWindow):
         list_widget = CameraFeedWidget(name)
         grid_widget = GridFeedWidget(name)
         cam_item = CameraItem(name=name, url=url, view_angle=fov, view_range=view_range)
+        cam_item.context_menu_callback = self._on_camera_context_menu
         
         # Set position and rotation
         if pos:
@@ -899,4 +907,300 @@ class MainWindow(QMainWindow):
         except:
             pass # Window might already be closed
     
-
+    # =========================================================================
+    # Camera Calibration System
+    # =========================================================================
+    
+    def _start_calibration(self, camera_name: str):
+        """
+        Enter calibration mode for a specific camera.
+        The user will click 2 reference points on the map.
+        """
+        if camera_name not in self.ai_instances:
+            self._styled_msgbox("Calibration", 
+                              f"Camera '{camera_name}' has no active AI system.\n"
+                              "Start detection first, then calibrate.",
+                              "warning")
+            return
+        
+        self._calibration_camera = camera_name
+        self._calibration_points = []
+        self._calibration_markers = []
+        self._calibration_active = True
+        
+        # Install event filter on graphics view to capture clicks
+        self.drag_area.viewport().installEventFilter(self)
+        
+        self._styled_msgbox("Camera Calibration",
+            f"Calibrating: {camera_name}\n\n"
+            f"Step 1 of 2:\n"
+            f"Have ONE person stand at a known spot visible in {camera_name}.\n"
+            f"Then click that spot on the floor map.\n\n"
+            f"Press Escape to cancel.")
+        
+        print(f"[CALIBRATION] Started for camera '{camera_name}'")
+    
+    def eventFilter(self, source, event):
+        """Capture mouse clicks on the scene during calibration mode."""
+        from PyQt6.QtCore import QEvent
+        
+        if (self._calibration_active and 
+            source == self.drag_area.viewport() and
+            event.type() == QEvent.Type.MouseButtonPress):
+            
+            from PyQt6.QtCore import Qt
+            if event.button() == Qt.MouseButton.LeftButton:
+                # Convert viewport click to scene coordinates
+                scene_pos = self.drag_area.mapToScene(event.pos())
+                self._on_calibration_click(scene_pos.x(), scene_pos.y())
+                return True  # Consume the event
+            elif event.button() == Qt.MouseButton.RightButton:
+                # Right-click cancels calibration
+                self._cancel_calibration()
+                return True
+        
+        return super().eventFilter(source, event)
+    
+    def keyPressEvent(self, event):
+        """Handle Escape key to cancel calibration."""
+        from PyQt6.QtCore import Qt
+        if event.key() == Qt.Key.Key_Escape and self._calibration_active:
+            self._cancel_calibration()
+            return
+        super().keyPressEvent(event)
+    
+    def _on_calibration_click(self, world_x: float, world_y: float):
+        """
+        Handle a click on the map during calibration.
+        Captures the world position AND the current person's frame position.
+        """
+        camera_name = self._calibration_camera
+        
+        # Read the current person's bounding box from DetectionSystem
+        ai_sys = self.ai_instances.get(camera_name)
+        if ai_sys is None:
+            print(f"[CALIBRATION] No AI system for {camera_name}")
+            return
+        
+        # Get tracked persons — need exactly 1 for calibration
+        persons = list(ai_sys.tracked_persons.values())
+        recent_persons = [p for p in persons if (time.time() - p.last_seen) < 1.0]
+        
+        if len(recent_persons) == 0:
+            self._styled_msgbox("Calibration",
+                "No person detected in camera!\n"
+                "Make sure one person is visible and detected.",
+                "warning")
+            return
+        
+        if len(recent_persons) > 1:
+            self._styled_msgbox("Calibration",
+                f"{len(recent_persons)} people detected!\n"
+                "Only ONE person should be visible during calibration.",
+                "warning")
+            return
+        
+        person = recent_persons[0]
+        
+        # Compute normalized frame position (0.0 = left edge, 1.0 = right edge)
+        # Get frame width from GlobalPersonTracker's camera info
+        frame_width = 1920  # Default fallback
+        if self.global_tracker and camera_name in self.global_tracker.cameras:
+            frame_width = self.global_tracker.cameras[camera_name].frame_width
+        bbox_center_x = person.x + person.w / 2
+        frame_x_normalized = bbox_center_x / frame_width
+        
+        # Create calibration point
+        from components.CameraCalibrator import CalibrationPoint
+        cal_point = CalibrationPoint(world_x, world_y, frame_x_normalized)
+        self._calibration_points.append(cal_point)
+        
+        # Add visual marker on scene
+        marker_color = QColor(0, 255, 100) if len(self._calibration_points) == 1 else QColor(100, 100, 255)
+        marker = QGraphicsEllipseItem(-6, -6, 12, 12)
+        marker.setBrush(QBrush(marker_color))
+        marker.setPen(QPen(Qt.GlobalColor.white, 2))
+        marker.setPos(world_x, world_y)
+        marker.setZValue(500)
+        marker.setToolTip(f"Cal Point {len(self._calibration_points)}\n"
+                         f"Map: ({world_x:.1f}, {world_y:.1f})\n"
+                         f"Frame: {frame_x_normalized:.3f}")
+        self.graphics_scene.addItem(marker)
+        self._calibration_markers.append(marker)
+        
+        # Add label
+        label = QGraphicsSimpleTextItem(f"P{len(self._calibration_points)}")
+        label.setBrush(QBrush(QColor(255, 255, 255)))
+        label.setPos(world_x + 10, world_y - 10)
+        label.setZValue(501)
+        self.graphics_scene.addItem(label)
+        self._calibration_markers.append(label)
+        
+        print(f"[CALIBRATION] Point {len(self._calibration_points)}: world=({world_x:.1f}, {world_y:.1f}), frame_x={frame_x_normalized:.3f}")
+        
+        if len(self._calibration_points) == 1:
+            # First point captured — ask for second
+            self._styled_msgbox("Camera Calibration",
+                f"Point 1 captured! ✓\n\n"
+                f"Step 2 of 2:\n"
+                f"Move the person to a DIFFERENT spot.\n"
+                f"Then click that spot on the floor map.")
+        
+        elif len(self._calibration_points) >= 2:
+            # Both points captured — run calibration
+            self._finish_calibration()
+    
+    def _finish_calibration(self):
+        """
+        Run the calibration solver and reposition the camera.
+        """
+        camera_name = self._calibration_camera
+        cam_item = self.scene_cameras.get(camera_name)
+        
+        if cam_item is None:
+            print(f"[CALIBRATION] Camera item not found: {camera_name}")
+            self._cancel_calibration()
+            return
+        
+        # Get current camera state
+        current_pos = cam_item.scenePos()
+        fov = cam_item.view_angle
+        
+        # Run solver
+        from components.CameraCalibrator import solve_camera_position
+        result = solve_camera_position(
+            points=self._calibration_points,
+            fov_degrees=fov,
+            initial_guess=(current_pos.x(), current_pos.y()),
+            search_radius=400.0
+        )
+        
+        if result is None:
+            self._styled_msgbox("Calibration Failed",
+                "Could not compute camera position.\n"
+                "Try using reference points that are further apart.",
+                "warning")
+            self._cancel_calibration()
+            return
+        
+        new_x, new_y, new_rotation = result
+        
+        # Show result and ask for confirmation
+        reply = self._styled_msgbox("Calibration Result",
+            f"Calibration complete!\n\n"
+            f"Old position: ({current_pos.x():.1f}, {current_pos.y():.1f}), rot={cam_item.rotation():.1f}°\n"
+            f"New position: ({new_x:.1f}, {new_y:.1f}), rot={new_rotation:.1f}°\n\n"
+            f"Apply these changes?",
+            "question")
+        
+        from PyQt6.QtWidgets import QMessageBox
+        if reply == QMessageBox.StandardButton.Yes:
+            # Reposition camera item
+            from PyQt6.QtCore import QPointF
+            cam_item.setPos(QPointF(new_x, new_y))
+            cam_item.setRotation(new_rotation)
+            cam_item.rotation_degree = new_rotation
+            cam_item.position = [new_x, new_y]
+            
+            # Update GlobalPersonTracker registration
+            if self.global_tracker:
+                self.global_tracker.register_camera(
+                    name=camera_name,
+                    position=(new_x, new_y),
+                    rotation=new_rotation,
+                    fov=fov,
+                    view_range=cam_item.view_range
+                )
+            
+            print(f"[CALIBRATION] Applied: camera '{camera_name}' → pos=({new_x:.1f}, {new_y:.1f}), rot={new_rotation:.1f}°")
+        
+        self._cleanup_calibration()
+    
+    def _cancel_calibration(self):
+        """Cancel calibration mode."""
+        print(f"[CALIBRATION] Cancelled")
+        self._styled_msgbox("Calibration", "Calibration cancelled.")
+        self._cleanup_calibration()
+    
+    def _cleanup_calibration(self):
+        """Clean up calibration state and visual markers."""
+        # Remove event filter
+        self.drag_area.viewport().removeEventFilter(self)
+        
+        # Remove visual markers
+        for marker in self._calibration_markers:
+            self.graphics_scene.removeItem(marker)
+        
+        self._calibration_camera = None
+        self._calibration_points = []
+        self._calibration_markers = []
+        self._calibration_active = False
+    
+    def _on_camera_context_menu(self, camera_name: str, global_pos):
+        """
+        Show context menu when right-clicking a camera item.
+        """
+        from PyQt6.QtWidgets import QMenu
+        menu = QMenu(self)
+        menu.setStyleSheet("""
+            QMenu { background-color: rgb(40, 40, 55); color: white; border: 1px solid #555; }
+            QMenu::item:selected { background-color: rgb(80, 80, 120); }
+        """)
+        
+        calibrate_action = menu.addAction("📐 Calibrate Position")
+        calibrate_action.triggered.connect(lambda: self._start_calibration(camera_name))
+        
+        menu.exec(global_pos)
+    
+    def _styled_msgbox(self, title: str, text: str, msg_type: str = "info"):
+        """
+        Create a QMessageBox styled to match the app's dark theme.
+        
+        Args:
+            title: Window title
+            text: Message body
+            msg_type: 'info', 'warning', or 'question'
+        
+        Returns:
+            QMessageBox.StandardButton (for 'question' type)
+        """
+        from PyQt6.QtWidgets import QMessageBox
+        
+        msg = QMessageBox(self)
+        msg.setWindowTitle(title)
+        msg.setText(text)
+        msg.setStyleSheet("""
+            QMessageBox {
+                background-color: rgb(39, 7, 40);
+                color: rgb(255, 255, 255);
+            }
+            QMessageBox QLabel {
+                color: rgb(255, 255, 255);
+                font-size: 13px;
+            }
+            QPushButton {
+                background-color: rgb(60, 30, 65);
+                color: white;
+                border: 1px solid rgb(100, 50, 110);
+                padding: 6px 20px;
+                border-radius: 4px;
+                min-width: 80px;
+            }
+            QPushButton:hover {
+                background-color: rgb(100, 50, 110);
+            }
+            QPushButton:pressed {
+                background-color: rgb(120, 60, 130);
+            }
+        """)
+        
+        if msg_type == "warning":
+            msg.setIcon(QMessageBox.Icon.Warning)
+        elif msg_type == "question":
+            msg.setIcon(QMessageBox.Icon.Question)
+            msg.setStandardButtons(QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
+            return msg.exec()
+        else:
+            msg.setIcon(QMessageBox.Icon.Information)
+        
+        msg.exec()

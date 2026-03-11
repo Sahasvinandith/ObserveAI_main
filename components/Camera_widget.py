@@ -220,5 +220,13 @@ class CameraItem(QGraphicsObject):
             
     # Show a tooltip
     def hoverEnterEvent(self, event):
-        self.setToolTip("Camera (Drag to move, Ctrl+Wheel to rotate)")
+        self.setToolTip("Camera (Drag to move, Ctrl+Wheel to rotate, Right-click for options)")
         super().hoverEnterEvent(event)
+    
+    def contextMenuEvent(self, event):
+        """Show right-click context menu via callback to MainWindow."""
+        if hasattr(self, 'context_menu_callback') and self.context_menu_callback:
+            self.context_menu_callback(self.name, event.screenPos())
+            event.accept()
+        else:
+            super().contextMenuEvent(event)

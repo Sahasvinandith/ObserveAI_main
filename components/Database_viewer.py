@@ -12,6 +12,25 @@ class DatabaseViewer(QWidget):
         # Load the new UI file
         loadUi("./UIs/database_viewer.ui", self)
         
+        self.setStyleSheet("""
+            QWidget { background-color: rgb(39, 7, 40); color: white; }
+            QLabel { color: white; background-color: transparent; border: none; }
+            QListWidget { 
+                background-color: rgb(60, 30, 65); color: white; 
+                border: 1px solid #555; border-radius: 3px; 
+            }
+            QListWidget::item:selected { background-color: rgb(100, 50, 110); }
+            QLineEdit { 
+                background-color: rgb(60, 30, 65); color: white; 
+                border: 1px solid #555; padding: 4px; border-radius: 3px;
+            }
+            QPushButton { 
+                background-color: rgb(60, 30, 65); color: white; 
+                border: 1px solid rgb(100, 50, 110); padding: 6px 15px; border-radius: 3px; 
+            }
+            QPushButton:hover { background-color: rgb(100, 50, 110); }
+        """)
+        
         # Internal data storage
         self.all_ids = [] # List of folder names
         

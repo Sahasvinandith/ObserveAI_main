@@ -44,6 +44,21 @@ class AddCameraDialog(QDialog):
     def __init__(self, parent=None):
         super().__init__(parent)
         uic.loadUi("UIs/add_camera_dialog.ui", self)
+        
+        self.setStyleSheet("""
+            QDialog { background-color: rgb(39, 7, 40); color: white; }
+            QLabel { color: white; background-color: transparent; border: none; }
+            QLineEdit, QSpinBox, QDoubleSpinBox { 
+                background-color: rgb(60, 30, 65); color: white; 
+                border: 1px solid #555; padding: 4px; border-radius: 3px;
+            }
+            QPushButton { 
+                background-color: rgb(60, 30, 65); color: white; 
+                border: 1px solid rgb(100, 50, 110); padding: 6px 15px; border-radius: 3px; 
+            }
+            QPushButton:hover { background-color: rgb(100, 50, 110); }
+        """)
+        
         # Access widgets by their objectName:
         # self.name_input, self.url_input, self.fov_input, self.view_range_input, self.buttonBox
         self.buttonBox.accepted.connect(self.accept)
