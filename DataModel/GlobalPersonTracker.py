@@ -465,6 +465,7 @@ class GlobalPersonTracker:
         
         # If det ≈ 0, rays are nearly parallel — can't triangulate
         if abs(det) < 0.01:
+            print(f"[STEREO] REJECT parallel rays: {cam1_name}({angle1:.1f}°) vs {cam2_name}({angle2:.1f}°), det={det:.4f}")
             return None
         
         dx = p2x - p1x
@@ -475,6 +476,7 @@ class GlobalPersonTracker:
         
         # Both t-values must be positive (intersection in FRONT of both cameras)
         if t1 < 0 or t2 < 0:
+            print(f"[STEREO] REJECT behind camera: {cam1_name}({angle1:.1f}°) t1={t1:.1f}, {cam2_name}({angle2:.1f}°) t2={t2:.1f}")
             return None
         
         # Compute intersection point using ray 1
@@ -485,6 +487,7 @@ class GlobalPersonTracker:
         # Use a generous limit — 5x view_range — to avoid rejecting valid positions
         max_range = max(cam1.view_range, cam2.view_range) * 5.0
         if t1 > max_range or t2 > max_range:
+            print(f"[STEREO] REJECT too far: t1={t1:.1f}, t2={t2:.1f}, max_range={max_range:.1f}")
             return None
         
         return (ix, iy)

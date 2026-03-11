@@ -113,6 +113,14 @@ class MainWindow(QMainWindow):
         # 3. (Optional but recommended) Set a size for the scene
         self.graphics_scene.setSceneRect(0, 0, 1200, 1200)
         
+        # 4. Add calibrated grid floor to the scene
+        from components.GridFloor import GridFloor
+        self.grid_floor = GridFloor(
+            scene_width=1200, scene_height=1200,
+            pixels_per_meter=self.pixels_per_meter
+        )
+        self.graphics_scene.addItem(self.grid_floor)
+        
         
         self.signal_setup()
         
@@ -637,6 +645,10 @@ class MainWindow(QMainWindow):
         if self.global_tracker:
             self.global_tracker.pixels_per_meter = self.pixels_per_meter
             print(f"[MAIN] Map scale set to {self.pixels_per_meter} pixels/meter")
+        
+        # Update grid floor with new scale
+        if hasattr(self, 'grid_floor'):
+            self.grid_floor.set_pixels_per_meter(self.pixels_per_meter)
 
         # Load walls
         for wall_data in layout_data.get("walls", []):
@@ -715,6 +727,14 @@ class MainWindow(QMainWindow):
         
         self.cam_list.clear()
         self.graphics_scene.clear()
+        
+        # Re-add grid floor (scene.clear() destroys all items)
+        from components.GridFloor import GridFloor
+        self.grid_floor = GridFloor(
+            scene_width=1200, scene_height=1200,
+            pixels_per_meter=self.pixels_per_meter
+        )
+        self.graphics_scene.addItem(self.grid_floor)
                 
     # =========================================================================
     # Pop-Out Window Management
