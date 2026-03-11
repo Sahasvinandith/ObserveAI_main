@@ -916,10 +916,10 @@ class MainWindow(QMainWindow):
         Enter calibration mode for a specific camera.
         The user will click 2 reference points on the map.
         """
-        if camera_name not in self.ai_instances:
+        if camera_name not in self.camera_workers:
             self._styled_msgbox("Calibration", 
-                              f"Camera '{camera_name}' has no active AI system.\n"
-                              "Start detection first, then calibrate.",
+                              f"Camera '{camera_name}' is not running.\n"
+                              "Please make sure the video feed is working.",
                               "warning")
             return
         
@@ -933,10 +933,11 @@ class MainWindow(QMainWindow):
         
         self._styled_msgbox("Camera Calibration",
             f"Calibrating: {camera_name}\n\n"
-            f"Step 1 of 2:\n"
-            f"Have ONE person stand at a known spot visible in {camera_name}.\n"
-            f"Then click that spot on the floor map.\n\n"
-            f"Press Escape to cancel.")
+            f"1. Click a known spot on the floor map.\n"
+            f"2. A window will pop up with the camera feed.\n"
+            f"3. Click the exact SAME spot on the camera image.\n"
+            f"4. Repeat for at least 2 different spots.\n\n"
+            f"When you have enough points, RIGHT-CLICK the map or press ESCAPE to finish and compute the position.")
         
         print(f"[CALIBRATION] Started for camera '{camera_name}'")
     
@@ -955,60 +956,54 @@ class MainWindow(QMainWindow):
                 self._on_calibration_click(scene_pos.x(), scene_pos.y())
                 return True  # Consume the event
             elif event.button() == Qt.MouseButton.RightButton:
-                # Right-click cancels calibration
-                self._cancel_calibration()
+                # Right-click finishes calibration if we have 2+ points, otherwise cancels
+                if len(self._calibration_points) >= 2:
+                    self._finish_calibration()
+                else:
+                    self._cancel_calibration()
                 return True
         
         return super().eventFilter(source, event)
     
     def keyPressEvent(self, event):
-        """Handle Escape key to cancel calibration."""
+        """Handle Escape key to cancel/finish calibration."""
         from PyQt6.QtCore import Qt
         if event.key() == Qt.Key.Key_Escape and self._calibration_active:
-            self._cancel_calibration()
+            if len(self._calibration_points) >= 2:
+                self._finish_calibration()
+            else:
+                self._cancel_calibration()
             return
         super().keyPressEvent(event)
     
     def _on_calibration_click(self, world_x: float, world_y: float):
         """
         Handle a click on the map during calibration.
-        Captures the world position AND the current person's frame position.
+        Opens a dialog to capture the corresponding frame position.
         """
         camera_name = self._calibration_camera
         
-        # Read the current person's bounding box from DetectionSystem
-        ai_sys = self.ai_instances.get(camera_name)
-        if ai_sys is None:
-            print(f"[CALIBRATION] No AI system for {camera_name}")
-            return
-        
-        # Get tracked persons — need exactly 1 for calibration
-        persons = list(ai_sys.tracked_persons.values())
-        recent_persons = [p for p in persons if (time.time() - p.last_seen) < 1.0]
-        
-        if len(recent_persons) == 0:
+        # Get the latest frame directly from the camera worker
+        worker = self.camera_workers.get(camera_name)
+        if worker is None or not hasattr(worker, 'latest_frame'):
             self._styled_msgbox("Calibration",
-                "No person detected in camera!\n"
-                "Make sure one person is visible and detected.",
-                "warning")
+                f"No video feed available for {camera_name}.\n"
+                "Please wait for the feed to load.", "warning")
             return
-        
-        if len(recent_persons) > 1:
-            self._styled_msgbox("Calibration",
-                f"{len(recent_persons)} people detected!\n"
-                "Only ONE person should be visible during calibration.",
-                "warning")
+            
+        frame = worker.latest_frame
+        if frame is None:
+            self._styled_msgbox("Calibration", "Failed to grab frame from video feed.", "warning")
             return
+            
+        # Open the image click dialog
+        from components.ImageClickDialog import ImageClickDialog
+        dlg = ImageClickDialog(frame, camera_name, self)
         
-        person = recent_persons[0]
-        
-        # Compute normalized frame position (0.0 = left edge, 1.0 = right edge)
-        # Get frame width from GlobalPersonTracker's camera info
-        frame_width = 1920  # Default fallback
-        if self.global_tracker and camera_name in self.global_tracker.cameras:
-            frame_width = self.global_tracker.cameras[camera_name].frame_width
-        bbox_center_x = person.x + person.w / 2
-        frame_x_normalized = bbox_center_x / frame_width
+        if dlg.exec() and dlg.normalized_x is not None:
+            frame_x_normalized = dlg.normalized_x
+        else:
+            return  # Cancelled clicking for this point
         
         # Create calibration point
         from components.CameraCalibrator import CalibrationPoint
@@ -1038,17 +1033,13 @@ class MainWindow(QMainWindow):
         
         print(f"[CALIBRATION] Point {len(self._calibration_points)}: world=({world_x:.1f}, {world_y:.1f}), frame_x={frame_x_normalized:.3f}")
         
-        if len(self._calibration_points) == 1:
-            # First point captured — ask for second
+        # Since we support infinite points, we don't automatically trigger finish.
+        # But we hint the user after 2 points.
+        if len(self._calibration_points) == 2:
             self._styled_msgbox("Camera Calibration",
-                f"Point 1 captured! ✓\n\n"
-                f"Step 2 of 2:\n"
-                f"Move the person to a DIFFERENT spot.\n"
-                f"Then click that spot on the floor map.")
-        
-        elif len(self._calibration_points) >= 2:
-            # Both points captured — run calibration
-            self._finish_calibration()
+                f"2 points captured! The position can now be computed.\n\n"
+                f"You can keep adding more points to increase accuracy, \n"
+                f"or RIGHT-CLICK anywhere on the grid (or press ESCAPE) to finish calibration.")
     
     def _finish_calibration(self):
         """

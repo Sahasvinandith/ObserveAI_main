@@ -111,6 +111,7 @@ class CameraWorker(QObject):
                     # 2. FIX: Create a deep copy to decouple from the local 'rgb_image' numpy array
                     qt_image_safe = qt_image_ref.copy() 
 
+                    self.latest_frame = frame.copy()
                     self.frameReady.emit(qt_image_safe)
 
                 except Exception as e:
