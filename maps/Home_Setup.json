@@ -1,0 +1,28 @@
+{
+    "pixels_per_meter": 30.0,
+    "cameras": [
+        {
+            "name": "SIde_cam",
+            "url": "0",
+            "pos": [
+                16.5,
+                109.5
+            ],
+            "rot": 50.652105718222856,
+            "fov": 70.0,
+            "view_range": 200.0
+        },
+        {
+            "name": "Lap_Cam",
+            "url": "1",
+            "pos": [
+                55.5,
+                58.0
+            ],
+            "rot": 76.6856756594922,
+            "fov": 70.0,
+            "view_range": 200.0
+        }
+    ],
+    "walls": []
+}

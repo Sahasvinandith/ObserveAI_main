@@ -382,17 +382,20 @@ class GlobalPersonTracker:
     
     def _estimate_person_position(self, camera_name: str, 
                                    bbox: Tuple[int, int, int, int],
-                                   distance_estimate: Optional[float] = None) -> Optional[Tuple[float, float]]:
+                                   distance_estimate: Optional[float] = None,
+                                   last_known_pos: Optional[Tuple[float, float]] = None) -> Optional[Tuple[float, float]]:
         """
         Estimate person's world position based on camera location and viewing angle.
         
         This is an approximation that projects the person along the viewing ray.
         Uses the camera's configured view_range to scale the distance estimate.
+        If last_known_pos is provided, it maintains the previous depth to prevent jumping.
         
         Args:
             camera_name: Name of the camera
             bbox: (x, y, w, h) bounding box
             distance_estimate: Override distance from camera. If None, uses half the camera's view_range.
+            last_known_pos: (x, y) previous position to estimate depth.
             
         Returns:
             (x, y) estimated position on floor plan, or None
@@ -402,9 +405,31 @@ class GlobalPersonTracker:
         
         camera = self.cameras[camera_name]
         
-        # Use camera's view_range if no explicit distance provided
         if distance_estimate is None:
-            distance_estimate = camera.view_range * 0.5
+            if last_known_pos is not None:
+                # Calculate distance from camera to last known position
+                dx = last_known_pos[0] - camera.position[0]
+                dy = last_known_pos[1] - camera.position[1]
+                dist = math.hypot(dx, dy)
+                # Keep distance within reasonable bounds (10% to 100% of view range)
+                distance_estimate = max(camera.view_range * 0.1, min(dist, camera.view_range))
+            else:
+                # Use Bounding Box feet position to estimate depth computationally
+                x, y, w, h = bbox
+                bottom_y = y + h
+                
+                # Normalize to 0.0 (top) to 1.0 (bottom of frame)
+                frame_height = getattr(camera, 'frame_height', 640)
+                normalized_y = min(1.0, max(0.0, bottom_y / frame_height))
+                
+                # Linear approximation of depth perspective:
+                # Feet near bottom of frame (1.0) = 10% of view range (very close)
+                # Feet at top of frame (0.0) = 100% of view range (very far)
+                distance_factor = 1.0 - (normalized_y * 0.9)
+                distance_estimate = camera.view_range * distance_factor
+                
+                # Floor constraint so they don't appear *inside* the camera
+                distance_estimate = max(20.0, distance_estimate)
         
         world_angle = self._bbox_to_world_angle(camera_name, bbox)
         
@@ -539,7 +564,9 @@ class GlobalPersonTracker:
         
         # FALLBACK: Single-camera estimate
         if raw_position is None:
-            raw_position = self._estimate_person_position(camera_name, bbox)
+            raw_position = self._estimate_person_position(
+                camera_name, bbox, last_known_pos=person.smoothed_position
+            )
         
         if raw_position is None:
             return None
