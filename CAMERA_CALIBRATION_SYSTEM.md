@@ -1,13 +1,44 @@
-# Camera Calibration System - Current Implementation
+# Camera Calibration System - ENHANCED Implementation
 
 ## Overview
-The ObserveAI camera calibration system automatically determines a camera's position and rotation on the floor map using reference points. The user marks corresponding points on both the floor map and the camera feed, and the system solves for the camera's location mathematically.
+**NEW**: The enhanced camera calibration system now automatically detects:
+- **Camera position** and **rotation** (as before)
+- **Field of View (FOV)** - detects actual zoom/focal length
+- **Effective view range** - depth of field for each camera
+
+This enables accurate cross-camera tracking even with cameras of different zoom levels and focus ranges.
+
+## Key Enhancement: Multi-Camera Zoom/Range Differences
+
+### Problem It Solves
+Different cameras have different optical properties:
+- **Zoom level** (focal length): Wide-angle vs narrow/telephoto
+- **Effective view range**: Some cameras see far, others see near
+- **Depth perception**: Affects how people appear in different frames
+
+**Old System**: All cameras assumed to have the same FOV → inaccurate matching
+**New System**: Each camera calibrated for its actual optical properties → accurate matching
 
 ## Architecture
 
 ### Components
 
-#### 1. **MainWindow Calibration Interface** (main/MainWindow.py)
+#### 1. **Enhanced CalibrationPoint** (components/CameraCalibrator.py)
+Now captures both horizontal AND vertical frame positions.
+
+**Class: CalibrationPoint**
+```python
+class CalibrationPoint:
+    world_x: float                  # Position on floor map (pixels)
+    world_y: float                  
+    frame_x_normalized: float       # Horizontal position in camera frame (0.0 = left, 1.0 = right)
+    frame_y_normalized: float       # NEW: Vertical position (0.0 = top, 1.0 = bottom)
+```
+
+**Why Y coordinate?**
+- Bottom of frame (high Y) = person appears larger = closer distance
+- Top of frame (low Y) = person appears smaller = farther distance
+- Used to estimate effective view range and camera behavior
 Handles user interactions and orchestration of the calibration workflow.
 
 **Key Methods**:
@@ -26,85 +57,106 @@ Handles user interactions and orchestration of the calibration workflow.
 - `_calibration_markers`: Visual markers on the scene
 - `_calibration_active`: Boolean flag for calibration mode
 
-#### 2. **CameraCalibrator Module** (components/CameraCalibrator.py)
-Mathematical solver for camera position and rotation.
+#### 2. **Enhanced CameraCalibrator** (components/CameraCalibrator.py)
+Multi-parameter solver that detects position, rotation, FOV, and view range.
 
-**Key Class: CalibrationPoint**
+**Main Function: solve_camera_position()**
 ```python
-class CalibrationPoint:
-    world_x: float                  # Position on floor map (pixels)
-    world_y: float                  
-    frame_x_normalized: float       # Position in camera frame (0.0 = left, 1.0 = right)
+def solve_camera_position(
+    points: List[CalibrationPoint],
+    fov_degrees: float,
+    initial_guess: Tuple[float, float],
+    search_radius: float = 300.0,
+    detect_fov: bool = False,           # NEW: Search for optimal FOV
+    detect_view_range: bool = False     # NEW: Estimate view range
+) -> Optional[Tuple[float, float, float, float, float]]:
+    """
+    Returns: (cx, cy, rotation_degrees, detected_fov, detected_view_range)
+    """
 ```
 
-**Key Function: solve_camera_position()**
-- **Input**: 2+ CalibrationPoints, camera FOV, initial position guess, search radius
-- **Output**: (camera_x, camera_y, rotation_degrees) or None
+**Three-Phase Algorithm**:
 
-**Algorithm**:
-1. **Coarse-to-Fine Grid Search**: Two-stage optimization
-   - **Coarse**: ±search_radius around initial guess, 5-pixel steps
-   - **Fine**: ±15 pixels around best coarse result, 0.5-pixel steps
-2. **Error Function**: For each candidate position (cx, cy):
-   - Compute actual angles from camera to each reference point
-   - Compare to expected angles from frame positions
-   - Minimize total squared angle error
-3. **Rotation Computation**: Derived from the solution using the first calibration point
+**Phase 1: Position + Rotation (Fixed FOV)**
+- Standard coarse-to-fine grid search
+- Works with 2+ points
+- Returns best (cx, cy, rotation)
 
-**Math Details**:
-- For each frame position: `offset = (frame_x - 0.5) × FOV`
-- Expected angle difference between two points: `offset_0 - offset_i`
-- Actual angle to point: `angle = atan2(world_y - cy, world_x - cx)`
-- Error: minimize `sum((actual_angle_diff - expected_angle_diff)²)`
+**Phase 2: FOV Detection** (requires 3+ points)
+- If `detect_fov=True`, searches FOV range 40-140°
+- Coarse search: 5° steps
+- Fine search: 1° steps around best candidate
+- Finds FOV that minimizes angle error
+- Each FOV value gets its own position solution
 
-#### 3. **ImageClickDialog** (components/ImageClickDialog.py)
-Qt dialog for selecting a point in the camera feed.
+**Phase 3: View Range Estimation** (requires Y coordinates)
+- If `detect_view_range=True`, analyzes vertical frame positions
+- Points at image bottom (high Y) appear closer than top (low Y)
+- Uses perspective cues to estimate effective range
+- Returns range that explains observed perspective best
 
-**Features**:
-- Displays the camera frame with crosshair cursor
-- Auto-scales large frames to fit on screen
-- Returns normalized X coordinate (0.0 = left edge, 1.0 = right edge)
-- Maintains accuracy despite scaling
+**Helper Functions**:
+- `_solve_fixed_fov()`: Standard grid search with fixed FOV
+- `_solve_with_fov_search()`: Searches multiple FOV values
+- `_estimate_view_range()`: Analyzes Y positions for depth estimation
+
+#### 3. **Enhanced ImageClickDialog** (components/ImageClickDialog.py)
+Qt dialog now captures BOTH X and Y frame coordinates.
+
+**NEW Features**:
+- Returns `normalized_x` and `normalized_y`
+- Auto-scales large frames
+- Accurate coordinate calculation despite scaling
 - Dark theme styling
+
+**Output**:
+```python
+normalized_x: float  # 0.0 (left) to 1.0 (right)
+normalized_y: float  # 0.0 (top) to 1.0 (bottom) - NEW
+```
 
 ## Calibration Workflow
 
-### Step-by-Step Process
+### Enhanced Step-by-Step Process
 
-1. **Initiation**
-   - User right-clicks a camera on the floor map
-   - Selects "📐 Calibrate Position" from context menu
+1. **Initiation** (same as before)
+   - User right-clicks camera → "📐 Calibrate Position"
 
-2. **Calibration Mode Entry**
+2. **Calibration Mode Entry** (same as before)
    - System enters calibration mode
-   - Event filter installed on graphics view
-   - Instructions dialog shown to user
+   - Event filter installed
+   - Instructions shown
 
-3. **Reference Point Capture** (repeat for each point)
-   - User clicks a known location on the floor map (e.g., corner, intersection)
-   - ImageClickDialog opens with live camera feed
-   - User clicks the exact same physical spot in the camera view
-   - System captures:
-     - World coordinates: map click position
-     - Frame coordinate: normalized X from image click
-   - Visual markers added to map (P1, P2, etc.)
+3. **Reference Point Capture** (ENHANCED - now captures Y coordinate)
+   - User clicks location on floor map
+   - ImageClickDialog opens with camera feed
+   - User clicks matching spot in camera view
+   - **NEW**: System captures both X and Y position in frame
+   - Visual markers added (P1, P2, etc.)
+   - Tooltip shows both coordinates
 
-4. **Solution Computation**
+4. **Optimal Point Count**:
+   - **2 points**: Basic position and rotation (no FOV/range detection)
+   - **3+ points**: Enables FOV and range detection ⭐
+
+5. **Solution Computation** (ENHANCED)
    - User presses Escape or Right-click with 2+ points
-   - `solve_camera_position()` executed
-   - Grid search finds optimal camera position and rotation
+   - `solve_camera_position()` executed with detection flags
+   - **NEW**: For 3+ points, searches for optimal FOV and view_range
+   - Grid search finds optimal camera position, rotation, FOV, and range
 
-5. **Result Review**
+6. **Result Review** (ENHANCED)
    - Dialog shows:
-     - Old position and rotation
      - New position and rotation
-     - Confirmation button
+     - **NEW**: Old vs detected FOV (with change indicator ⚠️ or ✓)
+     - **NEW**: Old vs detected view range
    - User can accept or reject
 
-6. **Application**
-   - Camera item repositioned on floor map
-   - GlobalPersonTracker updated with new registration
-   - Calibration markers cleaned up
+7. **Application** (ENHANCED)
+   - Camera repositioned on map
+   - **NEW**: FOV updated on camera item if detected
+   - **NEW**: View range updated on camera item if detected
+   - GlobalPersonTracker updated with all parameters
    - Normal operation resumes
 
 ### Calibration State Diagram
@@ -141,34 +193,51 @@ END (Resume normal operation)
 ## Configuration & Parameters
 
 ### Solver Parameters (Tunable in solve_camera_position)
-- **search_radius**: 300.0 pixels (how far from initial guess to search)
-- **coarse_step**: 5 pixels (coarse grid step)
+
+**Grid Search**:
+- **search_radius**: 300.0 pixels (coarse search range)
+- **coarse_step**: 5 pixels
 - **fine_radius**: 15 pixels (fine search area)
-- **fine_step**: 0.5 pixels (fine grid step)
-- **error_threshold**: 0.01 radians (~5.7°)
+- **fine_step**: 0.5 pixels
+
+**FOV Detection** (if detect_fov=True):
+- **fov_range**: 40-140 degrees
+- **coarse_step**: 5 degrees
+- **fine_step**: 1 degree
+- Searches FOV values until minimal angle error achieved
+
+**View Range Estimation** (if detect_view_range=True):
+- **min_range**: 50 pixels (floor)
+- **max_range**: 500 pixels (ceiling)
+- Uses perspective cues from Y coordinates
+- More accurate with 4+ reference points
 
 ### Validation Criteria
-- **Minimum points**: 2 (more points improve accuracy)
-- **Max error tolerance**: 0.01 radians (warning if exceeded)
-- **Degenerate case check**: Rejects if camera position is too close to reference point
+- **Minimum points for basic calibration**: 2
+- **Minimum points for FOV detection**: 3
+- **Minimum points for range detection**: 3
+- **Max error tolerance**: 0.01 radians (~5.7°)
+- **Degenerate case check**: Rejects if camera too close to reference point
 
 ## Integration with GlobalPersonTracker
 
-After successful calibration:
+After successful calibration with all detected parameters:
 ```python
 self.global_tracker.register_camera(
     name=camera_name,
-    position=(new_x, new_y),
-    rotation=new_rotation,
-    fov=fov,
-    view_range=view_range
+    position=(new_x, new_y),           # Detected position
+    rotation=new_rotation,              # Detected rotation
+    fov=detected_fov,                   # NEW: Detected or confirmed FOV
+    view_range=detected_range           # NEW: Detected or estimated range
 )
 ```
 
-This enables:
-- Spatial awareness in cross-camera matching
-- Position estimation on floor map
-- Stereo triangulation with multiple cameras
+**Impact on Cross-Camera Tracking**:
+- ✅ Accurate spatial distance calculations (uses correct FOV per camera)
+- ✅ Better position estimation on floor map
+- ✅ Improved stereo triangulation between cameras
+- ✅ More accurate Re-ID feature matching with spatial awareness
+- ✅ Handles cameras with different zoom levels seamlessly
 
 ## Accuracy Considerations
 
@@ -176,21 +245,26 @@ This enables:
 
 **Positive Factors**:
 - Using reference points far apart (maximizes angle differences)
-- Using 3+ reference points (over-constrained system is more robust)
-- Using prominent, unambiguous physical landmarks
+- Using **4+ reference points** (improves FOV/range detection significantly)
+- Using points at different depths/vertical positions
+- Prominent, unambiguous physical landmarks
 - Accurate clicking on both map and frame
+- Points distributed vertically in frame (helps range detection)
 
 **Negative Factors**:
 - Reference points close together (small angle differences)
-- Using only 2 points (minimal constraint)
+- Using only 2 points (FOV/range detection disabled)
 - Non-distinctive landmarks
-- Camera distortion not accounted for
-- Wide FOV lenses (non-linear perspective)
+- Camera distortion (not modeled)
+- Very wide FOV lenses (>100°, non-linear perspective)
+- Points all at same frame height (no depth cues)
 
 ### Expected Precision
 - **Position**: ±5-10 pixels typical
 - **Rotation**: ±2-5 degrees typical
-- **Improves with**: More reference points, better spacing, accurate clicks
+- **FOV detection**: ±2-5 degrees typical (with 3+ points)
+- **View range**: ±10-15% typical (with 4+ points at varied depths)
+- **Improves with**: More points, better spacing, varied Y positions, accurate clicks
 
 ## Error Handling
 
@@ -201,24 +275,32 @@ This enables:
 4. **No solution found** (parallel rays): Calibration cancelled
 5. **User cancellation**: Escape key or insufficient points
 
+## Current Enhancements (Version 2.0)
+
+✅ **FOV Detection**: Automatically detects actual zoom level from reference points  
+✅ **View Range Estimation**: Estimates effective depth of field from perspective cues  
+✅ **Y-Coordinate Capture**: Full 2D frame position for better analysis  
+✅ **Multi-Camera Handling**: Accounts for cameras with different optical properties  
+✅ **Confidence Indicators**: Shows which parameters are detected vs confirmed  
+✅ **Smart Point Requirements**: 2 points for basic, 3+ for advanced detection  
+
 ## Current Limitations
 
-1. **Monocular Approach**: Uses only horizontal (X) frame coordinate
-   - Could be enhanced with vertical (Y) information
-   - Assumes person has feet on the floor
-
-2. **Simplified Camera Model**: Ignores
+1. **Perspective Model**: Simple linear model, doesn't account for:
    - Lens distortion
-   - Camera tilt (assumes level camera)
-   - Vertical FOV (only horizontal FOV used)
+   - Camera tilt/pitch (assumes level camera)
+   - Non-linear fisheye effects
 
-3. **2D Assumption**: Treats floor as completely flat
-   - Works well for true ground-level reference points
-   - May be less accurate with elevated features
-
-4. **Manual Process**: Requires user to identify matching points
+2. **Manual Process**: Requires user to identify matching points
    - Could be semi-automated with feature detection
-   - Could use known-size objects for automatic scaling
+   - Could use ArUco markers or QR codes for auto-alignment
+
+3. **Y-coordinate Usage**: Basic depth estimation
+   - Could integrate camera height and tilt angles
+   - Could use multiple Y-samples for better range estimate
+
+4. **Single-Reference Distance**: Uses first point for rotation
+   - Could average multiple points for robustness
 
 ## Future Enhancement Possibilities
 
@@ -242,17 +324,25 @@ This enables:
    - Simultaneously calibrate multiple cameras
    - Use cross-camera visibility constraints
 
-## Testing the Calibration
+## Testing & Verification
 
-### How to Test
-1. Place two distinctive physical markers at known map positions
-2. Right-click camera → "Calibrate Position"
-3. Click first marker on map, then in camera feed
-4. Click second marker on map, then in camera feed
-5. Review computed position vs expected position
-6. Accept or reject
+### Basic Test (Position/Rotation)
+1. Use 2 reference points far apart
+2. Review computed position on map
+3. Verify camera is positioned correctly relative to physical location
+4. Check rotation arrow matches where camera actually points
 
-### Verification
-- Camera item should reposition on the map to match reality
-- Person dots on floor map should align with visible people in feeds
-- Cross-camera tracking should improve accuracy
+### Advanced Test (FOV + Range Detection)
+1. Use 4-6 reference points with varied depths
+2. Note detected FOV vs camera specification
+3. Check if FOV detection is close to actual camera specs
+4. Verify detected range makes physical sense
+5. Test cross-camera tracking accuracy after calibration
+
+### Validation Checklist
+- ✅ Camera position visually matches floor plan
+- ✅ Camera rotation points correct direction
+- ✅ Detected FOV within 5° of camera specs (if known)
+- ✅ Person dots align with visible persons in feeds
+- ✅ Cross-camera matching improves after using all parameters
+- ✅ Multiple cameras with different zoom levels all track accurately

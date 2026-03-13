@@ -1002,12 +1002,13 @@ class MainWindow(QMainWindow):
         
         if dlg.exec() and dlg.normalized_x is not None:
             frame_x_normalized = dlg.normalized_x
+            frame_y_normalized = dlg.normalized_y if dlg.normalized_y is not None else 0.5  # Default to middle
         else:
             return  # Cancelled clicking for this point
         
-        # Create calibration point
+        # Create calibration point with Y coordinate for enhanced accuracy
         from components.CameraCalibrator import CalibrationPoint
-        cal_point = CalibrationPoint(world_x, world_y, frame_x_normalized)
+        cal_point = CalibrationPoint(world_x, world_y, frame_x_normalized, frame_y_normalized)
         self._calibration_points.append(cal_point)
         
         # Add visual marker on scene
@@ -1019,7 +1020,7 @@ class MainWindow(QMainWindow):
         marker.setZValue(500)
         marker.setToolTip(f"Cal Point {len(self._calibration_points)}\n"
                          f"Map: ({world_x:.1f}, {world_y:.1f})\n"
-                         f"Frame: {frame_x_normalized:.3f}")
+                         f"Frame: ({frame_x_normalized:.3f}, {frame_y_normalized:.3f})")
         self.graphics_scene.addItem(marker)
         self._calibration_markers.append(marker)
         
@@ -1031,23 +1032,24 @@ class MainWindow(QMainWindow):
         self.graphics_scene.addItem(label)
         self._calibration_markers.append(label)
         
-        print(f"[CALIBRATION] Point {len(self._calibration_points)}: world=({world_x:.1f}, {world_y:.1f}), frame_x={frame_x_normalized:.3f}")
+        print(f"[CALIBRATION] Point {len(self._calibration_points)}: world=({world_x:.1f}, {world_y:.1f}), "
+              f"frame=({frame_x_normalized:.3f}, {frame_y_normalized:.3f})")
         
         # Since we support infinite points, we don't automatically trigger finish.
         # But we hint the user after 2 points.
         if len(self._calibration_points) == 2:
             self._styled_msgbox("Camera Calibration",
                 f"2 points captured! The position can now be computed.\n\n"
-                f"You can keep adding more points to increase accuracy, \n"
-                f"or RIGHT-CLICK anywhere on the grid (or press ESCAPE) to finish calibration.")
+                f"You can keep adding more points to increase accuracy and detect FOV/range, \n"
+                f"or RIGHT-CLICK anywhere on the grid (or press ESCAPE) to finish calibration.\n\n"
+                f"TIP: 3+ points enables automatic FOV detection!")
     
     def _finish_calibration(self):
         """
-        Run the calibration solver and reposition the camera.
+        Run the enhanced calibration solver with FOV and view_range detection.
         """
         camera_name = self._calibration_camera
         cam_item = self.scene_cameras.get(camera_name)
-        
         if cam_item is None:
             print(f"[CALIBRATION] Camera item not found: {camera_name}")
             self._cancel_calibration()
@@ -1055,15 +1057,25 @@ class MainWindow(QMainWindow):
         
         # Get current camera state
         current_pos = cam_item.scenePos()
-        fov = cam_item.view_angle
+        current_fov = cam_item.view_angle
+        current_range = cam_item.view_range
         
-        # Run solver
+        # Decide whether to detect FOV and view_range based on point count
+        detect_fov = len(self._calibration_points) >= 3
+        detect_range = len(self._calibration_points) >= 3
+        
+        print(f"[CALIBRATION] Running solver with {len(self._calibration_points)} points "
+              f"(detect_fov={detect_fov}, detect_range={detect_range})...")
+        
+        # Run enhanced solver
         from components.CameraCalibrator import solve_camera_position
         result = solve_camera_position(
             points=self._calibration_points,
-            fov_degrees=fov,
+            fov_degrees=current_fov,
             initial_guess=(current_pos.x(), current_pos.y()),
-            search_radius=400.0
+            search_radius=400.0,
+            detect_fov=detect_fov,
+            detect_view_range=detect_range
         )
         
         if result is None:
@@ -1074,15 +1086,28 @@ class MainWindow(QMainWindow):
             self._cancel_calibration()
             return
         
-        new_x, new_y, new_rotation = result
+        # Unpack enhanced result (now includes FOV and view_range)
+        new_x, new_y, new_rotation, detected_fov, detected_range = result
         
-        # Show result and ask for confirmation
-        reply = self._styled_msgbox("Calibration Result",
-            f"Calibration complete!\n\n"
-            f"Old position: ({current_pos.x():.1f}, {current_pos.y():.1f}), rot={cam_item.rotation():.1f}°\n"
-            f"New position: ({new_x:.1f}, {new_y:.1f}), rot={new_rotation:.1f}°\n\n"
-            f"Apply these changes?",
-            "question")
+        # Build informative result message
+        fov_changed = abs(detected_fov - current_fov) > 0.1
+        range_changed = abs(detected_range - current_range) > 1.0
+        
+        result_text = f"Calibration complete!\n\n"
+        result_text += f"Old position: ({current_pos.x():.1f}, {current_pos.y():.1f}), rot={cam_item.rotation():.1f}°\n"
+        result_text += f"New position: ({new_x:.1f}, {new_y:.1f}), rot={new_rotation:.1f}°\n\n"
+        
+        if detect_fov:
+            result_text += f"Old FOV: {current_fov:.1f}°\n"
+            result_text += f"Detected FOV: {detected_fov:.1f}° {'⚠️ CHANGED' if fov_changed else '✓ Confirmed'}\n\n"
+        
+        if detect_range:
+            result_text += f"Old view range: {current_range:.1f} px\n"
+            result_text += f"Detected range: {detected_range:.1f} px {'⚠️ CHANGED' if range_changed else '✓ Confirmed'}\n\n"
+        
+        result_text += f"Apply these changes?"
+        
+        reply = self._styled_msgbox("Calibration Result", result_text, "question")
         
         from PyQt6.QtWidgets import QMessageBox
         if reply == QMessageBox.StandardButton.Yes:
@@ -1093,17 +1118,26 @@ class MainWindow(QMainWindow):
             cam_item.rotation_degree = new_rotation
             cam_item.position = [new_x, new_y]
             
-            # Update GlobalPersonTracker registration
+            # Update FOV and view_range if detected
+            if detect_fov:
+                cam_item.view_angle = detected_fov
+                print(f"[CALIBRATION] FOV updated: {current_fov:.1f}° → {detected_fov:.1f}°")
+            
+            if detect_range:
+                cam_item.view_range = detected_range
+                print(f"[CALIBRATION] View range updated: {current_range:.1f} → {detected_range:.1f}px")
+            
+            # Update GlobalPersonTracker registration with new parameters
             if self.global_tracker:
                 self.global_tracker.register_camera(
                     name=camera_name,
                     position=(new_x, new_y),
                     rotation=new_rotation,
-                    fov=fov,
-                    view_range=cam_item.view_range
+                    fov=detected_fov,
+                    view_range=detected_range
                 )
             
-            print(f"[CALIBRATION] Applied: camera '{camera_name}' → pos=({new_x:.1f}, {new_y:.1f}), rot={new_rotation:.1f}°")
+            print(f"[CALIBRATION] ✓ Applied all parameters to camera '{camera_name}'")
         
         self._cleanup_calibration()
     
