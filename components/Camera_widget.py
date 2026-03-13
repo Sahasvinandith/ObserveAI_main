@@ -46,7 +46,7 @@ class CameraItem(QGraphicsObject):
             # Make sure 'camera.png' is in the same directory
             # or you provide the full path
             pix = QPixmap("./images/cctv_logo_light.png") 
-            self.pixmap_item.setPixmap(pix.scaled(32, 32, Qt.AspectRatioMode.KeepAspectRatio))
+            self.pixmap_item.setPixmap(pix.scaled(16, 16, Qt.AspectRatioMode.KeepAspectRatio))
         except Exception as e:
             print(f"Warning: Could not load camera.png. {e}")
             
