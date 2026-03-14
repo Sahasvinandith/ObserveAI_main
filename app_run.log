@@ -1,0 +1,181 @@
+2026-03-14 13:14:11.442936: I tensorflow/core/platform/cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+Using cache found in /home/sahas/.cache/torch/hub/pytorch_vision_v0.10.0
+[ WARN:0@12.798] global cap_v4l.cpp:914 open VIDEOIO(V4L2:/dev/video3): can't open camera by index
+2026-03-14 13:14:26.719125: W tensorflow/core/common_runtime/gpu/gpu_bfc_allocator.cc:47] Overriding orig_value setting because the TF_FORCE_GPU_ALLOW_GROWTH environment variable is set. Original config value was 0.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1773474266.720130  461333 gpu_device.cc:2020] Created device /job:localhost/replica:0/task:0/device:GPU:0 with 1640 MB memory:  -> device: 0, name: NVIDIA GeForce GTX 1650 Ti with Max-Q Design, pci bus id: 0000:01:00.0, compute capability: 7.5
+2026-03-14 13:14:28.140982: I external/local_xla/xla/stream_executor/cuda/cuda_dnn.cc:473] Loaded cuDNN version 91002
+2026-03-14 13:14:28.998660: W external/local_xla/xla/tsl/framework/bfc_allocator.cc:382] Garbage collection: deallocate free memory regions (i.e., allocations) so that we can re-allocate a larger region to avoid OOM due to memory fragmentation. If you see this message frequently, you are running near the threshold of the available device memory and re-allocation may incur great performance overhead. You may try smaller batch sizes to observe the performance impact. Set TF_ENABLE_GPU_GARBAGE_COLLECTION=false if you'd like to disable this feature.
+Using cache found in /home/sahas/.cache/torch/hub/pytorch_vision_v0.10.0
+Using cache found in /home/sahas/.cache/torch/hub/pytorch_vision_v0.10.0
+[SETTINGS] Loaded settings from settings.json
+[GLOBAL TRACKER] Initialized with threshold=0.5, weights: reid=0.7, spatial=0.3, pixels_per_meter=30.0
+Clearing all items...
+[MAIN] Map scale set to 30.0 pixels/meter
+[GLOBAL TRACKER] Registered camera 'Cheap' at pos=(243.5, 56.0), rot=91.46103979926235°, fov=46°, range=400.0
+[MAIN] Registered camera 'Cheap' with global tracker
+Initializing AI System for CameraCheap...
+[Cheap] Worker thread: Trying to connect...
+[INFO] Initializing Detection System...
+AI System for Cheap started.
+[SETTINGS] Loaded settings from settings.json
+[GLOBAL TRACKER] Registered camera 'HD' at pos=(3.0, 157.5), rot=1.8633368513326616°, fov=42°, range=400.0
+[MAIN] Registered camera 'HD' with global tracker
+Initializing AI System for CameraHD...
+[INFO] Initializing Detection System...
+AI System for HD started.
+Layout loaded successfully.
+[HD] Worker thread: Trying to connect...
+Building embedding cache (averaging all images per user)...
+Cached User_1 (averaged 9 images)
+Cached User_2 (averaged 3 images)
+[INFO] Models loaded.
+[INFO] Models loaded.
+[INFO] System initialized successfully.
+[INFO] Starting all threads...
+[THREAD] Camera thread started
+[THREAD] Processing thread started
+[THREAD] Recognition Worker started
+[THREAD] Display thread started
+[THREAD] DB Update Worker started
+[THREAD] Watchdog thread started
+[INFO] System initialized successfully.
+[INFO] Starting all threads...
+[THREAD] Camera thread started
+[THREAD] Processing thread started
+[THREAD] Recognition Worker started
+[THREAD] Display thread started
+[THREAD] DB Update Worker started
+[THREAD] Watchdog thread started
+[BEV] showEvent - starting timer
+[BEV] Creating and starting timer
+[BEV] Timer started
+[BEV] DEBUG: scene_cameras keys = ['Cheap', 'HD']
+[BEV] DEBUG: global_tracker.cameras keys = ['Cheap', 'HD']
+[BEV] DEBUG: global_persons count = 0
+[BEV] DEBUG: debug_mode = False
+[BEV] DEBUG: Grid added to scene
+[BEV] DEBUG: Drawing camera Cheap at (243.5, 56.0)
+[BEV] DEBUG: Drawing camera HD at (3.0, 157.5)
+[BEV] DEBUG: Found 0 global persons
+[BEV] DEBUG: scene_cameras keys = ['Cheap', 'HD']
+[BEV] DEBUG: global_tracker.cameras keys = ['Cheap', 'HD']
+[BEV] DEBUG: global_persons count = 0
+[BEV] DEBUG: debug_mode = False
+[BEV] DEBUG: Grid added to scene
+[BEV] DEBUG: Drawing camera Cheap at (243.5, 56.0)
+[BEV] DEBUG: Drawing camera HD at (3.0, 157.5)
+[BEV] DEBUG: Found 0 global persons
+[BEV] DEBUG: scene_cameras keys = ['Cheap', 'HD']
+[BEV] DEBUG: global_tracker.cameras keys = ['Cheap', 'HD']
+[BEV] DEBUG: global_persons count = 0
+[BEV] DEBUG: debug_mode = False
+[BEV] DEBUG: Grid added to scene
+[BEV] DEBUG: Drawing camera Cheap at (243.5, 56.0)
+[BEV] DEBUG: Drawing camera HD at (3.0, 157.5)
+[BEV] DEBUG: Found 0 global persons
+[BEV] DEBUG: scene_cameras keys = ['Cheap', 'HD']
+[BEV] DEBUG: global_tracker.cameras keys = ['Cheap', 'HD']
+[BEV] DEBUG: global_persons count = 0
+[BEV] DEBUG: debug_mode = False
+[BEV] DEBUG: Grid added to scene
+[BEV] DEBUG: Drawing camera Cheap at (243.5, 56.0)
+[BEV] DEBUG: Drawing camera HD at (3.0, 157.5)
+[BEV] DEBUG: Found 0 global persons
+deepsort track for user in HD is not yet confirmed
+deepsort track for user in HD is not yet confirmed
+[BEV] DEBUG: scene_cameras keys = ['Cheap', 'HD']
+[BEV] DEBUG: global_tracker.cameras keys = ['Cheap', 'HD']
+[BEV] DEBUG: global_persons count = 0
+[BEV] DEBUG: debug_mode = False
+[BEV] DEBUG: Grid added to scene
+[BEV] DEBUG: Drawing camera Cheap at (243.5, 56.0)
+[BEV] DEBUG: Drawing camera HD at (3.0, 157.5)
+[BEV] DEBUG: Found 0 global persons
+[GLOBAL TRACKER] === create_or_update called: camera='HD', local_id=1, has_features=True ===
+[MATCH DEBUG] === Searching for match from camera='HD', exclude='HD' ===
+[MATCH DEBUG] Total global persons: 0, threshold: 0.5
+[MATCH DEBUG] Best match: G:None, distance=inf, threshold=0.5
+[MATCH DEBUG] ✗ NO MATCH (best distance inf >= threshold 0.5)
+[GLOBAL TRACKER] ✗ Created NEW person G:1 in 'HD' (no match found)
+[FLOOR MAP] Created dot for person 1 at (47.0, 158.4)
+deepsort track for user in Cheap is not yet confirmed
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[BEV] DEBUG: scene_cameras keys = ['Cheap', 'HD']
+[BEV] DEBUG: global_tracker.cameras keys = ['Cheap', 'HD']
+[BEV] DEBUG: global_persons count = 1
+[BEV] DEBUG: debug_mode = False
+[BEV] DEBUG: Grid added to scene
+[BEV] DEBUG: Drawing camera Cheap at (243.5, 56.0)
+[BEV] DEBUG: Drawing camera HD at (3.0, 157.5)
+[BEV] DEBUG: Found 1 global persons
+[BEV] DEBUG: Drawing person 1, smoothed_pos=(46.99126856038385, 158.37652178990731)
+[TIMING] yolo_face_model: 99.5ms
+[YOLO FACE] Detected face with confidence: 0.812
+[FACE ACCEPT] Size 106x150, conf 0.812 - valid face
+deepsort track for user in Cheap is not yet confirmed
+[GLOBAL TRACKER] === create_or_update called: camera='Cheap', local_id=1, has_features=True ===
+[MATCH DEBUG] === Searching for match from camera='Cheap', exclude='Cheap' ===
+[MATCH DEBUG] Total global persons: 1, threshold: 0.5
+[MATCH DEBUG] G:1 ('Unknown'): reid=0.210, spatial=0.616, combined=0.332, cameras=['HD']
+[MATCH DEBUG] Best match: G:1, distance=0.332, threshold=0.5
+[MATCH DEBUG] ✓ MATCHED to G:1
+[GLOBAL TRACKER] ✓ Updated person G:1 in 'Cheap' (was in cameras: ['HD'])
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[BEV] DEBUG: scene_cameras keys = ['Cheap', 'HD']
+[BEV] DEBUG: global_tracker.cameras keys = ['Cheap', 'HD']
+[BEV] DEBUG: global_persons count = 1
+[BEV] DEBUG: debug_mode = False
+[BEV] DEBUG: Grid added to scene
+[BEV] DEBUG: Drawing camera Cheap at (243.5, 56.0)
+[BEV] DEBUG: Drawing camera HD at (3.0, 157.5)
+[BEV] DEBUG: Found 1 global persons
+[BEV] DEBUG: Drawing person 1, smoothed_pos=(46.99126856038385, 158.37652178990731)
+[QUEUE] Created Face 3 and added to identified_faces
+[QUEUE] Pushed Face 3 for recognition
+[DEBUG] Saved face 3 to debug_face_temp.jpg (shape=(150, 106, 3))
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[TIMING] yolo_face_model: 128.4ms
+[YOLO FACE] Detected face with confidence: 0.756
+[FACE ACCEPT] Size 95x101, conf 0.756 - valid face
+[BEV] DEBUG: scene_cameras keys = ['Cheap', 'HD']
+[BEV] DEBUG: global_tracker.cameras keys = ['Cheap', 'HD']
+[BEV] DEBUG: global_persons count = 1
+[BEV] DEBUG: debug_mode = False
+[BEV] DEBUG: Grid added to scene
+[BEV] DEBUG: Drawing camera Cheap at (243.5, 56.0)
+[BEV] DEBUG: Drawing camera HD at (3.0, 157.5)
+[BEV] DEBUG: Found 1 global persons
+[BEV] DEBUG: Drawing person 1, smoothed_pos=(46.99126856038385, 158.37652178990731)
+[RECOG] Face 3 matched: name='User_1', conf=0.115
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[TIMING] yolo_face_model: 11.4ms
+[YOLO FACE] Detected face with confidence: 0.807
+[FACE ACCEPT] Size 107x152, conf 0.807 - valid face
+[KNOWN MATCH] Face 3: verified=User_1, locked=None, person_id=1
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[QUEUE] Created Face 3 and added to identified_faces
+[QUEUE] Pushed Face 3 for recognition
+[DEBUG] Saved face 3 to debug_face_temp.jpg (shape=(101, 95, 3))
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[BEV] DEBUG: scene_cameras keys = ['Cheap', 'HD']
+[BEV] DEBUG: global_tracker.cameras keys = ['Cheap', 'HD']
+[BEV] DEBUG: global_persons count = 1
+[BEV] DEBUG: debug_mode = False
+[BEV] DEBUG: Grid added to scene
+[BEV] DEBUG: Drawing camera Cheap at (243.5, 56.0)
+[BEV] DEBUG: Drawing camera HD at (3.0, 157.5)
+[BEV] DEBUG: Found 1 global persons
+[BEV] DEBUG: Drawing person 1, smoothed_pos=(153.1002077568926, 160.49073218559127)
+[RECOG] Face 3 matched: name='User_1', conf=0.044
+[KNOWN MATCH] Face 3: verified=User_1, locked=None, person_id=1
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[TIMING] yolo_face_model: 16.6ms
+[YOLO FACE] Detected face with confidence: 0.683
+[FACE REJECT] Confidence 0.683 < 0.75 minimum
+[TIMING] yolo_face_model: 16.5ms
