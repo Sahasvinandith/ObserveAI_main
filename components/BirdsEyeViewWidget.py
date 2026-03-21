@@ -111,42 +111,70 @@ class CameraVisualization(QGraphicsItem):
         scaled_x = self.position[0] * self.scale
         scaled_y = self.position[1] * self.scale
 
-        # Draw camera position as a small circle
-        camera_pen = QPen(QColor(0, 200, 0), 2)
-        camera_brush = QBrush(QColor(0, 200, 0, 100))
+        # Draw CCTV camera icon - a larger circle with triangle pointing to rotation
+        camera_size = 20
+        
+        # Outer circle (camera body) - yellow
+        camera_pen = QPen(QColor(255, 200, 0), 2)
+        camera_brush = QBrush(QColor(255, 200, 0, 180))
         painter.setPen(camera_pen)
         painter.setBrush(camera_brush)
-        painter.drawEllipse(int(scaled_x - 8), int(scaled_y - 8), 16, 16)
+        painter.drawEllipse(
+            int(scaled_x - camera_size), 
+            int(scaled_y - camera_size), 
+            camera_size * 2, 
+            camera_size * 2
+        )
+        
+        # Draw direction indicator (arrow pointing in rotation direction)
+        # In map coordinates: 0° = North (up), 90° = East (right), 180° = South (down), 270° = West (left)
+        rotation_rad = math.radians(self.rotation)
+        indicator_length = camera_size + 8
+        # Use -cos for Y because Y increases downward in screen coords, but we want 0° to point UP
+        tip_x = scaled_x + indicator_length * math.sin(rotation_rad)
+        tip_y = scaled_y - indicator_length * math.cos(rotation_rad)  # Negated to point up at 0°
+        
+        indicator_pen = QPen(QColor(255, 255, 0), 2)
+        painter.setPen(indicator_pen)
+        painter.drawLine(int(scaled_x), int(scaled_y), int(tip_x), int(tip_y))
+        
+        # Draw a small filled triangle at the tip
+        triangle_size = 5
+        painter.setBrush(QBrush(QColor(255, 255, 0)))
+        painter.drawEllipse(
+            int(tip_x - triangle_size), 
+            int(tip_y - triangle_size),
+            triangle_size * 2,
+            triangle_size * 2
+        )
 
-        # Draw FOV cone
-        cone_radius = 150  # pixels
+        # Draw FOV cone (semi-transparent)
+        cone_radius = 120  # pixels
         half_fov = self.fov / 2
         
-        # Rotation in radians
-        rotation_rad = math.radians(self.rotation)
-        
-        # Draw FOV cone lines
-        cone_pen = QPen(QColor(0, 150, 0, 150), 1, Qt.PenStyle.DashLine)
+        # Draw FOV as arc
+        cone_pen = QPen(QColor(0, 200, 255, 100), 1, Qt.PenStyle.DashLine)
         painter.setPen(cone_pen)
         
-        # Left edge of cone
+        # Left edge of cone (pointing left from camera direction)
         left_angle = rotation_rad - math.radians(half_fov)
         left_x = scaled_x + cone_radius * math.sin(left_angle)
-        left_y = scaled_y + cone_radius * math.cos(left_angle)
+        left_y = scaled_y - cone_radius * math.cos(left_angle)  # Negated for correct orientation
         painter.drawLine(int(scaled_x), int(scaled_y), int(left_x), int(left_y))
         
-        # Right edge of cone
+        # Right edge of cone (pointing right from camera direction)
         right_angle = rotation_rad + math.radians(half_fov)
         right_x = scaled_x + cone_radius * math.sin(right_angle)
-        right_y = scaled_y + cone_radius * math.cos(right_angle)
+        right_y = scaled_y - cone_radius * math.cos(right_angle)  # Negated for correct orientation
         painter.drawLine(int(scaled_x), int(scaled_y), int(right_x), int(right_y))
 
         # Draw camera name label
         font = QFont()
-        font.setPointSize(8)
+        font.setPointSize(9)
+        font.setBold(True)
         painter.setFont(font)
-        painter.setPen(QPen(QColor(0, 200, 0)))
-        painter.drawText(int(scaled_x + 15), int(scaled_y - 10), self.cam_name)
+        painter.setPen(QPen(QColor(255, 255, 100)))
+        painter.drawText(int(scaled_x + 25), int(scaled_y - 5), self.cam_name)
 
 
 class BirdsEyeViewWidget(QWidget):
@@ -169,6 +197,11 @@ class BirdsEyeViewWidget(QWidget):
         self._is_updating = False  # Recursion guard
         self._timer_active = False
         self.update_timer = None  # Will create on demand
+        
+        # Scaling variables for coordinate transformation
+        self.current_scale = 1.0
+        self.world_min_x = 0.0
+        self.world_min_y = 0.0
 
         # UI Setup
         self._setup_ui()
@@ -244,80 +277,101 @@ class BirdsEyeViewWidget(QWidget):
             return
         
         if self.global_tracker is None:
-            print("[BEV] DEBUG: global_tracker is None")
             return
 
         self._is_updating = True
         try:
             self.graphics_scene.clear()
 
-            # Calculate scene bounds based on camera and person positions
-            min_x, max_x = 0, 1200
-            min_y, max_y = 0, 1200
+            # Use FIXED scene rect like camera settings page (1200x1200)
+            SCENE_SIZE = 1200
+            self.graphics_scene.setSceneRect(0, 0, SCENE_SIZE, SCENE_SIZE)
+
+            # Calculate world bounds from actual camera and person positions
+            min_x = min_y = max_x = max_y = None
             
             # Check camera positions
             for cam_info in self.global_tracker.cameras.values():
-                cam_scaled_x = cam_info.position[0] * GRID_PIXELS_PER_UNIT
-                cam_scaled_y = cam_info.position[1] * GRID_PIXELS_PER_UNIT
-                min_x = min(min_x, cam_scaled_x - 200)
-                max_x = max(max_x, cam_scaled_x + 200)
-                min_y = min(min_y, cam_scaled_y - 200)
-                max_y = max(max_y, cam_scaled_y + 200)
+                cam_x, cam_y = cam_info.position
+                if min_x is None:
+                    min_x = max_x = cam_x
+                    min_y = max_y = cam_y
+                else:
+                    min_x = min(min_x, cam_x)
+                    max_x = max(max_x, cam_x)
+                    min_y = min(min_y, cam_y)
+                    max_y = max(max_y, cam_y)
             
             # Check person positions
             for person in self.global_tracker.global_persons.values():
                 if hasattr(person, 'smoothed_position') and person.smoothed_position:
-                    pers_scaled_x = person.smoothed_position[0] * GRID_PIXELS_PER_UNIT
-                    pers_scaled_y = person.smoothed_position[1] * GRID_PIXELS_PER_UNIT
-                    min_x = min(min_x, pers_scaled_x - 50)
-                    max_x = max(max_x, pers_scaled_x + 50)
-                    min_y = min(min_y, pers_scaled_y - 50)
-                    max_y = max(max_y, pers_scaled_y + 50)
+                    pers_x, pers_y = person.smoothed_position
+                    if min_x is None:
+                        min_x = max_x = pers_x
+                        min_y = max_y = pers_y
+                    else:
+                        min_x = min(min_x, pers_x)
+                        max_x = max(max_x, pers_x)
+                        min_y = min(min_y, pers_y)
+                        max_y = max(max_y, pers_y)
             
-            # Ensure minimum scene size
-            scene_width = max(max_x - min_x, 1200)
-            scene_height = max(max_y - min_y, 1200)
+            # Default bounds if no cameras/persons
+            if min_x is None:
+                min_x = max_x = 100
+                min_y = max_y = 100
             
-            # Set scene rect with padding
-            padding = 100
-            self.graphics_scene.setSceneRect(
-                min_x - padding, 
-                min_y - padding, 
-                scene_width + 2*padding, 
-                scene_height + 2*padding
-            )
+            # Add padding
+            padding = (max_x - min_x) * 0.1 if (max_x - min_x) > 0 else 10
+            if padding < 10:
+                padding = 10
             
-            print(f"[BEV] DEBUG: Scene rect: ({min_x}, {min_y}, {scene_width}, {scene_height})")
-
-            # DEBUG: Print what we have
-            print(f"[BEV] DEBUG: scene_cameras keys = {list(self.scene_cameras.keys())}")
-            print(f"[BEV] DEBUG: global_tracker.cameras keys = {list(self.global_tracker.cameras.keys())}")
-            print(f"[BEV] DEBUG: global_persons count = {len(self.global_tracker.global_persons)}")
-            print(f"[BEV] DEBUG: debug_mode = {self.debug_mode}")
+            world_min_x = min_x - padding
+            world_max_x = max_x + padding
+            world_min_y = min_y - padding
+            world_max_y = max_y + padding
+            
+            world_width = world_max_x - world_min_x
+            world_height = world_max_y - world_min_y
+            
+            # Calculate scale to fit everything in 1200x1200
+            scale_x = (SCENE_SIZE - 50) / world_width if world_width > 0 else 1
+            scale_y = (SCENE_SIZE - 50) / world_height if world_height > 0 else 1
+            scale = min(scale_x, scale_y)  # Use minimum to fit both dimensions
+            
+            # Use this scale for drawing
+            self.current_scale = scale
+            self.world_min_x = world_min_x
+            self.world_min_y = world_min_y
+            
+            print(f"[BEV] Bounds: X({world_min_x:.1f}-{world_max_x:.1f}) Y({world_min_y:.1f}-{world_max_y:.1f}) | Scale: {scale:.2f}")
+            print(f"[BEV] Cameras: {list(self.scene_cameras.keys())} | Persons: {len(self.global_tracker.global_persons)}")
+            
+            # Debug: Log camera positions and parameters
+            for cam_name, cam_info in self.global_tracker.cameras.items():
+                print(f"[BEV CAM] {cam_name}: pos=({cam_info.position[0]:.1f}, {cam_info.position[1]:.1f}) rot={cam_info.rotation:.1f}° fov={cam_info.fov}° range={cam_info.view_range:.0f}")
 
             # Draw grid background
-            grid = GridOverlay(int(scene_width + 2*padding), int(scene_height + 2*padding), GRID_SIZE)
-            grid.setPos(min_x - padding, min_y - padding)
+            grid = GridOverlay(SCENE_SIZE, SCENE_SIZE, int(50 / scale) if scale > 0 else 50)
             self.graphics_scene.addItem(grid)
-            print("[BEV] DEBUG: Grid added to scene")
 
             # Draw camera visualizations
             for cam_name, cam_item in self.scene_cameras.items():
                 try:
-                    # Get camera info from tracker
                     if cam_name not in self.global_tracker.cameras:
-                        print(f"[BEV] DEBUG: Camera {cam_name} not in tracker.cameras")
                         continue
                     
                     cam_info = self.global_tracker.cameras[cam_name]
-                    print(f"[BEV] DEBUG: Drawing camera {cam_name} at {cam_info.position}")
+                    
+                    # Transform world coordinates to scene coordinates
+                    scene_x = (cam_info.position[0] - self.world_min_x) * self.current_scale + 25
+                    scene_y = (cam_info.position[1] - self.world_min_y) * self.current_scale + 25
                     
                     cam_viz = CameraVisualization(
                         cam_name=cam_name,
-                        position=cam_info.position,
+                        position=(scene_x, scene_y),
                         rotation=cam_info.rotation,
                         fov=cam_info.fov,
-                        scale=GRID_PIXELS_PER_UNIT
+                        scale=1.0  # Already in scene coordinates
                     )
                     self.graphics_scene.addItem(cam_viz)
                 except Exception as e:
@@ -325,10 +379,8 @@ class BirdsEyeViewWidget(QWidget):
 
             # Draw persons
             if hasattr(self.global_tracker, 'global_persons'):
-                print(f"[BEV] DEBUG: Found {len(self.global_tracker.global_persons)} global persons")
                 for global_id, person in self.global_tracker.global_persons.items():
                     try:
-                        print(f"[BEV] DEBUG: Drawing person {global_id}, smoothed_pos={getattr(person, 'smoothed_position', None)}")
                         if self.debug_mode:
                             self._draw_debug_projections(person)
                         else:
@@ -337,12 +389,10 @@ class BirdsEyeViewWidget(QWidget):
                         print(f"Error drawing person {global_id}: {e}")
         finally:
             self._is_updating = False
-            # Fit view to show all scene items after drawing
-            if self.graphics_scene.items():
-                self.graphics_view.fitInView(
-                    self.graphics_scene.itemsBoundingRect(),
-                    Qt.AspectRatioMode.KeepAspectRatio
-                )
+            # DO NOT use fitInView - keep fixed scene rect visible
+            # Just ensure the view is initialized
+            if not self.graphics_view.isVisible():
+                self.graphics_view.show()
 
     def _on_debug_toggled(self, checked: bool):
         """Handle debug toggle button"""
@@ -395,9 +445,13 @@ class BirdsEyeViewWidget(QWidget):
         if not hasattr(person, 'smoothed_position') or person.smoothed_position is None:
             return
 
+        # Transform world coordinates to scene coordinates
         world_x, world_y = person.smoothed_position
-        scaled_x = world_x * GRID_PIXELS_PER_UNIT
-        scaled_y = world_y * GRID_PIXELS_PER_UNIT
+        scaled_x = (world_x - self.world_min_x) * self.current_scale + 25
+        scaled_y = (world_y - self.world_min_y) * self.current_scale + 25
+
+        # Debug log
+        print(f"[BEV STEREO] Person {person.global_id}: world=({world_x:.1f}, {world_y:.1f}) scene=({scaled_x:.1f}, {scaled_y:.1f})")
 
         # Draw global position marker (green circle)
         marker = QGraphicsEllipseItem(
@@ -446,16 +500,34 @@ class BirdsEyeViewWidget(QWidget):
 
                     # Project bbox from this camera
                     if hasattr(local_track, 'bbox') and local_track.bbox:
+                        bbox_x, bbox_y, bbox_w, bbox_h = local_track.bbox
+                        print(f"[BEV DEBUG] {cam_name}: bbox={local_track.bbox} → unpacked as (x={bbox_x}, y={bbox_y}, w={bbox_w}, h={bbox_h})")
+                        
+                        # Check if bbox looks like it's in wrong format (x, y, x2, y2)
+                        if bbox_w > 640 or bbox_h > 480:  # Looks like x2, y2 instead of w, h
+                            print(f"[BEV BBOX WARN] {cam_name}: bbox might be in (x,y,x2,y2) format, not (x,y,w,h)!")
+                            print(f"  Converting: ({bbox_x}, {bbox_y}, {bbox_w}, {bbox_h}) → ({bbox_x}, {bbox_y}, {bbox_w-bbox_x}, {bbox_h-bbox_y})")
+                            bbox_x, bbox_y, bbox_w, bbox_h = bbox_x, bbox_y, bbox_w - bbox_x, bbox_h - bbox_y
+                            bbox_to_use = (bbox_x, bbox_y, bbox_w, bbox_h)
+                        else:
+                            bbox_to_use = local_track.bbox
+                        
                         proj_world = HomographyProjector.project_bbox_to_world(
-                            local_track.bbox, H, 480
+                            bbox_to_use, H, 480
                         )
                         
                         if proj_world is None:
+                            print(f"[BEV CAM-PROJ] {cam_name}: Projection failed for person {person.global_id}")
                             continue
                         
                         proj_x, proj_y = proj_world
-                        scaled_proj_x = proj_x * GRID_PIXELS_PER_UNIT
-                        scaled_proj_y = proj_y * GRID_PIXELS_PER_UNIT
+                        # Debug log individual camera projection
+                        bbox_info = f"bbox={bbox_to_use}" if hasattr(local_track, 'bbox') else "no-bbox"
+                        print(f"[BEV CAM-PROJ] {cam_name}: Person {person.global_id} world=({proj_x:.1f}, {proj_y:.1f}) {bbox_info}")
+                        
+                        # Transform to scene coordinates
+                        scaled_proj_x = (proj_x - self.world_min_x) * self.current_scale + 25
+                        scaled_proj_y = (proj_y - self.world_min_y) * self.current_scale + 25
                         
                         # Use debug color for this camera
                         color_idx = camera_count % len(DEBUG_COLORS)
@@ -482,8 +554,8 @@ class BirdsEyeViewWidget(QWidget):
                         self.graphics_scene.addItem(label)
                         
                         # Draw line from camera position to projection
-                        cam_scaled_x = cam_info.position[0] * GRID_PIXELS_PER_UNIT
-                        cam_scaled_y = cam_info.position[1] * GRID_PIXELS_PER_UNIT
+                        cam_scaled_x = (cam_info.position[0] - self.world_min_x) * self.current_scale + 25
+                        cam_scaled_y = (cam_info.position[1] - self.world_min_y) * self.current_scale + 25
                         
                         line = QGraphicsLineItem(
                             cam_scaled_x, cam_scaled_y,
@@ -498,13 +570,17 @@ class BirdsEyeViewWidget(QWidget):
                         camera_count += 1
                 
                 except Exception as e:
-                    print(f"Error drawing projection for {cam_name}: {e}")
+                    print(f"[BEV CAM-PROJ ERROR] {cam_name}: {e}")
+        
+        # Summary debug log for this person
+        print(f"[BEV PERSON] ID {person.global_id}: detected in {camera_count} camera(s)")
 
         # Draw global stereo position (green, prominent)
         if hasattr(person, 'smoothed_position') and person.smoothed_position:
             world_x, world_y = person.smoothed_position
-            scaled_x = world_x * GRID_PIXELS_PER_UNIT
-            scaled_y = world_y * GRID_PIXELS_PER_UNIT
+            # Transform to scene coordinates
+            scaled_x = (world_x - self.world_min_x) * self.current_scale + 25
+            scaled_y = (world_y - self.world_min_y) * self.current_scale + 25
 
             # Draw global position as larger circle
             global_marker = QGraphicsEllipseItem(
@@ -533,27 +609,22 @@ class BirdsEyeViewWidget(QWidget):
     def showEvent(self, event):
         """Called when widget becomes visible - start update timer"""
         super().showEvent(event)
-        print("[BEV] showEvent - starting timer")
         self._start_timer()
     
     def hideEvent(self, event):
         """Called when widget is hidden - stop update timer"""
-        print("[BEV] hideEvent - stopping timer")
         self._stop_timer()
         super().hideEvent(event)
     
     def _start_timer(self):
         """Start the update timer if not already running"""
         if self._timer_active or self.update_timer is not None:
-            print("[BEV] Timer already running, skipping")
             return
         
-        print("[BEV] Creating and starting timer")
         self.update_timer = QTimer(self)
         self.update_timer.timeout.connect(self._on_timer_tick)
         self.update_timer.start(100)  # Update every 100ms
         self._timer_active = True
-        print("[BEV] Timer started")
     
     def _stop_timer(self):
         """Stop the update timer"""
@@ -562,7 +633,6 @@ class BirdsEyeViewWidget(QWidget):
             self.update_timer.deleteLater()
             self.update_timer = None
         self._timer_active = False
-        print("[BEV] Timer stopped")
     
     def _on_timer_tick(self):
         """Periodic update timer callback"""
@@ -585,12 +655,7 @@ class BirdsEyeViewWidget(QWidget):
         self.graphics_view.scale(factor, factor)
 
     def resizeEvent(self, event):
-        """Fit scene to view on resize"""
+        """Handle resize - no need to fitInView as we use fixed scene rect"""
         super().resizeEvent(event)
-        if not self.graphics_scene.items():
-            return
-        
-        self.graphics_view.fitInView(
-            self.graphics_scene.itemsBoundingRect(),
-            Qt.AspectRatioMode.KeepAspectRatio
-        )
+        # Scene rect is already set in update_visualization
+        # Just let the view render the fixed scene rect

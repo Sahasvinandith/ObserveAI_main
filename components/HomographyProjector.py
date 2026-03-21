@@ -80,8 +80,8 @@ class HomographyProjector:
             frame_ref_points = np.array([
                 [0, 0],                    # Top-left
                 [frame_width, 0],          # Top-right
-                [frame_width, frame_height],  # Bottom-right
-                [0, frame_height]          # Bottom-left
+                [frame_width, frame_height * 0.8],  # Near-bottom-right (80% of frame)
+                [0, frame_height * 0.8]   # Near-bottom-left (80% of frame)
             ], dtype=np.float32)
 
             # Compute corresponding world points
@@ -109,9 +109,16 @@ class HomographyProjector:
                 angle = norm_x * fov_degrees / 2  # in degrees
                 
                 # Distance: top-to-bottom (based on view range)
-                # Top (fy=0) -> far (view_range)
-                # Bottom (fy=height) -> near (0)
-                distance = view_range * (1.0 - norm_y)
+                # For a downward-looking camera:
+                # - Top of frame (fy=0) = far away = farthest visible point
+                # - Bottom of frame (fy=height) = near camera = closest point
+                # 
+                # IMPORTANT: The mapping depends on camera orientation!
+                # If camera is looking DOWN: top=far, bottom=near
+                # If camera is looking UP or SIDE: this might be reversed
+                #
+                # Current model assumes: top=far, bottom=near
+                distance = view_range * (1.0 - norm_y)  # Top=view_range, Bottom=0
                 
                 # Convert to world coordinates
                 # Camera faces along its rotation direction
@@ -177,10 +184,14 @@ class HomographyProjector:
             cx_frame = bbox[0] + bbox[2] / 2.0
             cy_frame = bbox[1] + bbox[3] / 2.0
             
-            # Use bbox bottom (contact point with ground) for more accuracy
-            # cy_bottom = bbox[1] + bbox[3]  # Bottom of bbox
-            # For now, use center for consistency
-            cy_bottom = cy_frame
+            # Debug: Check if bbox looks like (x1, y1, x2, y2) format instead of (x, y, w, h)
+            if bbox[2] > 640 or bbox[3] > 480:
+                print(f"[HOMOGRAPHY WARN] Unusual bbox values: {bbox} - might be (x1,y1,x2,y2) instead of (x,y,w,h)!")
+            
+            # Use bbox BOTTOM (contact point with ground) for accurate ground projection
+            # This represents where the person's feet touch the ground
+            cy_bottom = bbox[1] + bbox[3]  # Bottom of bbox = feet on ground
+            # Note: This is more accurate than using center (which is at head/chest height)
 
             # Apply homography
             point = np.array([[[cx_frame, cy_bottom]]], dtype=np.float32)

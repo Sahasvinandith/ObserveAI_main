@@ -1,0 +1,1411 @@
+2026-03-15 02:35:22.019807: I tensorflow/core/platform/cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+Using cache found in /home/sahas/.cache/torch/hub/pytorch_vision_v0.10.0
+[ WARN:0@11.611] global cap_v4l.cpp:914 open VIDEOIO(V4L2:/dev/video3): can't open camera by index
+2026-03-15 02:35:36.056580: W tensorflow/core/common_runtime/gpu/gpu_bfc_allocator.cc:47] Overriding orig_value setting because the TF_FORCE_GPU_ALLOW_GROWTH environment variable is set. Original config value was 0.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1773522336.057618  612476 gpu_device.cc:2020] Created device /job:localhost/replica:0/task:0/device:GPU:0 with 1251 MB memory:  -> device: 0, name: NVIDIA GeForce GTX 1650 Ti with Max-Q Design, pci bus id: 0000:01:00.0, compute capability: 7.5
+2026-03-15 02:35:37.386814: I external/local_xla/xla/stream_executor/cuda/cuda_dnn.cc:473] Loaded cuDNN version 91002
+2026-03-15 02:35:38.178422: W external/local_xla/xla/tsl/framework/bfc_allocator.cc:310] Allocator (GPU_0_bfc) ran out of memory trying to allocate 1.08GiB with freed_by_count=0. The caller indicates that this is not a failure, but this may mean that there could be performance gains if more memory were available.
+2026-03-15 02:35:38.239232: W external/local_xla/xla/tsl/framework/bfc_allocator.cc:310] Allocator (GPU_0_bfc) ran out of memory trying to allocate 1.08GiB with freed_by_count=0. The caller indicates that this is not a failure, but this may mean that there could be performance gains if more memory were available.
+Using cache found in /home/sahas/.cache/torch/hub/pytorch_vision_v0.10.0
+Using cache found in /home/sahas/.cache/torch/hub/pytorch_vision_v0.10.0
+[SETTINGS] Loaded settings from settings.json
+[GLOBAL TRACKER] Initialized with threshold=0.5, weights: reid=0.7, spatial=0.3, pixels_per_meter=30.0
+Clearing all items...
+[MAIN] Map scale set to 30.0 pixels/meter
+[GLOBAL TRACKER] Registered camera 'Cheap' at pos=(243.5, 56.0), rot=91.46103979926235°, fov=46°, range=400.0
+[MAIN] Registered camera 'Cheap' with global tracker
+Initializing AI System for CameraCheap...
+[INFO] Initializing Detection System...
+AI System for Cheap started.
+[SETTINGS] Loaded settings from settings.json
+[Cheap] Worker thread: Trying to connect...
+[GLOBAL TRACKER] Registered camera 'HD' at pos=(3.0, 157.5), rot=1.8633368513326616°, fov=42°, range=400.0
+[MAIN] Registered camera 'HD' with global tracker
+Initializing AI System for CameraHD...
+[INFO] Initializing Detection System...
+[HD] Worker thread: Trying to connect...
+AI System for HD started.
+Layout loaded successfully.
+Building embedding cache (averaging all images per user)...
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+Cached User_1 (averaged 9 images)
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+Cached User_2 (averaged 3 images)
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-181.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[INFO] Models loaded.
+[INFO] Models loaded.
+[INFO] System initialized successfully.
+[INFO] Starting all threads...
+[THREAD] Camera thread started
+[THREAD] Processing thread started
+[THREAD] Recognition Worker started
+[THREAD] Display thread started
+[THREAD] DB Update Worker started
+[THREAD] Watchdog thread started
+[INFO] System initialized successfully.
+[INFO] Starting all threads...
+[THREAD] Camera thread started
+[THREAD] Processing thread started
+[THREAD] Recognition Worker started
+[THREAD] Display thread started
+[THREAD] DB Update Worker started
+[THREAD] Watchdog thread started
+deepsort track for user in Cheap is not yet confirmed
+deepsort track for user in Cheap is not yet confirmed
+[GLOBAL TRACKER] === create_or_update called: camera='Cheap', local_id=1, has_features=True ===
+[MATCH DEBUG] === Searching for match from camera='Cheap', exclude='Cheap' ===
+[MATCH DEBUG] Total global persons: 0, threshold: 0.5
+[MATCH DEBUG] Best match: G:None, distance=inf, threshold=0.5
+[MATCH DEBUG] ✗ NO MATCH (best distance inf >= threshold 0.5)
+[GLOBAL TRACKER] ✗ Created NEW person G:1 in 'Cheap' (no match found)
+[FLOOR MAP] Created dot for person 1 at (235.7, 95.2)
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+deepsort track for user in HD is not yet confirmed
+[TIMING] yolo_face_model: 88.1ms
+[YOLO FACE] Detected face with confidence: 0.416
+[FACE REJECT] Confidence 0.416 < 0.75 minimum
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[TIMING] yolo_face_model: 12.8ms
+[YOLO FACE] Detected face with confidence: 0.765
+[FACE ACCEPT] Size 94x122, conf 0.765 - valid face
+[QUEUE] Created Face 3 and added to identified_faces
+[QUEUE] Pushed Face 3 for recognition
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DEBUG] Saved face 3 to debug_face_temp.jpg (shape=(122, 94, 3))
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+deepsort track for user in HD is not yet confirmed
+[RECOG] Face 3 matched: name='User_1', conf=0.074
+[KNOWN MATCH] Face 3: verified=User_1, locked=None, person_id=1
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[TIMING] yolo_face_model: 15.7ms
+[YOLO FACE] Detected face with confidence: 0.538
+[FACE REJECT] Confidence 0.538 < 0.75 minimum
+[GLOBAL TRACKER] === create_or_update called: camera='HD', local_id=1, has_features=True ===
+[MATCH DEBUG] === Searching for match from camera='HD', exclude='HD' ===
+[MATCH DEBUG] Total global persons: 1, threshold: 0.5
+[MATCH DEBUG] G:1 ('Unknown'): reid=0.192, spatial=0.610, combined=0.317, cameras=['Cheap']
+[MATCH DEBUG] Best match: G:1, distance=0.317, threshold=0.5
+[MATCH DEBUG] ✓ MATCHED to G:1
+[GLOBAL TRACKER] ✓ Updated person G:1 in 'HD' (was in cameras: ['Cheap'])
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[TIMING] yolo_face_model: 14.2ms
+[YOLO FACE] Detected face with confidence: 0.726
+[FACE REJECT] Confidence 0.726 < 0.75 minimum
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[TIMING] yolo_face_model: 88.1ms
+[YOLO FACE] Detected face with confidence: 0.845
+[FACE ACCEPT] Size 114x164, conf 0.845 - valid face
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[TIMING] yolo_face_model: 11.7ms
+[YOLO FACE] Detected face with confidence: 0.532
+[FACE REJECT] Confidence 0.532 < 0.75 minimum
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[TIMING] yolo_face_model: 11.8ms
+[YOLO FACE] Detected face with confidence: 0.788
+[FACE ACCEPT] Size 94x118, conf 0.788 - valid face
+[QUEUE] Re-queued unlocked Face 3 for recognition
+[DEBUG] Saved face 3 to debug_face_temp.jpg (shape=(118, 94, 3))
+[QUEUE] Created Face 3 and added to identified_faces
+[QUEUE] Pushed Face 3 for recognition
+[DEBUG] Saved face 3 to debug_face_temp.jpg (shape=(164, 114, 3))
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[RECOG] Face 3 matched: name='User_1', conf=0.091
+[KNOWN MATCH] Face 3: verified=User_1, locked=None, person_id=1
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[RECOG] Face 3 matched: name='User_1', conf=0.348
+[KNOWN MATCH] Face 3: verified=User_1, locked=None, person_id=1
+[TIMING] yolo_face_model: 32.6ms
+[YOLO FACE] Detected face with confidence: 0.729
+[FACE REJECT] Confidence 0.729 < 0.75 minimum
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[TIMING] yolo_face_model: 13.1ms
+[YOLO FACE] Detected face with confidence: 0.849
+[FACE ACCEPT] Size 114x162, conf 0.849 - valid face
+[QUEUE] Re-queued unlocked Face 3 for recognition
+[DEBUG] Saved face 3 to debug_face_temp.jpg (shape=(162, 114, 3))
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[RECOG] Face 3 matched: name='User_1', conf=0.454
+[TIMING] yolo_face_model: 43.0ms
+[YOLO FACE] Detected face with confidence: 0.522
+[FACE REJECT] Confidence 0.522 < 0.75 minimum
+[KNOWN MATCH] Face 3: verified=User_1, locked=None, person_id=1
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[TIMING] yolo_face_model: 13.7ms
+[YOLO FACE] Detected face with confidence: 0.855
+[FACE ACCEPT] Size 114x161, conf 0.855 - valid face
+[QUEUE] Re-queued unlocked Face 3 for recognition
+[DEBUG] Saved face 3 to debug_face_temp.jpg (shape=(161, 114, 3))
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-190.3) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[TIMING] yolo_face_model: 77.3ms
+[YOLO FACE] Detected face with confidence: 0.630
+[FACE REJECT] Confidence 0.630 < 0.75 minimum
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[RECOG] Face 3 matched: name='Unknown', conf=1.000
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-193.2) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[RECOG] Face 3 Unknown (1/3) - waiting for more frames
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[TIMING] yolo_face_model: 21.7ms
+[YOLO FACE] Detected face with confidence: 0.854
+[FACE ACCEPT] Size 115x163, conf 0.854 - valid face
+[QUEUE] Re-queued unlocked Face 3 for recognition
+[DEBUG] Saved face 3 to debug_face_temp.jpg (shape=(163, 115, 3))
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[TIMING] yolo_face_model: 51.4ms
+[YOLO FACE] Detected face with confidence: 0.798
+[FACE ACCEPT] Size 93x112, conf 0.798 - valid face
+[QUEUE] Re-queued unlocked Face 3 for recognition
+[DEBUG] Saved face 3 to debug_face_temp.jpg (shape=(112, 93, 3))
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-193.2) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-193.2) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[RECOG] Face 3 matched: name='User_1', conf=0.467
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[RECOG] Face 3 matched: name='User_1', conf=0.070
+[TIMING] yolo_face_model: 12.1ms
+[YOLO FACE] Detected face with confidence: 0.857
+[FACE ACCEPT] Size 113x161, conf 0.857 - valid face
+[IDENTITY] Locked User_1 (avg_conf=0.08)
+[KNOWN MATCH] Face 3: verified=User_1, locked=User_1, person_id=1
+[CONSOLIDATE CALL] global_id=1, user=User_1, conf=0.078
+[ID REPORT] Global 1: Received 'User_1' (conf=0.078), current='Unknown' (best=1.000)
+[ID SET] Global 1: Set to 'User_1' (0.078)
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.4) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[CACHE] Updated User_1 min_quality=376.0
+[IDENTITY] Locked User_1 (avg_conf=0.42)
+[KNOWN MATCH] Face 3: verified=User_1, locked=User_1, person_id=1
+[CONSOLIDATE CALL] global_id=1, user=User_1, conf=0.423
+[ID REPORT] Global 1: Received 'User_1' (conf=0.423), current='User_1' (best=0.078)
+[CACHE] Updated User_1 min_quality=376.0
+[TIMING] yolo_face_model: 26.8ms
+[YOLO FACE] Detected face with confidence: 0.420
+[FACE REJECT] Confidence 0.420 < 0.75 minimum
+[TIMING] yolo_face_model: 18.6ms
+[YOLO FACE] Detected face with confidence: 0.663
+[FACE REJECT] Confidence 0.663 < 0.75 minimum
+[TIMING] yolo_face_model: 15.6ms
+[YOLO FACE] Detected face with confidence: 0.858
+[FACE ACCEPT] Size 114x162, conf 0.858 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.9) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 15.1ms
+[YOLO FACE] Detected face with confidence: 0.681
+[FACE REJECT] Confidence 0.681 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.2) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 15.2ms
+[YOLO FACE] Detected face with confidence: 0.847
+[FACE ACCEPT] Size 117x163, conf 0.847 - valid face
+[TIMING] yolo_face_model: 11.7ms
+[YOLO FACE] Detected face with confidence: 0.589
+[FACE REJECT] Confidence 0.589 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.2) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 16.5ms
+[YOLO FACE] Detected face with confidence: 0.689
+[FACE REJECT] Confidence 0.689 < 0.75 minimum
+[TIMING] yolo_face_model: 11.8ms
+[YOLO FACE] Detected face with confidence: 0.850
+[FACE ACCEPT] Size 116x162, conf 0.850 - valid face
+[TIMING] yolo_face_model: 11.4ms
+[YOLO FACE] Detected face with confidence: 0.762
+[FACE ACCEPT] Size 91x114, conf 0.762 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.2) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 14.0ms
+[YOLO FACE] Detected face with confidence: 0.700
+[FACE REJECT] Confidence 0.700 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.2) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 16.4ms
+[YOLO FACE] Detected face with confidence: 0.857
+[FACE ACCEPT] Size 115x164, conf 0.857 - valid face
+[TIMING] yolo_face_model: 13.9ms
+[YOLO FACE] Detected face with confidence: 0.601
+[FACE REJECT] Confidence 0.601 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.2) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 18.7ms
+[YOLO FACE] Detected face with confidence: 0.731
+[FACE REJECT] Confidence 0.731 < 0.75 minimum
+[TIMING] yolo_face_model: 15.4ms
+[YOLO FACE] Detected face with confidence: 0.854
+[FACE ACCEPT] Size 114x162, conf 0.854 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.2) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 13.7ms
+[YOLO FACE] Detected face with confidence: 0.656
+[FACE REJECT] Confidence 0.656 < 0.75 minimum
+[TIMING] yolo_face_model: 11.2ms
+[YOLO FACE] Detected face with confidence: 0.848
+[FACE ACCEPT] Size 115x161, conf 0.848 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.2) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 14.0ms
+[YOLO FACE] Detected face with confidence: 0.708
+[FACE REJECT] Confidence 0.708 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.1) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 17.3ms
+[YOLO FACE] Detected face with confidence: 0.635
+[FACE REJECT] Confidence 0.635 < 0.75 minimum
+[TIMING] yolo_face_model: 11.8ms
+[YOLO FACE] Detected face with confidence: 0.856
+[FACE ACCEPT] Size 115x162, conf 0.856 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.1) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 13.3ms
+[YOLO FACE] Detected face with confidence: 0.757
+[FACE ACCEPT] Size 92x117, conf 0.757 - valid face
+[TIMING] yolo_face_model: 12.5ms
+[YOLO FACE] Detected face with confidence: 0.615
+[FACE REJECT] Confidence 0.615 < 0.75 minimum
+[TIMING] yolo_face_model: 13.0ms
+[YOLO FACE] Detected face with confidence: 0.859
+[FACE ACCEPT] Size 114x162, conf 0.859 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.0) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 10.6ms
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.9) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 17.3ms
+[YOLO FACE] Detected face with confidence: 0.381
+[FACE REJECT] Confidence 0.381 < 0.75 minimum
+[TIMING] yolo_face_model: 16.9ms
+[YOLO FACE] Detected face with confidence: 0.851
+[FACE ACCEPT] Size 114x161, conf 0.851 - valid face
+[TIMING] yolo_face_model: 12.9ms
+[YOLO FACE] Detected face with confidence: 0.713
+[FACE REJECT] Confidence 0.713 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.9) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 16.7ms
+[YOLO FACE] Detected face with confidence: 0.853
+[FACE ACCEPT] Size 114x161, conf 0.853 - valid face
+[TIMING] yolo_face_model: 14.2ms
+[YOLO FACE] Detected face with confidence: 0.582
+[FACE REJECT] Confidence 0.582 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 14.5ms
+[YOLO FACE] Detected face with confidence: 0.564
+[FACE REJECT] Confidence 0.564 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.7) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 19.1ms
+[YOLO FACE] Detected face with confidence: 0.847
+[FACE ACCEPT] Size 114x161, conf 0.847 - valid face
+[TIMING] yolo_face_model: 12.4ms
+[YOLO FACE] Detected face with confidence: 0.675
+[FACE REJECT] Confidence 0.675 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.7) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 19.7ms
+[YOLO FACE] Detected face with confidence: 0.690
+[FACE REJECT] Confidence 0.690 < 0.75 minimum
+[TIMING] yolo_face_model: 12.3ms
+[YOLO FACE] Detected face with confidence: 0.846
+[FACE ACCEPT] Size 114x159, conf 0.846 - valid face
+[TIMING] yolo_face_model: 13.1ms
+[YOLO FACE] Detected face with confidence: 0.658
+[FACE REJECT] Confidence 0.658 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 13.1ms
+[YOLO FACE] Detected face with confidence: 0.605
+[FACE REJECT] Confidence 0.605 < 0.75 minimum
+[TIMING] yolo_face_model: 12.9ms
+[YOLO FACE] Detected face with confidence: 0.854
+[FACE ACCEPT] Size 114x161, conf 0.854 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.5) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 14.9ms
+[YOLO FACE] Detected face with confidence: 0.261
+[FACE REJECT] Confidence 0.261 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 17.1ms
+[YOLO FACE] Detected face with confidence: 0.791
+[FACE ACCEPT] Size 89x104, conf 0.791 - valid face
+[TIMING] yolo_face_model: 14.9ms
+[YOLO FACE] Detected face with confidence: 0.849
+[FACE ACCEPT] Size 114x161, conf 0.849 - valid face
+[TIMING] yolo_face_model: 10.9ms
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 11.7ms
+[YOLO FACE] Detected face with confidence: 0.643
+[FACE REJECT] Confidence 0.643 < 0.75 minimum
+[TIMING] yolo_face_model: 11.4ms
+[YOLO FACE] Detected face with confidence: 0.849
+[FACE ACCEPT] Size 114x161, conf 0.849 - valid face
+[TIMING] yolo_face_model: 11.3ms
+[YOLO FACE] Detected face with confidence: 0.354
+[FACE REJECT] Confidence 0.354 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.7) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 16.4ms
+[YOLO FACE] Detected face with confidence: 0.565
+[FACE REJECT] Confidence 0.565 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 15.1ms
+[YOLO FACE] Detected face with confidence: 0.434
+[FACE REJECT] Confidence 0.434 < 0.75 minimum
+[TIMING] yolo_face_model: 54.7ms
+[YOLO FACE] Detected face with confidence: 0.840
+[FACE ACCEPT] Size 116x167, conf 0.840 - valid face
+[TIMING] yolo_face_model: 17.5ms
+[YOLO FACE] Detected face with confidence: 0.594
+[FACE REJECT] Confidence 0.594 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 12.5ms
+[YOLO FACE] Detected face with confidence: 0.716
+[FACE REJECT] Confidence 0.716 < 0.75 minimum
+[TIMING] yolo_face_model: 13.9ms
+[YOLO FACE] Detected face with confidence: 0.827
+[FACE ACCEPT] Size 114x168, conf 0.827 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.7) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 13.8ms
+[YOLO FACE] Detected face with confidence: 0.619
+[FACE REJECT] Confidence 0.619 < 0.75 minimum
+[TIMING] yolo_face_model: 12.0ms
+[YOLO FACE] Detected face with confidence: 0.773
+[FACE ACCEPT] Size 94x115, conf 0.773 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.7) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 19.6ms
+[YOLO FACE] Detected face with confidence: 0.829
+[FACE ACCEPT] Size 116x168, conf 0.829 - valid face
+[TIMING] yolo_face_model: 13.2ms
+[YOLO FACE] Detected face with confidence: 0.410
+[FACE REJECT] Confidence 0.410 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.7) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 15.4ms
+[YOLO FACE] Detected face with confidence: 0.646
+[FACE REJECT] Confidence 0.646 < 0.75 minimum
+[TIMING] yolo_face_model: 17.9ms
+[YOLO FACE] Detected face with confidence: 0.833
+[FACE ACCEPT] Size 115x162, conf 0.833 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 23.5ms
+[YOLO FACE] Detected face with confidence: 0.592
+[FACE REJECT] Confidence 0.592 < 0.75 minimum
+[TIMING] yolo_face_model: 14.0ms
+[YOLO FACE] Detected face with confidence: 0.399
+[FACE REJECT] Confidence 0.399 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 20.7ms
+[YOLO FACE] Detected face with confidence: 0.834
+[FACE ACCEPT] Size 116x167, conf 0.834 - valid face
+[TIMING] yolo_face_model: 16.5ms
+[YOLO FACE] Detected face with confidence: 0.651
+[FACE REJECT] Confidence 0.651 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 17.6ms
+[TIMING] yolo_face_model: 22.8ms
+[YOLO FACE] Detected face with confidence: 0.828
+[FACE ACCEPT] Size 114x167, conf 0.828 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 22.9ms
+[YOLO FACE] Detected face with confidence: 0.553
+[FACE REJECT] Confidence 0.553 < 0.75 minimum
+[TIMING] yolo_face_model: 12.5ms
+[YOLO FACE] Detected face with confidence: 0.843
+[FACE ACCEPT] Size 114x161, conf 0.843 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 15.7ms
+[YOLO FACE] Detected face with confidence: 0.737
+[FACE REJECT] Confidence 0.737 < 0.75 minimum
+[TIMING] yolo_face_model: 13.3ms
+[YOLO FACE] Detected face with confidence: 0.533
+[FACE REJECT] Confidence 0.533 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 14.7ms
+[YOLO FACE] Detected face with confidence: 0.833
+[FACE ACCEPT] Size 116x165, conf 0.833 - valid face
+[TIMING] yolo_face_model: 16.8ms
+[YOLO FACE] Detected face with confidence: 0.670
+[FACE REJECT] Confidence 0.670 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 16.6ms
+[TIMING] yolo_face_model: 17.7ms
+[YOLO FACE] Detected face with confidence: 0.650
+[YOLO FACE] Detected face with confidence: 0.838
+[FACE REJECT] Confidence 0.650 < 0.75 minimum
+[FACE ACCEPT] Size 115x161, conf 0.838 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.7) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 15.4ms
+[TIMING] yolo_face_model: 12.8ms
+[YOLO FACE] Detected face with confidence: 0.837
+[FACE ACCEPT] Size 115x168, conf 0.837 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.7) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 11.0ms
+[YOLO FACE] Detected face with confidence: 0.641
+[FACE REJECT] Confidence 0.641 < 0.75 minimum
+[TIMING] yolo_face_model: 15.2ms
+[YOLO FACE] Detected face with confidence: 0.461
+[FACE REJECT] Confidence 0.461 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.7) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 12.4ms
+[YOLO FACE] Detected face with confidence: 0.837
+[FACE ACCEPT] Size 115x166, conf 0.837 - valid face
+[TIMING] yolo_face_model: 12.5ms
+[YOLO FACE] Detected face with confidence: 0.586
+[FACE REJECT] Confidence 0.586 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.7) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 14.1ms
+[YOLO FACE] Detected face with confidence: 0.661
+[FACE REJECT] Confidence 0.661 < 0.75 minimum
+[TIMING] yolo_face_model: 13.2ms
+[YOLO FACE] Detected face with confidence: 0.837
+[FACE ACCEPT] Size 115x166, conf 0.837 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 14.9ms
+[YOLO FACE] Detected face with confidence: 0.487
+[FACE REJECT] Confidence 0.487 < 0.75 minimum
+[TIMING] yolo_face_model: 12.5ms
+[YOLO FACE] Detected face with confidence: 0.336
+[FACE REJECT] Confidence 0.336 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 13.8ms
+[YOLO FACE] Detected face with confidence: 0.833
+[FACE ACCEPT] Size 114x165, conf 0.833 - valid face
+[TIMING] yolo_face_model: 12.3ms
+[YOLO FACE] Detected face with confidence: 0.661
+[FACE REJECT] Confidence 0.661 < 0.75 minimum
+[TIMING] yolo_face_model: 14.2ms
+[YOLO FACE] Detected face with confidence: 0.596
+[FACE REJECT] Confidence 0.596 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 17.0ms
+[YOLO FACE] Detected face with confidence: 0.834
+[FACE ACCEPT] Size 114x166, conf 0.834 - valid face
+[TIMING] yolo_face_model: 14.2ms
+[YOLO FACE] Detected face with confidence: 0.533
+[FACE REJECT] Confidence 0.533 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 15.1ms
+[YOLO FACE] Detected face with confidence: 0.682
+[FACE REJECT] Confidence 0.682 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.7) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 16.3ms
+[YOLO FACE] Detected face with confidence: 0.834
+[FACE ACCEPT] Size 114x166, conf 0.834 - valid face
+[TIMING] yolo_face_model: 14.1ms
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 13.0ms
+[YOLO FACE] Detected face with confidence: 0.827
+[FACE ACCEPT] Size 114x164, conf 0.827 - valid face
+[TIMING] yolo_face_model: 11.5ms
+[YOLO FACE] Detected face with confidence: 0.667
+[FACE REJECT] Confidence 0.667 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 25.1ms
+[YOLO FACE] Detected face with confidence: 0.604
+[FACE REJECT] Confidence 0.604 < 0.75 minimum
+[TIMING] yolo_face_model: 16.6ms
+[YOLO FACE] Detected face with confidence: 0.515
+[FACE REJECT] Confidence 0.515 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.9) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 18.7ms
+[YOLO FACE] Detected face with confidence: 0.835
+[FACE ACCEPT] Size 115x168, conf 0.835 - valid face
+[TIMING] yolo_face_model: 13.0ms
+[YOLO FACE] Detected face with confidence: 0.489
+[FACE REJECT] Confidence 0.489 < 0.75 minimum
+[TIMING] yolo_face_model: 14.0ms
+[YOLO FACE] Detected face with confidence: 0.265
+[FACE REJECT] Confidence 0.265 < 0.75 minimum
+[TIMING] yolo_face_model: 17.4ms
+[YOLO FACE] Detected face with confidence: 0.830
+[FACE ACCEPT] Size 115x165, conf 0.830 - valid face
+[TIMING] yolo_face_model: 12.8ms
+[YOLO FACE] Detected face with confidence: 0.638
+[FACE REJECT] Confidence 0.638 < 0.75 minimum
+[TIMING] yolo_face_model: 15.9ms
+[YOLO FACE] Detected face with confidence: 0.831
+[FACE ACCEPT] Size 115x162, conf 0.831 - valid face
+[TIMING] yolo_face_model: 13.2ms
+[YOLO FACE] Detected face with confidence: 0.638
+[FACE REJECT] Confidence 0.638 < 0.75 minimum
+[TIMING] yolo_face_model: 14.0ms
+[YOLO FACE] Detected face with confidence: 0.745
+[FACE REJECT] Confidence 0.745 < 0.75 minimum
+[TIMING] yolo_face_model: 12.6ms
+[YOLO FACE] Detected face with confidence: 0.835
+[FACE ACCEPT] Size 115x163, conf 0.835 - valid face
+[TIMING] yolo_face_model: 10.9ms
+[YOLO FACE] Detected face with confidence: 0.521
+[FACE REJECT] Confidence 0.521 < 0.75 minimum
+[TIMING] yolo_face_model: 16.5ms
+[YOLO FACE] Detected face with confidence: 0.340
+[FACE REJECT] Confidence 0.340 < 0.75 minimum
+[YOLO FACE] Detected face with confidence: 0.277
+[FACE REJECT] Confidence 0.277 < 0.75 minimum
+[TIMING] yolo_face_model: 12.1ms
+[YOLO FACE] Detected face with confidence: 0.833
+[FACE ACCEPT] Size 116x166, conf 0.833 - valid face
+[TIMING] yolo_face_model: 12.6ms
+[YOLO FACE] Detected face with confidence: 0.666
+[FACE REJECT] Confidence 0.666 < 0.75 minimum
+[TIMING] yolo_face_model: 20.1ms
+[YOLO FACE] Detected face with confidence: 0.450
+[FACE REJECT] Confidence 0.450 < 0.75 minimum
+[TIMING] yolo_face_model: 11.9ms
+[YOLO FACE] Detected face with confidence: 0.833
+[FACE ACCEPT] Size 116x166, conf 0.833 - valid face
+[TIMING] yolo_face_model: 10.6ms
+[YOLO FACE] Detected face with confidence: 0.403
+[FACE REJECT] Confidence 0.403 < 0.75 minimum
+[TIMING] yolo_face_model: 13.1ms
+[TIMING] yolo_face_model: 19.7ms
+[YOLO FACE] Detected face with confidence: 0.840
+[FACE ACCEPT] Size 116x166, conf 0.840 - valid face
+[TIMING] yolo_face_model: 15.2ms
+[YOLO FACE] Detected face with confidence: 0.571
+[FACE REJECT] Confidence 0.571 < 0.75 minimum
+[TIMING] yolo_face_model: 12.0ms
+[YOLO FACE] Detected face with confidence: 0.665
+[FACE REJECT] Confidence 0.665 < 0.75 minimum
+[TIMING] yolo_face_model: 14.6ms
+[YOLO FACE] Detected face with confidence: 0.838
+[FACE ACCEPT] Size 116x166, conf 0.838 - valid face
+[TIMING] yolo_face_model: 11.1ms
+[YOLO FACE] Detected face with confidence: 0.701
+[FACE REJECT] Confidence 0.701 < 0.75 minimum
+[TIMING] yolo_face_model: 17.0ms
+[TIMING] yolo_face_model: 15.7ms
+[YOLO FACE] Detected face with confidence: 0.846
+[FACE ACCEPT] Size 116x165, conf 0.846 - valid face
+[TIMING] yolo_face_model: 14.7ms
+[YOLO FACE] Detected face with confidence: 0.720
+[FACE REJECT] Confidence 0.720 < 0.75 minimum
+[TIMING] yolo_face_model: 18.1ms
+[YOLO FACE] Detected face with confidence: 0.299
+[FACE REJECT] Confidence 0.299 < 0.75 minimum
+[TIMING] yolo_face_model: 17.4ms
+[TIMING] yolo_face_model: 14.7ms
+[YOLO FACE] Detected face with confidence: 0.835
+[FACE ACCEPT] Size 115x165, conf 0.835 - valid face
+[TIMING] yolo_face_model: 19.7ms
+[YOLO FACE] Detected face with confidence: 0.657
+[FACE REJECT] Confidence 0.657 < 0.75 minimum
+[TIMING] yolo_face_model: 17.6ms
+[TIMING] yolo_face_model: 15.6ms
+[YOLO FACE] Detected face with confidence: 0.843
+[YOLO FACE] Detected face with confidence: 0.591
+[FACE ACCEPT] Size 115x164, conf 0.843 - valid face
+[FACE REJECT] Confidence 0.591 < 0.75 minimum
+[TIMING] yolo_face_model: 11.4ms
+[YOLO FACE] Detected face with confidence: 0.563
+[FACE REJECT] Confidence 0.563 < 0.75 minimum
+[TIMING] yolo_face_model: 13.5ms
+[YOLO FACE] Detected face with confidence: 0.836
+[FACE ACCEPT] Size 116x168, conf 0.836 - valid face
+[TIMING] yolo_face_model: 10.7ms
+[YOLO FACE] Detected face with confidence: 0.673
+[FACE REJECT] Confidence 0.673 < 0.75 minimum
+[TIMING] yolo_face_model: 11.2ms
+[YOLO FACE] Detected face with confidence: 0.746
+[FACE REJECT] Confidence 0.746 < 0.75 minimum
+[TIMING] yolo_face_model: 13.3ms
+[YOLO FACE] Detected face with confidence: 0.833
+[FACE ACCEPT] Size 116x166, conf 0.833 - valid face
+[TIMING] yolo_face_model: 11.4ms
+[YOLO FACE] Detected face with confidence: 0.350
+[FACE REJECT] Confidence 0.350 < 0.75 minimum
+[TIMING] yolo_face_model: 13.8ms
+[YOLO FACE] Detected face with confidence: 0.530
+[FACE REJECT] Confidence 0.530 < 0.75 minimum
+[TIMING] yolo_face_model: 12.8ms
+[YOLO FACE] Detected face with confidence: 0.840
+[FACE ACCEPT] Size 115x164, conf 0.840 - valid face
+[TIMING] yolo_face_model: 11.1ms
+[TIMING] yolo_face_model: 17.8ms
+[YOLO FACE] Detected face with confidence: 0.643
+[FACE REJECT] Confidence 0.643 < 0.75 minimum
+[TIMING] yolo_face_model: 14.7ms
+[YOLO FACE] Detected face with confidence: 0.830
+[FACE ACCEPT] Size 116x164, conf 0.830 - valid face
+[TIMING] yolo_face_model: 18.1ms
+[YOLO FACE] Detected face with confidence: 0.367
+[FACE REJECT] Confidence 0.367 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.9) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 15.8ms
+[YOLO FACE] Detected face with confidence: 0.496
+[FACE REJECT] Confidence 0.496 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.9) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 11.3ms
+[YOLO FACE] Detected face with confidence: 0.836
+[FACE ACCEPT] Size 115x164, conf 0.836 - valid face
+[TIMING] yolo_face_model: 13.4ms
+[YOLO FACE] Detected face with confidence: 0.601
+[FACE REJECT] Confidence 0.601 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.9) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 20.1ms
+[YOLO FACE] Detected face with confidence: 0.712
+[FACE REJECT] Confidence 0.712 < 0.75 minimum
+[TIMING] yolo_face_model: 11.2ms
+[YOLO FACE] Detected face with confidence: 0.831
+[FACE ACCEPT] Size 115x163, conf 0.831 - valid face
+[TIMING] yolo_face_model: 11.0ms
+[YOLO FACE] Detected face with confidence: 0.698
+[FACE REJECT] Confidence 0.698 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.0) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 16.6ms
+[YOLO FACE] Detected face with confidence: 0.636
+[FACE REJECT] Confidence 0.636 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.1) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 20.7ms
+[YOLO FACE] Detected face with confidence: 0.696
+[FACE REJECT] Confidence 0.696 < 0.75 minimum
+[TIMING] yolo_face_model: 21.5ms
+[YOLO FACE] Detected face with confidence: 0.838
+[FACE ACCEPT] Size 117x165, conf 0.838 - valid face
+[TIMING] yolo_face_model: 20.1ms
+[YOLO FACE] Detected face with confidence: 0.496
+[FACE REJECT] Confidence 0.496 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.0) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 15.3ms
+[YOLO FACE] Detected face with confidence: 0.442
+[FACE REJECT] Confidence 0.442 < 0.75 minimum
+[TIMING] yolo_face_model: 15.8ms
+[YOLO FACE] Detected face with confidence: 0.831
+[FACE ACCEPT] Size 116x164, conf 0.831 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.0) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 19.0ms
+[YOLO FACE] Detected face with confidence: 0.691
+[FACE REJECT] Confidence 0.691 < 0.75 minimum
+[TIMING] yolo_face_model: 16.2ms
+[YOLO FACE] Detected face with confidence: 0.838
+[FACE ACCEPT] Size 115x162, conf 0.838 - valid face
+[TIMING] yolo_face_model: 14.9ms
+[YOLO FACE] Detected face with confidence: 0.648
+[FACE REJECT] Confidence 0.648 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.1) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 12.8ms
+[YOLO FACE] Detected face with confidence: 0.471
+[FACE REJECT] Confidence 0.471 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.1) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 13.4ms
+[YOLO FACE] Detected face with confidence: 0.841
+[FACE ACCEPT] Size 116x164, conf 0.841 - valid face
+[TIMING] yolo_face_model: 11.7ms
+[YOLO FACE] Detected face with confidence: 0.506
+[FACE REJECT] Confidence 0.506 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.1) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 13.7ms
+[YOLO FACE] Detected face with confidence: 0.519
+[FACE REJECT] Confidence 0.519 < 0.75 minimum
+[TIMING] yolo_face_model: 12.9ms
+[YOLO FACE] Detected face with confidence: 0.834
+[FACE ACCEPT] Size 116x163, conf 0.834 - valid face
+[TIMING] yolo_face_model: 12.1ms
+[YOLO FACE] Detected face with confidence: 0.549
+[FACE REJECT] Confidence 0.549 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.0) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 12.3ms
+[YOLO FACE] Detected face with confidence: 0.768
+[FACE ACCEPT] Size 87x112, conf 0.768 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 19.4ms
+[YOLO FACE] Detected face with confidence: 0.848
+[FACE ACCEPT] Size 117x166, conf 0.848 - valid face
+[TIMING] yolo_face_model: 13.1ms
+[YOLO FACE] Detected face with confidence: 0.702
+[FACE REJECT] Confidence 0.702 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.7) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 14.3ms
+[YOLO FACE] Detected face with confidence: 0.631
+[FACE REJECT] Confidence 0.631 < 0.75 minimum
+[TIMING] yolo_face_model: 17.2ms
+[YOLO FACE] Detected face with confidence: 0.840
+[FACE ACCEPT] Size 114x167, conf 0.840 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.7) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 18.8ms
+[YOLO FACE] Detected face with confidence: 0.655
+[FACE REJECT] Confidence 0.655 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 21.8ms
+[YOLO FACE] Detected face with confidence: 0.846
+[FACE ACCEPT] Size 115x165, conf 0.846 - valid face
+[TIMING] yolo_face_model: 17.1ms
+[YOLO FACE] Detected face with confidence: 0.549
+[FACE REJECT] Confidence 0.549 < 0.75 minimum
+[TIMING] yolo_face_model: 15.5ms
+[YOLO FACE] Detected face with confidence: 0.449
+[FACE REJECT] Confidence 0.449 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 12.5ms
+[YOLO FACE] Detected face with confidence: 0.848
+[FACE ACCEPT] Size 116x165, conf 0.848 - valid face
+[TIMING] yolo_face_model: 11.5ms
+[YOLO FACE] Detected face with confidence: 0.658
+[FACE REJECT] Confidence 0.658 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 12.2ms
+[YOLO FACE] Detected face with confidence: 0.645
+[FACE REJECT] Confidence 0.645 < 0.75 minimum
+[TIMING] yolo_face_model: 18.8ms
+[YOLO FACE] Detected face with confidence: 0.844
+[FACE ACCEPT] Size 115x164, conf 0.844 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.0) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 21.0ms
+[YOLO FACE] Detected face with confidence: 0.637
+[FACE REJECT] Confidence 0.637 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.0) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 20.7ms
+[YOLO FACE] Detected face with confidence: 0.846
+[FACE ACCEPT] Size 115x160, conf 0.846 - valid face
+[TIMING] yolo_face_model: 15.3ms
+[YOLO FACE] Detected face with confidence: 0.599
+[FACE REJECT] Confidence 0.599 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.0) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 14.7ms
+[YOLO FACE] Detected face with confidence: 0.468
+[FACE REJECT] Confidence 0.468 < 0.75 minimum
+[TIMING] yolo_face_model: 13.0ms
+[YOLO FACE] Detected face with confidence: 0.831
+[FACE ACCEPT] Size 116x163, conf 0.831 - valid face
+[TIMING] yolo_face_model: 14.5ms
+[YOLO FACE] Detected face with confidence: 0.701
+[FACE REJECT] Confidence 0.701 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.1) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 30.6ms
+[YOLO FACE] Detected face with confidence: 0.755
+[FACE ACCEPT] Size 86x105, conf 0.755 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.1) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 32.0ms
+[YOLO FACE] Detected face with confidence: 0.854
+[FACE ACCEPT] Size 114x158, conf 0.854 - valid face
+[TIMING] yolo_face_model: 40.6ms
+[YOLO FACE] Detected face with confidence: 0.585
+[FACE REJECT] Confidence 0.585 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.1) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 25.2ms
+[YOLO FACE] Detected face with confidence: 0.842
+[FACE ACCEPT] Size 112x160, conf 0.842 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.0) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 31.9ms
+[YOLO FACE] Detected face with confidence: 0.603
+[FACE REJECT] Confidence 0.603 < 0.75 minimum
+[TIMING] yolo_face_model: 28.3ms
+[YOLO FACE] Detected face with confidence: 0.689
+[FACE REJECT] Confidence 0.689 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.1) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 19.3ms
+[YOLO FACE] Detected face with confidence: 0.850
+[FACE ACCEPT] Size 113x157, conf 0.850 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.0) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 23.6ms
+[TIMING] yolo_face_model: 28.5ms
+[YOLO FACE] Detected face with confidence: 0.854
+[FACE ACCEPT] Size 113x155, conf 0.854 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.0) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 25.5ms
+[YOLO FACE] Detected face with confidence: 0.749
+[FACE REJECT] Confidence 0.749 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.9) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 30.8ms
+[YOLO FACE] Detected face with confidence: 0.855
+[FACE ACCEPT] Size 114x155, conf 0.855 - valid face
+[TIMING] yolo_face_model: 14.7ms
+[YOLO FACE] Detected face with confidence: 0.721
+[FACE REJECT] Confidence 0.721 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 14.4ms
+[YOLO FACE] Detected face with confidence: 0.857
+[FACE ACCEPT] Size 115x161, conf 0.857 - valid face
+[TIMING] yolo_face_model: 15.9ms
+[YOLO FACE] Detected face with confidence: 0.684
+[FACE REJECT] Confidence 0.684 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 14.0ms
+[YOLO FACE] Detected face with confidence: 0.569
+[FACE REJECT] Confidence 0.569 < 0.75 minimum
+[TIMING] yolo_face_model: 16.1ms
+[YOLO FACE] Detected face with confidence: 0.851
+[FACE ACCEPT] Size 114x158, conf 0.851 - valid face
+[TIMING] yolo_face_model: 11.7ms
+[YOLO FACE] Detected face with confidence: 0.509
+[FACE REJECT] Confidence 0.509 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 11.2ms
+[YOLO FACE] Detected face with confidence: 0.580
+[FACE REJECT] Confidence 0.580 < 0.75 minimum
+[TIMING] yolo_face_model: 13.1ms
+[YOLO FACE] Detected face with confidence: 0.853
+[FACE ACCEPT] Size 113x160, conf 0.853 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 11.9ms
+[YOLO FACE] Detected face with confidence: 0.275
+[FACE REJECT] Confidence 0.275 < 0.75 minimum
+[TIMING] yolo_face_model: 11.3ms
+[YOLO FACE] Detected face with confidence: 0.738
+[FACE REJECT] Confidence 0.738 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 12.5ms
+[YOLO FACE] Detected face with confidence: 0.854
+[FACE ACCEPT] Size 113x161, conf 0.854 - valid face
+[TIMING] yolo_face_model: 12.2ms
+[YOLO FACE] Detected face with confidence: 0.503
+[FACE REJECT] Confidence 0.503 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 23.4ms
+[YOLO FACE] Detected face with confidence: 0.503
+[FACE REJECT] Confidence 0.503 < 0.75 minimum
+[TIMING] yolo_face_model: 17.4ms
+[YOLO FACE] Detected face with confidence: 0.852
+[FACE ACCEPT] Size 114x157, conf 0.852 - valid face
+[TIMING] yolo_face_model: 14.5ms
+[YOLO FACE] Detected face with confidence: 0.615
+[FACE REJECT] Confidence 0.615 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.9) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 19.8ms
+[YOLO FACE] Detected face with confidence: 0.661
+[FACE REJECT] Confidence 0.661 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.0) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 18.0ms
+[TIMING] yolo_face_model: 15.6ms
+[YOLO FACE] Detected face with confidence: 0.849
+[YOLO FACE] Detected face with confidence: 0.703
+[FACE ACCEPT] Size 114x158, conf 0.849 - valid face
+[FACE REJECT] Confidence 0.703 < 0.75 minimum
+[TIMING] yolo_face_model: 16.1ms
+[YOLO FACE] Detected face with confidence: 0.508
+[FACE REJECT] Confidence 0.508 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.1) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 11.6ms
+[YOLO FACE] Detected face with confidence: 0.841
+[FACE ACCEPT] Size 113x159, conf 0.841 - valid face
+[TIMING] yolo_face_model: 10.7ms
+[YOLO FACE] Detected face with confidence: 0.522
+[FACE REJECT] Confidence 0.522 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.1) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 15.2ms
+[YOLO FACE] Detected face with confidence: 0.642
+[FACE REJECT] Confidence 0.642 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.2) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 19.9ms
+[YOLO FACE] Detected face with confidence: 0.832
+[FACE ACCEPT] Size 114x160, conf 0.832 - valid face
+[TIMING] yolo_face_model: 16.9ms
+[YOLO FACE] Detected face with confidence: 0.731
+[FACE REJECT] Confidence 0.731 < 0.75 minimum
+[TIMING] yolo_face_model: 15.7ms
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.3) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 14.7ms
+[TIMING] yolo_face_model: 16.5ms
+[YOLO FACE] Detected face with confidence: 0.846
+[FACE ACCEPT] Size 113x152, conf 0.846 - valid face
+[TIMING] yolo_face_model: 9.8ms
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.3) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 11.2ms
+[TIMING] yolo_face_model: 15.5ms
+[YOLO FACE] Detected face with confidence: 0.801
+[FACE ACCEPT] Size 108x148, conf 0.801 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-195.1) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 10.4ms
+[TIMING] yolo_face_model: 10.1ms
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 15.1ms
+[YOLO FACE] Detected face with confidence: 0.808
+[FACE ACCEPT] Size 107x148, conf 0.808 - valid face
+[TIMING] yolo_face_model: 10.3ms
+[YOLO FACE] Detected face with confidence: 0.357
+[FACE REJECT] Confidence 0.357 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 16.0ms
+[TIMING] yolo_face_model: 17.2ms
+[YOLO FACE] Detected face with confidence: 0.369
+[FACE REJECT] Confidence 0.369 < 0.75 minimum
+[TIMING] yolo_face_model: 17.3ms
+[YOLO FACE] Detected face with confidence: 0.817
+[FACE ACCEPT] Size 102x149, conf 0.817 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.2) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 14.9ms
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-193.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 18.9ms
+[YOLO FACE] Detected face with confidence: 0.551
+[FACE REJECT] Confidence 0.551 < 0.75 minimum
+[TIMING] yolo_face_model: 24.0ms
+[YOLO FACE] Detected face with confidence: 0.823
+[FACE ACCEPT] Size 103x150, conf 0.823 - valid face
+[TIMING] yolo_face_model: 19.4ms
+[YOLO FACE] Detected face with confidence: 0.560
+[FACE REJECT] Confidence 0.560 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-193.5) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 16.2ms
+[YOLO FACE] Detected face with confidence: 0.820
+[FACE ACCEPT] Size 102x146, conf 0.820 - valid face
+[TIMING] yolo_face_model: 11.5ms
+[YOLO FACE] Detected face with confidence: 0.345
+[FACE REJECT] Confidence 0.345 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-193.5) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 18.8ms
+[YOLO FACE] Detected face with confidence: 0.659
+[FACE REJECT] Confidence 0.659 < 0.75 minimum
+[TIMING] yolo_face_model: 17.8ms
+[YOLO FACE] Detected face with confidence: 0.826
+[FACE ACCEPT] Size 102x147, conf 0.826 - valid face
+[TIMING] yolo_face_model: 13.7ms
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-193.3) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 14.0ms
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-193.5) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 11.2ms
+[YOLO FACE] Detected face with confidence: 0.827
+[FACE ACCEPT] Size 105x149, conf 0.827 - valid face
+[TIMING] yolo_face_model: 11.6ms
+[YOLO FACE] Detected face with confidence: 0.313
+[FACE REJECT] Confidence 0.313 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-193.5) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 15.8ms
+[TIMING] yolo_face_model: 11.8ms
+[YOLO FACE] Detected face with confidence: 0.830
+[FACE ACCEPT] Size 107x152, conf 0.830 - valid face
+[TIMING] yolo_face_model: 11.0ms
+[YOLO FACE] Detected face with confidence: 0.694
+[FACE REJECT] Confidence 0.694 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-193.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 15.1ms
+[YOLO FACE] Detected face with confidence: 0.558
+[FACE REJECT] Confidence 0.558 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-193.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 16.7ms
+[YOLO FACE] Detected face with confidence: 0.835
+[FACE ACCEPT] Size 110x155, conf 0.835 - valid face
+[TIMING] yolo_face_model: 17.4ms
+[YOLO FACE] Detected face with confidence: 0.570
+[FACE REJECT] Confidence 0.570 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-193.8) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 16.9ms
+[TIMING] yolo_face_model: 19.3ms
+[YOLO FACE] Detected face with confidence: 0.844
+[FACE ACCEPT] Size 108x157, conf 0.844 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.0) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 19.7ms
+[YOLO FACE] Detected face with confidence: 0.519
+[FACE REJECT] Confidence 0.519 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.2) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 16.8ms
+[TIMING] yolo_face_model: 18.3ms
+[YOLO FACE] Detected face with confidence: 0.825
+[FACE ACCEPT] Size 108x152, conf 0.825 - valid face
+[TIMING] yolo_face_model: 13.6ms
+[YOLO FACE] Detected face with confidence: 0.400
+[FACE REJECT] Confidence 0.400 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.2) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 13.1ms
+[TIMING] yolo_face_model: 17.8ms
+[YOLO FACE] Detected face with confidence: 0.830
+[FACE ACCEPT] Size 110x149, conf 0.830 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.3) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 22.3ms
+[TIMING] yolo_face_model: 14.9ms
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.4) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 22.2ms
+[YOLO FACE] Detected face with confidence: 0.843
+[FACE ACCEPT] Size 109x153, conf 0.843 - valid face
+[TIMING] yolo_face_model: 27.6ms
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.5) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 40.8ms
+[YOLO FACE] Detected face with confidence: 0.357
+[FACE REJECT] Confidence 0.357 < 0.75 minimum
+[TIMING] yolo_face_model: 33.7ms
+[YOLO FACE] Detected face with confidence: 0.818
+[FACE ACCEPT] Size 106x154, conf 0.818 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.5) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 15.9ms
+[YOLO FACE] Detected face with confidence: 0.296
+[FACE REJECT] Size 74x74 < 70x90 minimum
+[TIMING] yolo_face_model: 13.9ms
+[YOLO FACE] Detected face with confidence: 0.854
+[FACE ACCEPT] Size 103x155, conf 0.854 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 16.5ms
+[YOLO FACE] Detected face with confidence: 0.374
+[FACE REJECT] Size 79x87 < 70x90 minimum
+[TIMING] yolo_face_model: 14.4ms
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 14.5ms
+[TIMING] yolo_face_model: 20.2ms
+[YOLO FACE] Detected face with confidence: 0.828
+[FACE ACCEPT] Size 103x153, conf 0.828 - valid face
+[TIMING] yolo_face_model: 15.9ms
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.5) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 15.1ms
+[TIMING] yolo_face_model: 18.2ms
+[YOLO FACE] Detected face with confidence: 0.827
+[FACE ACCEPT] Size 105x152, conf 0.827 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.5) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 22.0ms
+[YOLO FACE] Detected face with confidence: 0.360
+[FACE REJECT] Size 85x87 < 70x90 minimum
+[TIMING] yolo_face_model: 17.2ms
+[TIMING] yolo_face_model: 13.2ms
+[YOLO FACE] Detected face with confidence: 0.828
+[FACE ACCEPT] Size 106x153, conf 0.828 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.4) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 17.0ms
+[YOLO FACE] Detected face with confidence: 0.375
+[FACE REJECT] Confidence 0.375 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.4) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 11.6ms
+[YOLO FACE] Detected face with confidence: 0.822
+[FACE ACCEPT] Size 103x153, conf 0.822 - valid face
+[TIMING] yolo_face_model: 11.7ms
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.4) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 14.8ms
+[TIMING] yolo_face_model: 17.2ms
+[YOLO FACE] Detected face with confidence: 0.819
+[FACE ACCEPT] Size 106x153, conf 0.819 - valid face
+[TIMING] yolo_face_model: 12.2ms
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.4) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 15.4ms
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 21.4ms
+[YOLO FACE] Detected face with confidence: 0.275
+[FACE REJECT] Confidence 0.275 < 0.75 minimum
+[TIMING] yolo_face_model: 16.1ms
+[YOLO FACE] Detected face with confidence: 0.822
+[FACE ACCEPT] Size 106x152, conf 0.822 - valid face
+[TIMING] yolo_face_model: 18.8ms
+[YOLO FACE] Detected face with confidence: 0.494
+[FACE REJECT] Confidence 0.494 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 17.5ms
+[YOLO FACE] Detected face with confidence: 0.827
+[FACE ACCEPT] Size 103x154, conf 0.827 - valid face
+[TIMING] yolo_face_model: 14.5ms
+[YOLO FACE] Detected face with confidence: 0.562
+[FACE REJECT] Size 79x85 < 70x90 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.5) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 11.9ms
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.5) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 18.7ms
+[YOLO FACE] Detected face with confidence: 0.818
+[FACE ACCEPT] Size 105x155, conf 0.818 - valid face
+[TIMING] yolo_face_model: 12.0ms
+[YOLO FACE] Detected face with confidence: 0.441
+[FACE REJECT] Confidence 0.441 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 19.8ms
+[YOLO FACE] Detected face with confidence: 0.557
+[FACE REJECT] Confidence 0.557 < 0.75 minimum
+[TIMING] yolo_face_model: 13.0ms
+[YOLO FACE] Detected face with confidence: 0.810
+[FACE ACCEPT] Size 107x152, conf 0.810 - valid face
+[TIMING] yolo_face_model: 12.0ms
+[YOLO FACE] Detected face with confidence: 0.491
+[FACE REJECT] Confidence 0.491 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 12.5ms
+[YOLO FACE] Detected face with confidence: 0.403
+[FACE REJECT] Size 80x85 < 70x90 minimum
+[TIMING] yolo_face_model: 19.9ms
+[YOLO FACE] Detected face with confidence: 0.812
+[FACE ACCEPT] Size 105x155, conf 0.812 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 13.4ms
+[YOLO FACE] Detected face with confidence: 0.515
+[FACE REJECT] Confidence 0.515 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.7) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 24.4ms
+[YOLO FACE] Detected face with confidence: 0.297
+[FACE REJECT] Size 81x81 < 70x90 minimum
+[TIMING] yolo_face_model: 27.5ms
+[YOLO FACE] Detected face with confidence: 0.819
+[FACE ACCEPT] Size 104x158, conf 0.819 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.7) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 30.5ms
+[YOLO FACE] Detected face with confidence: 0.313
+[FACE REJECT] Confidence 0.313 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.5) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 38.4ms
+[YOLO FACE] Detected face with confidence: 0.809
+[FACE ACCEPT] Size 104x159, conf 0.809 - valid face
+[TIMING] yolo_face_model: 30.5ms
+[YOLO FACE] Detected face with confidence: 0.364
+[FACE REJECT] Size 81x86 < 70x90 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.4) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 26.9ms
+[YOLO FACE] Detected face with confidence: 0.813
+[FACE ACCEPT] Size 103x160, conf 0.813 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.3) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 11.9ms
+[TIMING] yolo_face_model: 12.9ms
+[YOLO FACE] Detected face with confidence: 0.830
+[FACE ACCEPT] Size 106x154, conf 0.830 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.3) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 24.1ms
+[YOLO FACE] Detected face with confidence: 0.363
+[FACE REJECT] Confidence 0.363 < 0.75 minimum
+[TIMING] yolo_face_model: 19.7ms
+[YOLO FACE] Detected face with confidence: 0.486
+[FACE REJECT] Confidence 0.486 < 0.75 minimum
+[TIMING] yolo_face_model: 17.4ms
+[YOLO FACE] Detected face with confidence: 0.837
+[FACE ACCEPT] Size 107x153, conf 0.837 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.2) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 26.6ms
+[YOLO FACE] Detected face with confidence: 0.296
+[FACE REJECT] Confidence 0.296 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.2) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 14.7ms
+[TIMING] yolo_face_model: 18.2ms
+[YOLO FACE] Detected face with confidence: 0.824
+[FACE ACCEPT] Size 103x148, conf 0.824 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.2) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 12.0ms
+[YOLO FACE] Detected face with confidence: 0.346
+[FACE REJECT] Confidence 0.346 < 0.75 minimum
+[TIMING] yolo_face_model: 19.8ms
+[YOLO FACE] Detected face with confidence: 0.829
+[FACE ACCEPT] Size 104x153, conf 0.829 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.2) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 10.9ms
+[TIMING] yolo_face_model: 12.3ms
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.2) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 13.3ms
+[YOLO FACE] Detected face with confidence: 0.831
+[FACE ACCEPT] Size 106x152, conf 0.831 - valid face
+[TIMING] yolo_face_model: 14.3ms
+[YOLO FACE] Detected face with confidence: 0.300
+[FACE REJECT] Confidence 0.300 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.2) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 17.5ms
+[TIMING] yolo_face_model: 18.1ms
+[YOLO FACE] Detected face with confidence: 0.840
+[FACE ACCEPT] Size 106x154, conf 0.840 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.3) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 18.6ms
+[YOLO FACE] Detected face with confidence: 0.269
+[FACE REJECT] Confidence 0.269 < 0.75 minimum
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.4) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 17.9ms
+[YOLO FACE] Detected face with confidence: 0.845
+[FACE ACCEPT] Size 107x153, conf 0.845 - valid face
+[TIMING] yolo_face_model: 12.2ms
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.4) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 75.5ms
+[YOLO FACE] Detected face with confidence: 0.306
+[FACE REJECT] Confidence 0.306 < 0.75 minimum
+[TIMING] yolo_face_model: 56.7ms
+[YOLO FACE] Detected face with confidence: 0.836
+[FACE ACCEPT] Size 107x155, conf 0.836 - valid face
+[BEV] World bounds: X(-21.1-267.6) Y(31.9-194.6) | Scale: 3.98
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 21.4ms

@@ -1,0 +1,336 @@
+2026-03-15 02:27:45.006518: I tensorflow/core/platform/cpu_feature_guard.cc:210] This TensorFlow binary is optimized to use available CPU instructions in performance-critical operations.
+To enable the following instructions: AVX2 FMA, in other operations, rebuild TensorFlow with the appropriate compiler flags.
+Using cache found in /home/sahas/.cache/torch/hub/pytorch_vision_v0.10.0
+[ WARN:0@10.159] global cap_v4l.cpp:914 open VIDEOIO(V4L2:/dev/video3): can't open camera by index
+2026-03-15 02:27:58.013302: W tensorflow/core/common_runtime/gpu/gpu_bfc_allocator.cc:47] Overriding orig_value setting because the TF_FORCE_GPU_ALLOW_GROWTH environment variable is set. Original config value was 0.
+WARNING: All log messages before absl::InitializeLog() is called are written to STDERR
+I0000 00:00:1773521878.014461  606597 gpu_device.cc:2020] Created device /job:localhost/replica:0/task:0/device:GPU:0 with 1205 MB memory:  -> device: 0, name: NVIDIA GeForce GTX 1650 Ti with Max-Q Design, pci bus id: 0000:01:00.0, compute capability: 7.5
+2026-03-15 02:27:59.458691: I external/local_xla/xla/stream_executor/cuda/cuda_dnn.cc:473] Loaded cuDNN version 91002
+2026-03-15 02:28:00.270335: W external/local_xla/xla/tsl/framework/bfc_allocator.cc:310] Allocator (GPU_0_bfc) ran out of memory trying to allocate 1.08GiB with freed_by_count=0. The caller indicates that this is not a failure, but this may mean that there could be performance gains if more memory were available.
+2026-03-15 02:28:00.331646: W external/local_xla/xla/tsl/framework/bfc_allocator.cc:310] Allocator (GPU_0_bfc) ran out of memory trying to allocate 1.08GiB with freed_by_count=0. The caller indicates that this is not a failure, but this may mean that there could be performance gains if more memory were available.
+Using cache found in /home/sahas/.cache/torch/hub/pytorch_vision_v0.10.0
+Using cache found in /home/sahas/.cache/torch/hub/pytorch_vision_v0.10.0
+[SETTINGS] Loaded settings from settings.json
+[GLOBAL TRACKER] Initialized with threshold=0.5, weights: reid=0.7, spatial=0.3, pixels_per_meter=30.0
+Clearing all items...
+[MAIN] Map scale set to 30.0 pixels/meter
+[GLOBAL TRACKER] Registered camera 'Cheap' at pos=(243.5, 56.0), rot=91.46103979926235°, fov=46°, range=400.0
+[MAIN] Registered camera 'Cheap' with global tracker
+Initializing AI System for CameraCheap...
+[INFO] Initializing Detection System...
+AI System for Cheap started.
+[Cheap] Worker thread: Trying to connect...
+[SETTINGS] Loaded settings from settings.json
+[GLOBAL TRACKER] Registered camera 'HD' at pos=(3.0, 157.5), rot=1.8633368513326616°, fov=42°, range=400.0
+[MAIN] Registered camera 'HD' with global tracker
+Initializing AI System for CameraHD...
+[HD] Worker thread: Trying to connect...
+[INFO] Initializing Detection System...
+AI System for HD started.
+Layout loaded successfully.
+Building embedding cache (averaging all images per user)...
+Cached User_1 (averaged 9 images)
+Cached User_2 (averaged 3 images)
+[INFO] Models loaded.
+[INFO] Models loaded.
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[INFO] System initialized successfully.
+[INFO] Starting all threads...
+[THREAD] Camera thread started
+[THREAD] Processing thread started
+[THREAD] Recognition Worker started
+[THREAD] Display thread started
+[THREAD] DB Update Worker started
+[THREAD] Watchdog thread started
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[INFO] System initialized successfully.
+[INFO] Starting all threads...
+[THREAD] Camera thread started
+[THREAD] Processing thread started
+[THREAD] Recognition Worker started
+[THREAD] Display thread started
+[THREAD] DB Update Worker started
+[THREAD] Watchdog thread started
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+deepsort track for user in HD is not yet confirmed
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+deepsort track for user in HD is not yet confirmed
+[BEV] DEBUG: Scene rect: (-810.0, -1297.5, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 0
+deepsort track for user in Cheap is not yet confirmed
+[GLOBAL TRACKER] === create_or_update called: camera='HD', local_id=1, has_features=True ===
+[MATCH DEBUG] === Searching for match from camera='HD', exclude='HD' ===
+[MATCH DEBUG] Total global persons: 0, threshold: 0.5
+[MATCH DEBUG] Best match: G:None, distance=inf, threshold=0.5
+[MATCH DEBUG] ✗ NO MATCH (best distance inf >= threshold 0.5)
+[GLOBAL TRACKER] ✗ Created NEW person G:1 in 'HD' (no match found)
+[FLOOR MAP] Created dot for person 1 at (45.0, 159.3)
+[BEV] DEBUG: Scene rect: (-810.0, -1270.8859946746848, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+deepsort track for user in Cheap is not yet confirmed
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[TIMING] yolo_face_model: 90.5ms
+[YOLO FACE] Detected face with confidence: 0.839
+[FACE ACCEPT] Size 104x156, conf 0.839 - valid face
+[GLOBAL TRACKER] === create_or_update called: camera='Cheap', local_id=1, has_features=True ===
+[MATCH DEBUG] === Searching for match from camera='Cheap', exclude='Cheap' ===
+[MATCH DEBUG] Total global persons: 1, threshold: 0.5
+[MATCH DEBUG] G:1 ('Unknown'): reid=0.189, spatial=0.614, combined=0.317, cameras=['HD']
+[MATCH DEBUG] Best match: G:1, distance=0.317, threshold=0.5
+[MATCH DEBUG] ✓ MATCHED to G:1
+[GLOBAL TRACKER] ✓ Updated person G:1 in 'Cheap' (was in cameras: ['HD'])
+[BEV] DEBUG: Scene rect: (-810.0, -1270.8859946746848, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[QUEUE] Created Face 3 and added to identified_faces
+[QUEUE] Pushed Face 3 for recognition
+[DEBUG] Saved face 3 to debug_face_temp.jpg (shape=(156, 104, 3))
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[BEV] DEBUG: Scene rect: (-810.0, -1204.3738296582537, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[RECOG] Face 3 matched: name='User_1', conf=0.374
+[TIMING] yolo_face_model: 18.3ms
+[YOLO FACE] Detected face with confidence: 0.853
+[FACE ACCEPT] Size 104x152, conf 0.853 - valid face
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[TIMING] yolo_face_model: 187.0ms
+[YOLO FACE] Detected face with confidence: 0.277
+[FACE REJECT] Confidence 0.277 < 0.75 minimum
+[BEV] DEBUG: Scene rect: (-810.0, -1204.3738296582537, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[KNOWN MATCH] Face 3: verified=User_1, locked=None, person_id=1
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[TIMING] yolo_face_model: 17.8ms
+[YOLO FACE] Detected face with confidence: 0.423
+[FACE REJECT] Confidence 0.423 < 0.75 minimum
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[TIMING] yolo_face_model: 21.4ms
+[YOLO FACE] Detected face with confidence: 0.513
+[FACE REJECT] Confidence 0.513 < 0.75 minimum
+[TIMING] yolo_face_model: 14.7ms
+[YOLO FACE] Detected face with confidence: 0.857
+[FACE ACCEPT] Size 105x151, conf 0.857 - valid face
+[QUEUE] Re-queued unlocked Face 3 for recognition
+[DEBUG] Saved face 3 to debug_face_temp.jpg (shape=(151, 105, 3))
+[BEV] DEBUG: Scene rect: (-810.0, -1179.4186980710747, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[RECOG] Face 3 matched: name='User_1', conf=0.353
+[BEV] DEBUG: Scene rect: (-810.0, -1179.4186980710747, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 15.7ms
+[YOLO FACE] Detected face with confidence: 0.393
+[FACE REJECT] Confidence 0.393 < 0.75 minimum
+[TIMING] yolo_face_model: 11.9ms
+[YOLO FACE] Detected face with confidence: 0.346
+[FACE REJECT] Confidence 0.346 < 0.75 minimum
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[TIMING] yolo_face_model: 17.5ms
+[YOLO FACE] Detected face with confidence: 0.850
+[FACE ACCEPT] Size 105x154, conf 0.850 - valid face
+[TIMING] yolo_face_model: 10.6ms
+[YOLO FACE] Detected face with confidence: 0.384
+[FACE REJECT] Confidence 0.384 < 0.75 minimum
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[BEV] DEBUG: Scene rect: (-810.0, -1170.021953566975, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[KNOWN MATCH] Face 3: verified=User_1, locked=None, person_id=1
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[TIMING] yolo_face_model: 13.4ms
+[YOLO FACE] Detected face with confidence: 0.274
+[FACE REJECT] Confidence 0.274 < 0.75 minimum
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[TIMING] yolo_face_model: 16.3ms
+[YOLO FACE] Detected face with confidence: 0.849
+[FACE ACCEPT] Size 104x154, conf 0.849 - valid face
+[QUEUE] Re-queued unlocked Face 3 for recognition
+[DEBUG] Saved face 3 to debug_face_temp.jpg (shape=(154, 104, 3))
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[BEV] DEBUG: Scene rect: (-810.0, -1165.0922995279236, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[TIMING] yolo_face_model: 60.4ms
+[YOLO FACE] Detected face with confidence: 0.471
+[FACE REJECT] Confidence 0.471 < 0.75 minimum
+[BEV] DEBUG: Scene rect: (-810.0, -1165.0922995279236, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[RECOG] Face 3 matched: name='User_1', conf=0.358
+[TIMING] yolo_face_model: 12.0ms
+[YOLO FACE] Detected face with confidence: 0.456
+[FACE REJECT] Confidence 0.456 < 0.75 minimum
+[DISPLAY] Person L:1 G:1 consolidated='Unknown', falling back to local
+[TIMING] yolo_face_model: 15.0ms
+[YOLO FACE] Detected face with confidence: 0.851
+[FACE ACCEPT] Size 106x152, conf 0.851 - valid face
+[TIMING] yolo_face_model: 10.6ms
+[YOLO FACE] Detected face with confidence: 0.374
+[FACE REJECT] Confidence 0.374 < 0.75 minimum
+[IDENTITY] Locked User_1 (avg_conf=0.36)
+[KNOWN MATCH] Face 3: verified=User_1, locked=User_1, person_id=1
+[CONSOLIDATE CALL] global_id=1, user=User_1, conf=0.362
+[ID REPORT] Global 1: Received 'User_1' (conf=0.362), current='Unknown' (best=1.000)
+[ID SET] Global 1: Set to 'User_1' (0.362)
+[CACHE] Updated User_1 min_quality=376.0
+[BEV] DEBUG: Scene rect: (-810.0, -1163.1204379123033, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 15.5ms
+[YOLO FACE] Detected face with confidence: 0.275
+[FACE REJECT] Confidence 0.275 < 0.75 minimum
+[TIMING] yolo_face_model: 12.2ms
+[YOLO FACE] Detected face with confidence: 0.849
+[FACE ACCEPT] Size 105x153, conf 0.849 - valid face
+[BEV] DEBUG: Scene rect: (-810.0, -1162.3583573793144, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 9.5ms
+[TIMING] yolo_face_model: 10.0ms
+[YOLO FACE] Detected face with confidence: 0.368
+[FACE REJECT] Confidence 0.368 < 0.75 minimum
+[TIMING] yolo_face_model: 10.2ms
+[YOLO FACE] Detected face with confidence: 0.855
+[FACE ACCEPT] Size 104x152, conf 0.855 - valid face
+[BEV] DEBUG: Scene rect: (-810.0, -1162.0535251661186, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 10.4ms
+[BEV] DEBUG: Scene rect: (-810.0, -1162.0535251661186, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 13.2ms
+[YOLO FACE] Detected face with confidence: 0.633
+[FACE REJECT] Confidence 0.633 < 0.75 minimum
+[TIMING] yolo_face_model: 16.5ms
+[YOLO FACE] Detected face with confidence: 0.862
+[FACE ACCEPT] Size 105x150, conf 0.862 - valid face
+[TIMING] yolo_face_model: 11.9ms
+[YOLO FACE] Detected face with confidence: 0.556
+[FACE REJECT] Confidence 0.556 < 0.75 minimum
+[BEV] DEBUG: Scene rect: (-810.0, -1163.5826256321748, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 14.4ms
+[YOLO FACE] Detected face with confidence: 0.355
+[FACE REJECT] Confidence 0.355 < 0.75 minimum
+[TIMING] yolo_face_model: 19.0ms
+[YOLO FACE] Detected face with confidence: 0.853
+[FACE ACCEPT] Size 105x155, conf 0.853 - valid face
+[BEV] DEBUG: Scene rect: (-810.0, -1163.6612510918771, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1
+[TIMING] yolo_face_model: 12.6ms
+[TIMING] yolo_face_model: 14.4ms
+[BEV] DEBUG: Scene rect: (-810.0, -1163.1336666445236, 9015.0, 9000)
+[BEV] cameras: ['Cheap', 'HD'] | persons: 1

@@ -660,13 +660,11 @@ class DetectionSystem:
                 _face_start = _time.perf_counter()
                 results = self.yolo_face_model(person_crop, verbose=False)
                 _face_elapsed = (_time.perf_counter() - _face_start) * 1000
-                print(f"[TIMING] yolo_face_model: {_face_elapsed:.1f}ms")
 
                 for r in results:
                     for box in r.boxes:
-                        # DEBUG: Log YOLO face detection confidence
+                        # Face detection confidence
                         yolo_conf = float(box.conf[0]) if box.conf is not None else 0.0
-                        print(f"[YOLO FACE] Detected face with confidence: {yolo_conf:.3f}")
                         
                         # Coords
                         lx1, ly1, lx2, ly2 = map(int, box.xyxy[0])
@@ -683,15 +681,11 @@ class DetectionSystem:
                         
                         # Check size requirements
                         if gw < min_width or gh < min_height:
-                            print(f"[FACE REJECT] Size {gw}x{gh} < {min_width}x{min_height} minimum")
                             continue
                         
                         # Check confidence requirement
                         if yolo_conf < min_conf:
-                            print(f"[FACE REJECT] Confidence {yolo_conf:.3f} < {min_conf:.2f} minimum")
                             continue
-                        
-                        print(f"[FACE ACCEPT] Size {gw}x{gh}, conf {yolo_conf:.3f} - valid face")
                         
                         new_center = (gx + gw // 2, gy + gh // 2)
 
