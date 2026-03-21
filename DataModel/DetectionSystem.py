@@ -856,23 +856,36 @@ class DetectionSystem:
                         person_obj = self.tracked_persons[tid] 
                         person_obj.update_position(l, t, w, h, 0.9)
                         
+                        # Fix missing global ID: retry feature extraction if missing
+                        if person_obj.feature_vector is None:
+                            crop = frame[t:t + h, l:l + w]
+                            if crop.size > 0:
+                                person_obj.feature_vector = self.extract_person_features(crop)
+                                
+                        if not hasattr(person_obj, '_no_feature_frames'):
+                            person_obj._no_feature_frames = 0
+                        
                         # Update global tracker if we have features but no global ID yet
-                        if self.global_tracker and person_obj.feature_vector is not None and person_obj.global_id is None:
-                            global_id = self.global_tracker.create_or_update(
-                                camera_name=self.camera_name,
-                                local_id=tid,
-                                feature_vector=person_obj.feature_vector,
-                                bbox=(l, t, w, h),
-                                frame_shape=(frame.shape[1], frame.shape[0])
-                            )
-                            person_obj.global_id = global_id
-                            
-                            # Check if this global person already has a known identity
-                            existing_name, existing_conf = self.global_tracker.get_person_identity(global_id)
-                            if existing_name not in ("Unknown", "Scanning..."):
-                                person_obj.inherited_identity = existing_name
-                                person_obj.inherited_confidence = existing_conf
-                                print(f"[INHERIT] Person L:{tid} inherited '{existing_name}' (conf={existing_conf:.3f}) from global G:{global_id}")
+                        if self.global_tracker and person_obj.global_id is None:
+                            # If we have features, OR if we've waited 15 frames without features
+                            if person_obj.feature_vector is not None or person_obj._no_feature_frames > 15:
+                                global_id = self.global_tracker.create_or_update(
+                                    camera_name=self.camera_name,
+                                    local_id=tid,
+                                    feature_vector=person_obj.feature_vector,
+                                    bbox=(l, t, w, h),
+                                    frame_shape=(frame.shape[1], frame.shape[0])
+                                )
+                                person_obj.global_id = global_id
+                                
+                                # Check if this global person already has a known identity
+                                existing_name, existing_conf = self.global_tracker.get_person_identity(global_id)
+                                if existing_name not in ("Unknown", "Scanning..."):
+                                    person_obj.inherited_identity = existing_name
+                                    person_obj.inherited_confidence = existing_conf
+                                    print(f"[INHERIT] Person L:{tid} inherited '{existing_name}' (conf={existing_conf:.3f}) from global G:{global_id}")
+                            else:
+                                person_obj._no_feature_frames += 1
                         
                         # --- POSITION UPDATE + FEATURE REFRESH for already-tracked persons ---
                         elif self.global_tracker and person_obj.global_id is not None:
@@ -900,12 +913,14 @@ class DetectionSystem:
                             )
                     else:
                         person_obj = Person(tid, l, t, w, h, 0.9)
+                        person_obj._no_feature_frames = 0
                         # Extract features once
                         crop = frame[t:t + h, l:l + w]
                         person_obj.feature_vector = self.extract_person_features(crop)
                         self.tracked_persons[tid] = person_obj
                         
                         # Register with global tracker
+
                         if self.global_tracker and person_obj.feature_vector is not None:
                             global_id = self.global_tracker.create_or_update(
                                 camera_name=self.camera_name,

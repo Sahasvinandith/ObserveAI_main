@@ -702,7 +702,7 @@ class GlobalPersonTracker:
             if exclude_camera and global_person.is_in_camera(exclude_camera):
                 track = global_person.camera_tracks[exclude_camera]
                 track_age = time.time() - track.last_seen
-                stale_threshold = 3.0  # seconds - if track older than this, person has left
+                stale_threshold = 1.0  # seconds - if track older than this, person has left
                 if track_age < stale_threshold:
                     print(f"[MATCH DEBUG] G:{gid} ('{identity}') SKIP - actively tracked in '{exclude_camera}' "
                           f"(track age={track_age:.1f}s < {stale_threshold}s). cameras={cameras_in}")
@@ -731,23 +731,26 @@ class GlobalPersonTracker:
             combined_distance = (self.reid_weight * reid_distance + 
                                 self.spatial_weight * spatial_distance)
             
-            print(f"[MATCH DEBUG] G:{gid} ('{identity}'): reid={reid_distance:.3f}, "
-                  f"spatial={spatial_distance:.3f}, combined={combined_distance:.3f}, "
-                  f"cameras={cameras_in}")
-            
+            print(f"\n[DEBUG DETAILED LOG] --- MATCHING CHECK ---")
+            print(f"[DEBUG] Inspecting detected person in camera '{current_camera}' vs existing Global Person G:{gid} ('{identity}')")
+            print(f"[DEBUG] Re-ID Matching Score      : {reid_distance:.4f} (Weight: {self.reid_weight})")
+            print(f"[DEBUG] Spatial Matching Score    : {spatial_distance:.4f} (Weight: {self.spatial_weight})")
+            print(f"[DEBUG] Final Matching Value      : {combined_distance:.4f} (Threshold: {self.feature_threshold})")
+            print(f"[DEBUG] -----------------------------------\n")
+
             # Track best match
             if combined_distance < best_combined_distance:
                 best_combined_distance = combined_distance
                 best_match_id = global_person.global_id
         
-        print(f"[MATCH DEBUG] Best match: G:{best_match_id}, distance={best_combined_distance:.3f}, threshold={self.feature_threshold}")
+        print(f"[MATCH DEBUG] Best match evaluated: G:{best_match_id}, final matching value={best_combined_distance:.3f}, threshold={self.feature_threshold}")
         
         # Return match if below threshold
         if best_combined_distance < self.feature_threshold:
-            print(f"[MATCH DEBUG] ✓ MATCHED to G:{best_match_id}")
+            print(f"[MATCH DEBUG] ✓ MATCHED to G:{best_match_id} (Final matching value {best_combined_distance:.3f} is below threshold {self.feature_threshold})")
             return best_match_id
         
-        print(f"[MATCH DEBUG] ✗ NO MATCH (best distance {best_combined_distance:.3f} >= threshold {self.feature_threshold})")
+        print(f"[MATCH DEBUG] ✗ NO MATCH (Best final matching value {best_combined_distance:.3f} is >= threshold {self.feature_threshold})")
         return None
     
     def update_person_position(self, global_id: int, camera_name: str,
