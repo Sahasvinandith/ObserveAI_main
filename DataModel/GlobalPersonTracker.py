@@ -594,54 +594,39 @@ class GlobalPersonTracker:
         """
         Calculate spatial distance score between two observations.
         
-        Combines:
-        1. Angular alignment: Are they looking at the same direction?
-        2. Camera proximity: How close are the cameras?
+        Projects both bounding boxes onto the 2D floor map and calculates
+        the absolute Euclidean distance between them. Divergent cameras
+        or vastly separated individuals will result in high penalties.
         
         Returns:
-            Distance score (0 = very likely same person, 1 = unlikely)
+            Distance score (0 = highly confident same location, 1 = physically impossible)
         """
         # If either camera not registered, return neutral score
         if camera1 not in self.cameras or camera2 not in self.cameras:
             return 0.5  # Neutral - don't affect matching
+            
+        # Estimate the (x, y) 2D floor coordinates for both targets
+        pos1 = self._estimate_person_position(camera1, bbox1)
+        pos2 = self._estimate_person_position(camera2, bbox2)
         
-        # Get world angles
-        angle1 = self._bbox_to_world_angle(camera1, bbox1)
-        angle2 = self._bbox_to_world_angle(camera2, bbox2)
+        if pos1 is None or pos2 is None:
+            return 0.5  # Neutral - mapping failed for some reason
+            
+        # Compute exact Euclidean distance between subjects on the map
+        map_distance = math.hypot(pos1[0] - pos2[0], pos1[1] - pos2[1])
         
-        if angle1 is None or angle2 is None:
-            return 0.5
+        # Determine maximum tolerable map distance
+        # e.g., 10 meters distance = 1.0 (maximum penalty)
+        pixels_per_meter = getattr(self, 'pixels_per_meter', 30.0)
+        max_valid_distance = 1.0 * pixels_per_meter
         
-        # Angular distance (0-180 degrees)
-        angle_diff = abs(angle1 - angle2)
-        if angle_diff > 180:
-            angle_diff = 360 - angle_diff
+        # Normalize distance to 0.0 - 1.0 score
+        spatial_score = min(1.0, map_distance / max_valid_distance)
         
-        # Normalize angular distance to 0-1
-        # 0 degrees difference = 0 (same direction)
-        # 180 degrees difference = 1 (opposite directions)
-        angular_score = angle_diff / 180.0
+        # Add slight exponential curve to penalize farther distances more aggressively
+        spatial_score = spatial_score ** 0.8
         
-        # Camera physical distance
-        cam1 = self.cameras[camera1]
-        cam2 = self.cameras[camera2]
-        cam_distance = math.sqrt(
-            (cam1.position[0] - cam2.position[0])**2 + 
-            (cam1.position[1] - cam2.position[1])**2
-        )
-        
-        # Normalize camera distance using the cameras' view ranges
-        # Closer cameras relative to their range = more likely same person
-        max_relevant_distance = max(cam1.view_range, cam2.view_range)
-        cam_score = min(cam_distance / max_relevant_distance, 1.0)
-        
-        # Penalize distant cameras more heavily (squaring makes closer scores better, distant worse)
-        cam_score = cam_score ** 0.8  
-        
-        # Combine scores: weight angular alignment vs physical distance
-        combined = 0.6 * angular_score + 0.4 * cam_score
-        
-        return combined
+        return spatial_score
     
     def _cosine_distance(self, vec1: np.ndarray, vec2: np.ndarray) -> float:
         """
