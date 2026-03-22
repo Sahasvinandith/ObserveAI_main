@@ -698,21 +698,53 @@ class GlobalPersonTracker:
                 continue
             
             # Skip if person is ACTIVELY tracked in the excluded camera
-            # BUT: if the track is stale (person left), still consider matching!
+            # BUT: if the track is stale (person left), OR if it's a DeepSORT fragment
+            # in the same spatial position, still consider matching!
             if exclude_camera and global_person.is_in_camera(exclude_camera):
                 track = global_person.camera_tracks[exclude_camera]
                 track_age = time.time() - track.last_seen
                 stale_threshold = 1.0  # seconds - if track older than this, person has left
+                
                 if track_age < stale_threshold:
-                    print(f"[MATCH DEBUG] G:{gid} ('{identity}') SKIP - actively tracked in '{exclude_camera}' "
-                          f"(track age={track_age:.1f}s < {stale_threshold}s). cameras={cameras_in}")
-                    continue
+                    allowed_fragment = False
+                    # Check spatial overlap to detect same-camera fragmented tracking
+                    if current_bbox is not None and track.bbox is not None:
+                        # Compare bounding box centers
+                        cx1 = current_bbox[0] + current_bbox[2] / 2
+                        cy1 = current_bbox[1] + current_bbox[3] / 2
+                        cx2 = track.bbox[0] + track.bbox[2] / 2
+                        cy2 = track.bbox[1] + track.bbox[3] / 2
+                        
+                        pixel_dist = math.hypot(cx1 - cx2, cy1 - cy2)
+                        # Require centers to be highly overlapping (e.g. less than 1.5x width/height)
+                        max_allowed_dist = max(current_bbox[2], current_bbox[3]) * 1.25
+                        
+                        if pixel_dist < max_allowed_dist:
+                            print(f"[MATCH DEBUG] G:{gid} ('{identity}') SAME-CAMERA FRAGMENT DETECTED in '{exclude_camera}'! "
+                                  f"(dist={pixel_dist:.1f}px < {max_allowed_dist:.1f}px). Circumventing camera exclusion rule.")
+                            allowed_fragment = True
+
+                    if not allowed_fragment:
+                        print(f"[MATCH DEBUG] G:{gid} ('{identity}') SKIP - distinct person actively tracked in '{exclude_camera}' "
+                              f"(track age={track_age:.1f}s < {stale_threshold}s). cameras={cameras_in}")
+                        continue
                 else:
                     print(f"[MATCH DEBUG] G:{gid} ('{identity}') STALE track in '{exclude_camera}' "
                           f"(track age={track_age:.1f}s >= {stale_threshold}s) - considering for re-match. cameras={cameras_in}")
             
-            # Calculate Re-ID distance (normalized to ~0-1 range)
-            reid_distance = self._cosine_distance(feature_vector, global_person.feature_vector)
+            # Calculate Re-ID distance using a multi-view matching approach
+            reid_distance = float('inf')
+            
+            # 1. Evaluate against the overarching global feature vector
+            if global_person.feature_vector is not None:
+                reid_distance = self._cosine_distance(feature_vector, global_person.feature_vector)
+                
+            # 2. Evaluate against every single camera's specific view (LocalTracks)
+            for track in global_person.camera_tracks.values():
+                if track.feature_vector is not None:
+                    track_dist = self._cosine_distance(feature_vector, track.feature_vector)
+                    if track_dist < reid_distance:
+                        reid_distance = track_dist
             
             # Calculate Spatial distance (0-1 range)
             spatial_distance = 0.5  # Default neutral if no spatial data

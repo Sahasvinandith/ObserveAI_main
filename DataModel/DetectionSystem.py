@@ -878,6 +878,12 @@ class DetectionSystem:
                                 )
                                 person_obj.global_id = global_id
                                 
+                                # Hide obsolete same-camera fragments that merged into this ID
+                                for other_tid, other_person in self.tracked_persons.items():
+                                    if other_tid != tid and other_person.global_id == global_id:
+                                        print(f"[CLEANUP] Track L:{tid} merged with Global G:{global_id}. Marking ghost track L:{other_tid} obsolete.")
+                                        other_person.is_obsolete = True
+                                        
                                 # Check if this global person already has a known identity
                                 existing_name, existing_conf = self.global_tracker.get_person_identity(global_id)
                                 if existing_name not in ("Unknown", "Scanning..."):
@@ -994,6 +1000,10 @@ class DetectionSystem:
             # 3. Drawing Loop
             current_time = time.time()
             for person_obj in display_persons:
+                # Skip drawing if marked obsolete (e.g. tracking fragment merged into new track)
+                if getattr(person_obj, 'is_obsolete', False):
+                    continue
+                    
                 # Skip drawing if person hasn't been seen recently
                 if current_time - person_obj.last_seen > 1.0:
                     continue
