@@ -164,6 +164,12 @@ class EmbeddingCache:
             except Exception as e:
                 print(f"[CACHE] Error processing {img_file}: {e}")
                 continue
+            
+            # CRITICAL: Force Python to yield the Global Interpreter Lock (GIL)
+            # This allows the camera/yolo processing threads to continually ingest 
+            # and draw frames seamlessly while embeddings quietly chug in the background.
+            import time
+            time.sleep(0.01)
         
         if embeddings_list:
             avg_embedding = np.mean(embeddings_list, axis=0)
