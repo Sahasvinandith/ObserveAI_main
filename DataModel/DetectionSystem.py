@@ -47,6 +47,7 @@ class Person:
         self.faces = {}  
         self.last_seen = time.time()
         self.feature_vector = None
+        self.color_hist = None
         self.global_id = None  # Global ID from GlobalPersonTracker
         # Cross-camera identity inheritance
         self.inherited_identity = None      # Identity inherited from global tracker (e.g., "User_1")
@@ -71,11 +72,7 @@ class Person:
             if consolidated and consolidated not in ("Unknown", "Scanning..."):
                 # DEBUG: Log when consolidated name is used
                 return consolidated
-            else:
-                print(f"[DISPLAY] Person L:{self.person_id} G:{self.global_id} consolidated='{consolidated}', falling back to local")
-        else:
-            print(f"[DISPLAY] Person L:{self.person_id} no global_tracker={global_tracker is not None} global_id={self.global_id}")
-        
+            
         if not self.faces:
             return "Unknown"
         # Prioritize faces that are NOT scanning and NOT unknown if possible
@@ -856,11 +853,11 @@ class DetectionSystem:
                         person_obj = self.tracked_persons[tid] 
                         person_obj.update_position(l, t, w, h, 0.9)
                         
-                        # Fix missing global ID: retry feature extraction if missing
                         if person_obj.feature_vector is None:
                             crop = frame[t:t + h, l:l + w]
                             if crop.size > 0:
                                 person_obj.feature_vector = self.extract_person_features(crop)
+                                person_obj.color_hist = self.extract_color_features(crop)
                                 
                         if not hasattr(person_obj, '_no_feature_frames'):
                             person_obj._no_feature_frames = 0
@@ -873,6 +870,7 @@ class DetectionSystem:
                                     camera_name=self.camera_name,
                                     local_id=tid,
                                     feature_vector=person_obj.feature_vector,
+                                    color_hist=person_obj.color_hist,
                                     bbox=(l, t, w, h),
                                     frame_shape=(frame.shape[1], frame.shape[0])
                                 )
@@ -902,20 +900,25 @@ class DetectionSystem:
                             
                             # Every 30 frames: re-extract Re-ID features (heavier)
                             refreshed_features = None
+                            refreshed_color = None
                             if person_obj._feature_refresh_counter >= 30:
                                 person_obj._feature_refresh_counter = 0
                                 crop = frame[t:t + h, l:l + w]
                                 if crop.size > 0:
                                     refreshed_features = self.extract_person_features(crop)
+                                    refreshed_color = self.extract_color_features(crop)
                                     if refreshed_features is not None:
                                         person_obj.feature_vector = refreshed_features
+                                    if refreshed_color is not None:
+                                        person_obj.color_hist = refreshed_color
                             
                             # Every frame: update position on map (lightweight)
                             self.global_tracker.update_person_position(
                                 person_obj.global_id,
                                 self.camera_name,
                                 bbox=(l, t, w, h),
-                                feature_vector=refreshed_features
+                                feature_vector=refreshed_features,
+                                color_hist=refreshed_color
                             )
                     else:
                         person_obj = Person(tid, l, t, w, h, 0.9)
@@ -923,6 +926,7 @@ class DetectionSystem:
                         # Extract features once
                         crop = frame[t:t + h, l:l + w]
                         person_obj.feature_vector = self.extract_person_features(crop)
+                        person_obj.color_hist = self.extract_color_features(crop)
                         self.tracked_persons[tid] = person_obj
                         
                         # Register with global tracker
@@ -932,6 +936,7 @@ class DetectionSystem:
                                 camera_name=self.camera_name,
                                 local_id=tid,
                                 feature_vector=person_obj.feature_vector,
+                                color_hist=person_obj.color_hist,
                                 bbox=(l, t, w, h),
                                 frame_shape=(frame.shape[1], frame.shape[0])
                             )
@@ -1057,6 +1062,25 @@ class DetectionSystem:
             return features.squeeze().cpu().numpy()
         except Exception as e:
             print(f"Error extracting person features: {e}")
+            return None
+
+    def extract_color_features(self, person_crop):
+        """Extract HSV color histogram from the upper half (torso) of the person crop"""
+        try:
+            h, w = person_crop.shape[:2]
+            if h <= 2 or w <= 2:
+                return None
+            # Use upper half to avoid pants/legs which might be occluded by desks
+            torso_crop = person_crop[0:h//2, :]
+            hsv_crop = cv2.cvtColor(torso_crop, cv2.COLOR_BGR2HSV)
+            
+            # Compute 2D histogram (Hue and Saturation)
+            # Hue: 0-180, Saturation: 0-256
+            hist = cv2.calcHist([hsv_crop], [0, 1], None, [16, 16], [0, 180, 0, 256])
+            cv2.normalize(hist, hist, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
+            return hist.flatten()
+        except Exception as e:
+            print(f"Error extracting color histogram: {e}")
             return None
 
     def watchdog_thread_function(self):

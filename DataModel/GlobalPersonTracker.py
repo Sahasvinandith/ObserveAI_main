@@ -37,14 +37,18 @@ class LocalTrack:
     camera_name: str
     local_person_id: int  # DeepSORT track ID in this camera
     feature_vector: Optional[np.ndarray] = None
+    color_hist: Optional[np.ndarray] = None
     last_seen: float = field(default_factory=time.time)
     bbox: Optional[Tuple[int, int, int, int]] = None  # (x, y, w, h)
     
     def update(self, feature_vector: Optional[np.ndarray] = None, 
+               color_hist: Optional[np.ndarray] = None,
                bbox: Optional[Tuple[int, int, int, int]] = None):
         """Update track information"""
         if feature_vector is not None:
             self.feature_vector = feature_vector
+        if color_hist is not None:
+            self.color_hist = color_hist
         if bbox is not None:
             self.bbox = bbox
         self.last_seen = time.time()
@@ -55,6 +59,7 @@ class GlobalPerson:
     """Represents a person tracked across multiple cameras"""
     global_id: int
     feature_vector: Optional[np.ndarray] = None  # Most recent/best features
+    color_hist: Optional[np.ndarray] = None
     camera_tracks: Dict[str, LocalTrack] = field(default_factory=dict)
     
     # Face recognition results (legacy fields kept for compatibility)
@@ -142,23 +147,27 @@ class GlobalPerson:
     
     def update_from_camera(self, camera_name: str, local_id: int,
                           feature_vector: Optional[np.ndarray] = None,
+                          color_hist: Optional[np.ndarray] = None,
                           bbox: Optional[Tuple[int, int, int, int]] = None):
         """Update or create a local track for this camera"""
         if camera_name in self.camera_tracks:
             # Update existing track
-            self.camera_tracks[camera_name].update(feature_vector, bbox)
+            self.camera_tracks[camera_name].update(feature_vector, color_hist, bbox)
         else:
             # Create new track
             self.camera_tracks[camera_name] = LocalTrack(
                 camera_name=camera_name,
                 local_person_id=local_id,
                 feature_vector=feature_vector,
+                color_hist=color_hist,
                 bbox=bbox
             )
         
         # Update global features if provided
         if feature_vector is not None:
             self.feature_vector = feature_vector
+        if color_hist is not None:
+            self.color_hist = color_hist
         
         self.last_seen = time.time()
     
@@ -185,9 +194,10 @@ class GlobalPersonTracker:
     - Thread-safe for multi-camera use
     """
     
-    def __init__(self, feature_threshold: float = 0.47, 
-                 reid_weight: float = 0.7, 
-                 spatial_weight: float = 0.5,
+    def __init__(self, feature_threshold: float = 0.4, 
+                 reid_weight: float = 0.5, 
+                 color_weight: float = 0.3,
+                 spatial_weight: float = 0.2,
                  position_callback: Optional[Callable] = None,
                  pixels_per_meter: float = 30.0):
         """
@@ -197,8 +207,9 @@ class GlobalPersonTracker:
             feature_threshold: Maximum combined distance for match (0.0-2.0)
                               Lower = stricter matching
                               Recommended: 0.4-0.6
-            reid_weight: Weight for Re-ID feature matching (default 0.7)
-            spatial_weight: Weight for spatial matching (default 0.3)
+            reid_weight: Weight for Re-ID feature matching (default 0.5)
+            color_weight: Weight for Color Histogram matching (default 0.3)
+            spatial_weight: Weight for spatial matching (default 0.2)
             position_callback: Optional callback(global_id, x, y, camera_name) 
                               for floor map visualization
             pixels_per_meter: Scale factor for the map (how many pixels = 1 meter)
@@ -208,6 +219,7 @@ class GlobalPersonTracker:
         self.next_id: int = 1
         self.feature_threshold: float = feature_threshold
         self.reid_weight: float = reid_weight
+        self.color_weight: float = color_weight
         self.spatial_weight: float = spatial_weight
         self.lock = threading.Lock()
         
@@ -589,38 +601,55 @@ class GlobalPersonTracker:
     
     
     
-    def _spatial_distance(self, camera1: str, bbox1: Tuple[int, int, int, int],
-                          camera2: str, bbox2: Tuple[int, int, int, int]) -> float:
+    def _spatial_distance(self, camera_name: str, bbox: Tuple[int, int, int, int], person: 'GlobalPerson') -> float:
         """
-        Calculate spatial distance score between two observations.
+        Calculate spatial distance score between a new observation and a tracked person.
         
-        Projects both bounding boxes onto the 2D floor map and calculates
-        the absolute Euclidean distance between them. Divergent cameras
-        or vastly separated individuals will result in high penalties.
+        Leverages the person's precise 2D floor `smoothed_position` (triangulated from 
+        multiple cameras) to accurately calculate the physical meter deviation of the 
+        new camera's ray from the person's true location.
         
         Returns:
             Distance score (0 = highly confident same location, 1 = physically impossible)
         """
-        # If either camera not registered, return neutral score
-        if camera1 not in self.cameras or camera2 not in self.cameras:
+        if camera_name not in self.cameras:
             return 0.5  # Neutral - don't affect matching
             
-        # Estimate the (x, y) 2D floor coordinates for both targets
-        pos1 = self._estimate_person_position(camera1, bbox1)
-        pos2 = self._estimate_person_position(camera2, bbox2)
+        map_distance = None
         
-        if pos1 is None or pos2 is None:
-            return 0.5  # Neutral - mapping failed for some reason
+        # 1. Primary Method: Pinpoint Ray Deviation using Stereoscopic Known Position
+        if getattr(person, 'smoothed_position', None) is not None:
+            # Project the new camera's ray until it hits the depth of the known person
+            pos1 = self._estimate_person_position(camera_name, bbox, last_known_pos=person.smoothed_position)
             
-        # Compute exact Euclidean distance between subjects on the map
-        map_distance = math.hypot(pos1[0] - pos2[0], pos1[1] - pos2[1])
+            if pos1 is not None:
+                # The map distance is exactly the chord length (in pixels) between 
+                # where the ray *is pointing* and where the person *actually is*.
+                map_distance = math.hypot(pos1[0] - person.smoothed_position[0], pos1[1] - person.smoothed_position[1])
+                
+        # 2. Fallback Method: Single-Camera Depth Approximation (for brand new targets)
+        if map_distance is None:
+            active_tracks = [t for c, t in person.camera_tracks.items() if c != camera_name and t.bbox is not None]
+            if not active_tracks:
+                return 0.5
+                
+            active_tracks.sort(key=lambda t: t.last_seen, reverse=True)
+            other_track = active_tracks[0]
+            
+            pos1 = self._estimate_person_position(camera_name, bbox)
+            pos2 = self._estimate_person_position(other_track.camera_name, other_track.bbox)
+            
+            if pos1 is None or pos2 is None:
+                return 0.5
+                
+            map_distance = math.hypot(pos1[0] - pos2[0], pos1[1] - pos2[1])
         
         # Determine maximum tolerable map distance
-        # e.g., 10 meters distance = 1.0 (maximum penalty)
         pixels_per_meter = getattr(self, 'pixels_per_meter', 30.0)
-        max_valid_distance = 1.0 * pixels_per_meter
+        # 3.0 meters deviation bubble gracefully accommodates bbox cropping jitter.
+        max_valid_distance = 0.5 * pixels_per_meter
         
-        # Normalize distance to 0.0 - 1.0 score
+        # Normalize distance to 0.0 - 1.0 (Maximum Penalty) score
         spatial_score = min(1.0, map_distance / max_valid_distance)
         
         # Add slight exponential curve to penalize farther distances more aggressively
@@ -628,6 +657,23 @@ class GlobalPersonTracker:
         
         return spatial_score
     
+    def _color_distance(self, hist1: np.ndarray, hist2: np.ndarray) -> float:
+        """
+        Calculate Bhattacharyya distance between two normalized histograms.
+        
+        Returns:
+            Distance in range [0, 1] where 0 = identical, 1 = completely disjoint colors
+        """
+        if hist1 is None or hist2 is None:
+            return 0.5
+        try:
+            import cv2
+            dist = cv2.compareHist(hist1, hist2, cv2.HISTCMP_BHATTACHARYYA)
+            return float(dist)
+        except Exception as e:
+            print(f"[GLOBAL TRACKER] Error calculating color distance: {e}")
+            return 0.5
+
     def _cosine_distance(self, vec1: np.ndarray, vec2: np.ndarray) -> float:
         """
         Calculate cosine distance between two feature vectors.
@@ -652,9 +698,11 @@ class GlobalPersonTracker:
             return 999.0  # Return large distance on error
     
     def _find_match_unsafe(self, feature_vector: np.ndarray, 
+                           color_hist: Optional[np.ndarray] = None,
                            exclude_camera: Optional[str] = None,
                            current_bbox: Optional[Tuple[int, int, int, int]] = None,
-                           current_camera: Optional[str] = None) -> Optional[int]:
+                           current_camera: Optional[str] = None,
+                           current_local_id: Optional[int] = None) -> Optional[int]:
         """
         Find a matching global person using combined Re-ID + Spatial scoring.
         
@@ -702,7 +750,7 @@ class GlobalPersonTracker:
                         
                         pixel_dist = math.hypot(cx1 - cx2, cy1 - cy2)
                         # Require centers to be highly overlapping (e.g. less than 1.5x width/height)
-                        max_allowed_dist = max(current_bbox[2], current_bbox[3]) * 1.25
+                        max_allowed_dist = max(current_bbox[2], current_bbox[3]) * 0.5
                         
                         if pixel_dist < max_allowed_dist:
                             print(f"[MATCH DEBUG] G:{gid} ('{identity}') SAME-CAMERA FRAGMENT DETECTED in '{exclude_camera}'! "
@@ -730,27 +778,39 @@ class GlobalPersonTracker:
                     track_dist = self._cosine_distance(feature_vector, track.feature_vector)
                     if track_dist < reid_distance:
                         reid_distance = track_dist
+
+            # Calculate Color distance
+            color_distance = 0.5
+            if color_hist is not None:
+                color_distance = float('inf')
+                if global_person.color_hist is not None:
+                    color_distance = self._color_distance(color_hist, global_person.color_hist)
+                for track in global_person.camera_tracks.values():
+                    if track.color_hist is not None:
+                        track_col_dist = self._color_distance(color_hist, track.color_hist)
+                        if track_col_dist < color_distance:
+                            color_distance = track_col_dist
+                if color_distance == float('inf'): color_distance = 0.5
             
             # Calculate Spatial distance (0-1 range)
             spatial_distance = 0.5  # Default neutral if no spatial data
             
             if current_bbox is not None and current_camera is not None:
-                # Find the person's most recent track in another camera
-                for cam_name, track in global_person.camera_tracks.items():
-                    if cam_name != current_camera and track.bbox is not None:
-                        spatial_distance = self._spatial_distance(
-                            current_camera, current_bbox,
-                            cam_name, track.bbox
-                        )
-                        break  # Use first available track
+                spatial_distance = self._spatial_distance(
+                    current_camera, current_bbox, global_person
+                )
             
             # Combined weighted score
             combined_distance = (self.reid_weight * reid_distance + 
+                                self.color_weight * color_distance +
                                 self.spatial_weight * spatial_distance)
             
+            cam_str = ", ".join([f"{c}(L:{t.local_person_id})" for c, t in global_person.camera_tracks.items()])
+            loc_str = f"L:{current_local_id}" if current_local_id is not None else "L:?"
             print(f"\n[DEBUG DETAILED LOG] --- MATCHING CHECK ---")
-            print(f"[DEBUG] Inspecting detected person in camera '{current_camera}' vs existing Global Person G:{gid} ('{identity}')")
+            print(f"[DEBUG] Inspecting detected {loc_str} in camera '{current_camera}' vs existing Global Person G:{gid} ('{identity}') tracked in [{cam_str}]")
             print(f"[DEBUG] Re-ID Matching Score      : {reid_distance:.4f} (Weight: {self.reid_weight})")
+            print(f"[DEBUG] Color Matching Score      : {color_distance:.4f} (Weight: {self.color_weight})")
             print(f"[DEBUG] Spatial Matching Score    : {spatial_distance:.4f} (Weight: {self.spatial_weight})")
             print(f"[DEBUG] Final Matching Value      : {combined_distance:.4f} (Threshold: {self.feature_threshold})")
             print(f"[DEBUG] -----------------------------------\n")
@@ -772,7 +832,8 @@ class GlobalPersonTracker:
     
     def update_person_position(self, global_id: int, camera_name: str,
                                 bbox: Tuple[int, int, int, int],
-                                feature_vector: Optional[np.ndarray] = None):
+                                feature_vector: Optional[np.ndarray] = None,
+                                color_hist: Optional[np.ndarray] = None):
         """
         Lightweight position + feature update for an already-matched global person.
         No match search — just updates bbox and fires position callback.
@@ -782,6 +843,7 @@ class GlobalPersonTracker:
             camera_name: Camera name
             bbox: Current bounding box (x, y, w, h)
             feature_vector: Optional updated Re-ID features
+            color_hist: Optional updated color Histogram
         """
         with self.lock:
             if global_id not in self.global_persons:
@@ -793,12 +855,17 @@ class GlobalPersonTracker:
             if camera_name in person.camera_tracks:
                 person.camera_tracks[camera_name].bbox = bbox
                 person.camera_tracks[camera_name].last_seen = time.time()
+                if color_hist is not None:
+                    person.camera_tracks[camera_name].color_hist = color_hist
             
             # Update Re-ID features if provided
             if feature_vector is not None:
                 person.feature_vector = feature_vector
                 if camera_name in person.camera_tracks:
                     person.camera_tracks[camera_name].feature_vector = feature_vector
+                    
+            if color_hist is not None:
+                person.color_hist = color_hist
             
             person.last_seen = time.time()
             person.last_camera = camera_name
@@ -819,6 +886,7 @@ class GlobalPersonTracker:
     
     def create_or_update(self, camera_name: str, local_id: int,
                         feature_vector: Optional[np.ndarray] = None,
+                        color_hist: Optional[np.ndarray] = None,
                         bbox: Optional[Tuple[int, int, int, int]] = None,
                         frame_shape: Optional[Tuple[int, int]] = None) -> int:
         """
@@ -837,9 +905,11 @@ class GlobalPersonTracker:
                 # Look for match in OTHER cameras (not this one)
                 matched_id = self._find_match_unsafe(
                     feature_vector, 
+                    color_hist=color_hist,
                     exclude_camera=camera_name,
                     current_bbox=bbox,
-                    current_camera=camera_name
+                    current_camera=camera_name,
+                    current_local_id=local_id
                 )
             else:
                 print(f"[GLOBAL TRACKER] No features, skipping match search")
@@ -848,7 +918,7 @@ class GlobalPersonTracker:
                 # Match found - update existing person
                 person = self.global_persons[matched_id]
                 old_cameras = list(person.camera_tracks.keys())
-                person.update_from_camera(camera_name, local_id, feature_vector, bbox)
+                person.update_from_camera(camera_name, local_id, feature_vector, color_hist, bbox)
                 global_id = matched_id
                 print(f"[GLOBAL TRACKER] ✓ Updated person G:{matched_id} in '{camera_name}' (was in cameras: {old_cameras})")
             else:
@@ -857,7 +927,7 @@ class GlobalPersonTracker:
                 self.next_id += 1
                 
                 person = GlobalPerson(global_id=new_id)
-                person.update_from_camera(camera_name, local_id, feature_vector, bbox)
+                person.update_from_camera(camera_name, local_id, feature_vector, color_hist, bbox)
                 self.global_persons[new_id] = person
                 global_id = new_id
                 print(f"[GLOBAL TRACKER] ✗ Created NEW person G:{new_id} in '{camera_name}' (no match found)")

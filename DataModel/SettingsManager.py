@@ -27,8 +27,9 @@ class SettingsManager:
     DEFAULTS: Dict[str, Any] = {
         # Global Tracker Settings
         "feature_threshold": 0.5,
-        "reid_weight": 0.7,
-        "spatial_weight": 0.3,
+        "reid_weight": 0.5,
+        "color_weight": 0.3,
+        "spatial_weight": 0.2,
         "default_fov": 70,
         "dot_radius": 8,
         # Face Quality Settings

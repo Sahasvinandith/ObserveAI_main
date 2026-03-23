@@ -109,6 +109,7 @@ class MainWindow(QMainWindow):
         self.global_tracker = GlobalPersonTracker(
             feature_threshold=self.settings.get("feature_threshold"),
             reid_weight=self.settings.get("reid_weight"),
+            color_weight=self.settings.get("color_weight", 0.3),
             spatial_weight=self.settings.get("spatial_weight"),
             position_callback=self._on_person_position_update,
             pixels_per_meter=self.pixels_per_meter
