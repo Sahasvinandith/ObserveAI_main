@@ -848,16 +848,36 @@ class DetectionSystem:
                     l, t, r, b = map(int, track.to_ltrb())
                     w, h = r - l, b - t
 
+                    # ── Minimum-size gate ──────────────────────────────────────────
+                    # Ignore tiny/partial detections (person just entering the frame)
+                    MIN_CROP_W = 50   # pixels
+                    MIN_CROP_H = 100  # pixels
+                    WARMUP_FRAMES = 5  # how many valid crops to collect before using the best one
+
                     # Update/Create Person already tracked person
                     if tid in self.tracked_persons:
                         person_obj = self.tracked_persons[tid] 
                         person_obj.update_position(l, t, w, h, 0.9)
                         
+                        # ── Warm-up buffer: collect crops, wait for best ────────
                         if person_obj.feature_vector is None:
-                            crop = frame[t:t + h, l:l + w]
-                            if crop.size > 0:
-                                person_obj.feature_vector = self.extract_person_features(crop)
-                                person_obj.color_hist = self.extract_color_features(crop, self.camera_name, tid)
+                            if w >= MIN_CROP_W and h >= MIN_CROP_H:
+                                crop = frame[t:t + h, l:l + w]
+                                if crop.size > 0:
+                                    if not hasattr(person_obj, '_crop_warmup_buffer'):
+                                        person_obj._crop_warmup_buffer = []
+                                    person_obj._crop_warmup_buffer.append((w * h, crop.copy()))
+                                    
+                                    if len(person_obj._crop_warmup_buffer) >= WARMUP_FRAMES:
+                                        # Pick the crop with the largest area
+                                        best_crop = max(person_obj._crop_warmup_buffer, key=lambda x: x[0])[1]
+                                        person_obj.feature_vector = self.extract_person_features(best_crop)
+                                        person_obj.color_hist = self.extract_color_features(best_crop, self.camera_name, tid)
+                                        del person_obj._crop_warmup_buffer  # free memory
+                                        print(f"[WARMUP] L:{tid} ({self.camera_name}): features extracted from best of {WARMUP_FRAMES} crops ({w}×{h}px)")
+                            else:
+                                # Detection too small — skip silently, wait for person to fully enter frame
+                                pass
                                 
                         if not hasattr(person_obj, '_no_feature_frames'):
                             person_obj._no_feature_frames = 0
@@ -898,19 +918,23 @@ class DetectionSystem:
                                 person_obj._feature_refresh_counter = 0
                             person_obj._feature_refresh_counter += 1
                             
-                            # Every 30 frames: re-extract Re-ID features (heavier)
+                            # Every 30 frames: re-extract Re-ID features (only if crop is big enough)
                             refreshed_features = None
                             refreshed_color = None
                             if person_obj._feature_refresh_counter >= 30:
                                 person_obj._feature_refresh_counter = 0
-                                crop = frame[t:t + h, l:l + w]
-                                if crop.size > 0:
-                                    refreshed_features = self.extract_person_features(crop)
-                                    refreshed_color = self.extract_color_features(crop, self.camera_name, tid)
-                                    if refreshed_features is not None:
-                                        person_obj.feature_vector = refreshed_features
-                                    if refreshed_color is not None:
-                                        person_obj.color_hist = refreshed_color
+                                if w >= MIN_CROP_W and h >= MIN_CROP_H:
+                                    crop = frame[t:t + h, l:l + w]
+                                    if crop.size > 0:
+                                        refreshed_features = self.extract_person_features(crop)
+                                        refreshed_color = self.extract_color_features(crop, self.camera_name, tid)
+                                        if refreshed_features is not None:
+                                            person_obj.feature_vector = refreshed_features
+                                        if refreshed_color is not None:
+                                            person_obj.color_hist = refreshed_color
+                                else:
+                                    # Crop too small for reliable refresh — skip this cycle
+                                    print(f"[REFRESH SKIP] L:{tid} crop too small ({w}×{h}px), skipping feature refresh")
                             
                             # Every frame: update position on map (lightweight)
                             self.global_tracker.update_person_position(
@@ -923,31 +947,18 @@ class DetectionSystem:
                     else:
                         person_obj = Person(tid, l, t, w, h, 0.9)
                         person_obj._no_feature_frames = 0
-                        # Extract features once
-                        crop = frame[t:t + h, l:l + w]
-                        person_obj.feature_vector = self.extract_person_features(crop)
-                        person_obj.color_hist = self.extract_color_features(crop, self.camera_name, tid)
-                        self.tracked_persons[tid] = person_obj
-                        
-                        # Register with global tracker
+                        person_obj._crop_warmup_buffer = []
 
-                        if self.global_tracker and person_obj.feature_vector is not None:
-                            global_id = self.global_tracker.create_or_update(
-                                camera_name=self.camera_name,
-                                local_id=tid,
-                                feature_vector=person_obj.feature_vector,
-                                color_hist=person_obj.color_hist,
-                                bbox=(l, t, w, h),
-                                frame_shape=(frame.shape[1], frame.shape[0])
-                            )
-                            person_obj.global_id = global_id
-                            
-                            # Check if this global person already has a known identity
-                            existing_name, existing_conf = self.global_tracker.get_person_identity(global_id)
-                            if existing_name not in ("Unknown", "Scanning..."):
-                                person_obj.inherited_identity = existing_name
-                                person_obj.inherited_confidence = existing_conf
-                                print(f"[INHERIT] New person L:{tid} inherited '{existing_name}' (conf={existing_conf:.3f}) from global G:{global_id}")
+                        # Only seed the warmup buffer if this first detection is big enough
+                        if w >= MIN_CROP_W and h >= MIN_CROP_H:
+                            crop = frame[t:t + h, l:l + w]
+                            if crop.size > 0:
+                                person_obj._crop_warmup_buffer.append((w * h, crop.copy()))
+
+                        self.tracked_persons[tid] = person_obj
+                        # Features will be extracted once warmup buffer is full (handled above on next frames)
+                        print(f"[NEW TRACK] L:{tid} ({self.camera_name}): {w}×{h}px — warmup buffer started (need {WARMUP_FRAMES} valid crops)")
+
 
                     # 4. Process faces (The new Async Logic)
                     face_ids = self.process_faces_in_person(frame, (l, t, w, h), tid)
@@ -1092,7 +1103,23 @@ class DetectionSystem:
                 
             torso_crop = person_crop[y_start:y_end, x_start:x_end]
 
-            # ── DEBUG: Save crops every N frames so you can inspect them ────────
+            # ── Gray World colour normalisation ─────────────────────────────
+            # Different camera models have different white balance, gamma, and
+            # colour temperature. This compensates by scaling each RGB channel
+            # so its mean equals 128, bringing both cameras to a common
+            # neutral-grey reference before the histogram is computed.
+            try:
+                gw = torso_crop.astype(np.float32)
+                means = gw.mean(axis=(0, 1))          # [mean_B, mean_G, mean_R]
+                if all(m > 5 for m in means):          # skip on near-black crops
+                    scale = 128.0 / means
+                    gw *= scale
+                    torso_crop = np.clip(gw, 0, 255).astype(np.uint8)
+            except Exception:
+                pass  # fall back to unnormalised crop if anything goes wrong
+            # ─────────────────────────────────────────────────────────────────
+
+
             if DetectionSystem.COLOR_DEBUG_SAVE:
                 import os, time
                 DetectionSystem._color_debug_counter += 1

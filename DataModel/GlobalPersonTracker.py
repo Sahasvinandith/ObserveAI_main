@@ -46,7 +46,14 @@ class LocalTrack:
                bbox: Optional[Tuple[int, int, int, int]] = None):
         """Update track information. Color histogram is blended (EMA) rather than replaced."""
         if feature_vector is not None:
-            self.feature_vector = feature_vector
+            if self.feature_vector is None:
+                self.feature_vector = feature_vector.copy()
+            else:
+                # EMA blend for Re-ID embeddings (alpha=0.15)
+                # We blend then re-normalize to keep the vector on the unit hypersphere
+                alpha = 0.15
+                blended = (1.0 - alpha) * self.feature_vector + alpha * feature_vector
+                self.feature_vector = blended / (np.linalg.norm(blended) + 1e-8)
         if color_hist is not None:
             if self.color_hist is None:
                 # First observation — accept it directly
@@ -172,9 +179,15 @@ class GlobalPerson:
                 bbox=bbox
             )
         
-        # Update global features if provided
+        # Update global features if provided (using EMA for stability)
         if feature_vector is not None:
-            self.feature_vector = feature_vector
+            if self.feature_vector is None:
+                self.feature_vector = feature_vector.copy()
+            else:
+                # Decaying alpha for global Re-ID signature
+                alpha = max(0.10, 1.0 / (self.color_hist_count + 1))
+                blended = (1.0 - alpha) * self.feature_vector + alpha * feature_vector
+                self.feature_vector = blended / (np.linalg.norm(blended) + 1e-8)
         if color_hist is not None:
             if self.color_hist is None:
                 # Very first observation for this global person
@@ -819,10 +832,10 @@ class GlobalPersonTracker:
                     current_camera, current_bbox, global_person
                 )
             
-            # Combined weighted score
-            combined_distance = (self.reid_weight * reid_distance + 
-                                self.color_weight * color_distance +
-                                self.spatial_weight * spatial_distance)
+            # Combined weighted score (uniform weights for both same- and cross-camera)
+            combined_distance = (self.reid_weight  * reid_distance +
+                                 self.color_weight * color_distance +
+                                 self.spatial_weight * spatial_distance)
             
             cam_str = ", ".join([f"{c}(L:{t.local_person_id})" for c, t in global_person.camera_tracks.items()])
             loc_str = f"L:{current_local_id}" if current_local_id is not None else "L:?"
@@ -878,11 +891,18 @@ class GlobalPersonTracker:
                     # Use LocalTrack's EMA blend method
                     person.camera_tracks[camera_name].update(color_hist=color_hist)
             
-            # Update Re-ID features if provided
+            # Update Re-ID features if provided (using the EMA method on the track)
             if feature_vector is not None:
-                person.feature_vector = feature_vector
+                if person.feature_vector is None:
+                    person.feature_vector = feature_vector.copy()
+                else:
+                    alpha = max(0.10, 1.0 / (person.color_hist_count + 1))
+                    blended = (1.0 - alpha) * person.feature_vector + alpha * feature_vector
+                    person.feature_vector = blended / (np.linalg.norm(blended) + 1e-8)
+                
                 if camera_name in person.camera_tracks:
-                    person.camera_tracks[camera_name].feature_vector = feature_vector
+                    # Update the local camera track's embedding as well
+                    person.camera_tracks[camera_name].update(feature_vector=feature_vector)
                     
             if color_hist is not None:
                 if person.color_hist is None:
