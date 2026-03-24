@@ -39,8 +39,7 @@ class CameraWorker(QObject):
         
             # --- 1. Connection Phase ---
             print(f"[{self.name}] Worker thread: Trying to connect...")
-            url_to_try = self.url_int if self.url_int is not None else self.url_str
-            cap = cv2.VideoCapture(url_to_try)
+            cap = self._open_camera()
             
             if not cap or not cap.isOpened():
                 self.connectionFailed.emit(f"Failed to open:\n{self.url_str}")
@@ -61,7 +60,7 @@ class CameraWorker(QObject):
                         cap = None
                     
                     # Try to reconnect
-                    cap = cv2.VideoCapture(url_to_try)
+                    cap = self._open_camera()
                     if not cap or not cap.isOpened():
                         self.connectionFailed.emit(f"Reconnection failed:\n{self.url_str}")
                         cap = None
@@ -125,6 +124,41 @@ class CameraWorker(QObject):
                 
         except Exception as e:
             print(f"[{self.name}] Worker thread error: {e}")
+
+    def _open_camera(self):
+        """
+        Open the camera with optimal settings to avoid USB bandwidth issues.
+        - Uses V4L2 backend explicitly for /dev/videoX paths
+        - Requests MJPEG codec to reduce USB bandwidth (10x less than raw YUYV)
+        - Sets buffer size to 1 to prevent stale frame buildup
+        Falls back to standard open if MJPEG negotiation fails.
+        """
+        is_device_path = isinstance(self.url_str, str) and self.url_str.startswith("/dev/video")
+        url_to_try = self.url_int if self.url_int is not None else self.url_str
+
+        if is_device_path:
+            # Use explicit V4L2 backend for local USB cameras
+            cap = cv2.VideoCapture(url_to_try, cv2.CAP_V4L2)
+        else:
+            cap = cv2.VideoCapture(url_to_try)
+
+        if not cap or not cap.isOpened():
+            return None
+
+        # Reduce buffer to 1 frame — avoids stale frames and QBUF overflow
+        cap.set(cv2.CAP_PROP_BUFFERSIZE, 1)
+
+        if is_device_path:
+            # Request MJPEG: ~10x less USB bandwidth than raw YUYV
+            fourcc_mjpg = cv2.VideoWriter.fourcc(*"MJPG")
+            cap.set(cv2.CAP_PROP_FOURCC, fourcc_mjpg)
+            actual_fourcc = int(cap.get(cv2.CAP_PROP_FOURCC))
+            actual_name = "".join([chr((actual_fourcc >> 8 * i) & 0xFF) for i in range(4)])
+            print(f"[{self.name}] Camera opened: codec={actual_name}, "
+                  f"res={int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))}x"
+                  f"{int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))}")
+
+        return cap
 
     def stop(self):
         """

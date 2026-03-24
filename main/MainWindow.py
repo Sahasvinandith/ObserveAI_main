@@ -1135,7 +1135,8 @@ class MainWindow(QMainWindow):
             initial_guess=(current_pos.x(), current_pos.y()),
             search_radius=400.0,
             detect_fov=detect_fov,
-            detect_view_range=detect_range
+            detect_view_range=detect_range,
+            lock_position=True  # Strictly enforce map origin placement
         )
         
         if result is None:

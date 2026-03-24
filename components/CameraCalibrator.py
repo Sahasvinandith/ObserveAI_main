@@ -47,12 +47,13 @@ def solve_camera_position(
     initial_guess: Tuple[float, float],
     search_radius: float = 300.0,
     detect_fov: bool = False,
-    detect_view_range: bool = False
+    detect_view_range: bool = False,
+    lock_position: bool = False
 ) -> Optional[Tuple[float, float, float, float, float]]:
     """
     Solve for camera parameters given reference points.
     
-    **NEW CAPABILITY**: Can now detect actual FOV and view_range!
+    **NEW CAPABILITY**: Can now strictly lock the map position and only detect FOV and view_range!
     
     Uses a coarse-to-fine grid search:
     1. Coarse: search ±search_radius around initial guess, step=5px
@@ -73,6 +74,7 @@ def solve_camera_position(
         search_radius: How far from initial guess to search (pixels)
         detect_fov: If True, search for optimal FOV (more points needed for accuracy)
         detect_view_range: If True, estimate view range from vertical frame positions
+        lock_position: If True, strictly enforces cx,cy = initial_guess, bypassing position grid-search completely.
     
     Returns:
         (cx, cy, rotation_degrees, detected_fov, detected_view_range) or None if calibration fails
@@ -86,13 +88,13 @@ def solve_camera_position(
     
     if detect_fov and len(points) >= 3:
         # With 3+ points, we can search for both position and FOV
-        best_result = _solve_with_fov_search(points, fov_degrees, initial_guess, search_radius)
+        best_result = _solve_with_fov_search(points, fov_degrees, initial_guess, search_radius, lock_position)
         if best_result is None:
             return None
         best_cx, best_cy, best_fov, rotation_deg, best_error = best_result
     else:
         # Standard solve with fixed FOV
-        best_result = _solve_fixed_fov(points, fov_degrees, initial_guess, search_radius)
+        best_result = _solve_fixed_fov(points, fov_degrees, initial_guess, search_radius, lock_position)
         if best_result is None:
             return None
         best_cx, best_cy, rotation_deg, best_error = best_result
@@ -115,7 +117,8 @@ def _solve_fixed_fov(
     points: List[CalibrationPoint],
     fov_degrees: float,
     initial_guess: Tuple[float, float],
-    search_radius: float
+    search_radius: float,
+    lock_position: bool = False
 ) -> Optional[Tuple[float, float, float, float]]:
     """
     Standard solver: Find (cx, cy, rotation) with fixed FOV.
@@ -152,38 +155,44 @@ def _solve_fixed_fov(
         
         return total_error
     
-    # --- Coarse search ---
     gx, gy = initial_guess
-    best_error = float('inf')
-    best_cx, best_cy = gx, gy
     
-    step = 5.0
-    x = gx - search_radius
-    while x <= gx + search_radius:
-        y = gy - search_radius
-        while y <= gy + search_radius:
-            err = compute_error(x, y)
-            if err < best_error:
-                best_error = err
-                best_cx, best_cy = x, y
-            y += step
-        x += step
-    
-    # --- Fine search ---
-    fine_radius = 15.0
-    fine_step = 0.5
-    coarse_cx, coarse_cy = best_cx, best_cy
-    
-    x = coarse_cx - fine_radius
-    while x <= coarse_cx + fine_radius:
-        y = coarse_cy - fine_radius
-        while y <= coarse_cy + fine_radius:
-            err = compute_error(x, y)
-            if err < best_error:
-                best_error = err
-                best_cx, best_cy = x, y
-            y += fine_step
-        x += fine_step
+    if lock_position:
+        # Bypass positional search entirely and use the user's explicit map coordinates
+        best_cx, best_cy = gx, gy
+        best_error = compute_error(gx, gy)
+    else:
+        # --- Coarse search ---
+        best_error = float('inf')
+        best_cx, best_cy = gx, gy
+        
+        step = 5.0
+        x = gx - search_radius
+        while x <= gx + search_radius:
+            y = gy - search_radius
+            while y <= gy + search_radius:
+                err = compute_error(x, y)
+                if err < best_error:
+                    best_error = err
+                    best_cx, best_cy = x, y
+                y += step
+            x += step
+        
+        # --- Fine search ---
+        fine_radius = 15.0
+        fine_step = 0.5
+        coarse_cx, coarse_cy = best_cx, best_cy
+        
+        x = coarse_cx - fine_radius
+        while x <= coarse_cx + fine_radius:
+            y = coarse_cy - fine_radius
+            while y <= coarse_cy + fine_radius:
+                err = compute_error(x, y)
+                if err < best_error:
+                    best_error = err
+                    best_cx, best_cy = x, y
+                y += fine_step
+            x += fine_step
     
     # Check validity
     if best_error > 0.01:
@@ -202,7 +211,8 @@ def _solve_with_fov_search(
     points: List[CalibrationPoint],
     initial_fov: float,
     initial_guess: Tuple[float, float],
-    search_radius: float
+    search_radius: float,
+    lock_position: bool = False
 ) -> Optional[Tuple[float, float, float, float, float]]:
     """
     Enhanced solver: Find (cx, cy, fov, rotation) by searching FOV range.
@@ -222,7 +232,7 @@ def _solve_with_fov_search(
     
     for test_fov in fov_candidates:
         # For this FOV, find best position
-        result = _solve_fixed_fov(points, test_fov, initial_guess, search_radius)
+        result = _solve_fixed_fov(points, test_fov, initial_guess, search_radius, lock_position)
         if result is None:
             continue
         
@@ -246,7 +256,7 @@ def _solve_with_fov_search(
         if fine_fov_candidates:
             print(f"[CALIBRATION] Fine-tuning FOV around {best_fov}°...")
             for test_fov in fine_fov_candidates:
-                result = _solve_fixed_fov(points, test_fov, (best_cx, best_cy), 10.0)
+                result = _solve_fixed_fov(points, test_fov, (best_cx, best_cy), 10.0, lock_position)
                 if result is None:
                     continue
                 cx, cy, rot, error = result
