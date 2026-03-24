@@ -1065,18 +1065,29 @@ class DetectionSystem:
             return None
 
     def extract_color_features(self, person_crop):
-        """Extract HSV color histogram from the upper half (torso) of the person crop"""
+        """Extract high-precision 3D HSV color histogram from the exact center of the torso"""
         try:
             h, w = person_crop.shape[:2]
             if h <= 2 or w <= 2:
                 return None
-            # Use upper half to avoid pants/legs which might be occluded by desks
-            torso_crop = person_crop[0:h//2, :]
+            
+            # Isolate the center torso: 15% to 60% height, 25% to 75% width.
+            # This completely removes backgrounds, arms, and legs.
+            y_start = int(h * 0.15)
+            y_end = int(h * 0.60)
+            x_start = int(w * 0.25)
+            x_end = int(w * 0.75)
+            
+            if y_end <= y_start or x_end <= x_start:
+                return None
+                
+            torso_crop = person_crop[y_start:y_end, x_start:x_end]
             hsv_crop = cv2.cvtColor(torso_crop, cv2.COLOR_BGR2HSV)
             
-            # Compute 2D histogram (Hue and Saturation)
-            # Hue: 0-180, Saturation: 0-256
-            hist = cv2.calcHist([hsv_crop], [0, 1], None, [16, 16], [0, 180, 0, 256])
+            # Compute 3D histogram (Hue, Saturation, Value)
+            # Hue: 0-180, Saturation: 0-256, Value: 0-256
+            # Bins: 8x8x8 = 512 dimensions. Captures black/white shirts via Value bins.
+            hist = cv2.calcHist([hsv_crop], [0, 1, 2], None, [8, 8, 8], [0, 180, 0, 256, 0, 256])
             cv2.normalize(hist, hist, alpha=0, beta=1, norm_type=cv2.NORM_MINMAX)
             return hist.flatten()
         except Exception as e:
