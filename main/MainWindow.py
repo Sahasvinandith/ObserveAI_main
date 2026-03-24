@@ -54,6 +54,7 @@ class MainWindow(QMainWindow):
         
         # test parameters
         self.is_running = True
+        self.camera_setup_done = False
         
         #  ADD TRACKERS ---
         # These will keep track of all items for saving
@@ -134,6 +135,12 @@ class MainWindow(QMainWindow):
         self.birds_eye_widget = BirdsEyeViewWidget(self)
         self.birds_eye_view_page.layout().addWidget(self.birds_eye_widget)
         
+        # Initial configure button states
+        self.add_camera_btn.hide()
+        self.add_wall_btn.hide()
+        self.done_setup_btn.hide()
+        self.configure_cameras_btn.show()
+
         self.signal_setup()
         
         # database setup
@@ -152,6 +159,8 @@ class MainWindow(QMainWindow):
         self.cam_set_btn.clicked.connect(lambda: self._switch_or_focus_page(0))
         self.cam_feed_btn.clicked.connect(lambda: self._switch_or_focus_page(1))       
         self.db_btn.clicked.connect(lambda: self._switch_or_focus_page(2))
+        self.configure_cameras_btn.clicked.connect(self.start_camera_setup)
+        self.done_setup_btn.clicked.connect(self.finish_camera_setup)
         self.add_camera_btn.clicked.connect(self.add_camera)
         self.update_btn.clicked.connect(self.update_camera)
         self.add_wall_btn.clicked.connect(self.add_a_wall)
@@ -179,7 +188,38 @@ class MainWindow(QMainWindow):
         
         # Setup settings page controls
         self.setup_settings_page()
-    
+    def start_camera_setup(self):
+        """Show configuration buttons and hide 'Configure Cameras'."""
+        self.configure_cameras_btn.hide()
+        self.add_camera_btn.show()
+        self.add_wall_btn.show()
+        self.done_setup_btn.show()
+
+    def finish_camera_setup(self):
+        """Hide configuration buttons and start AI threads."""
+        self.camera_setup_done = True
+        self.add_camera_btn.hide()
+        self.add_wall_btn.hide()
+        self.done_setup_btn.hide()
+        self.configure_cameras_btn.show()
+        
+        # Start AI for all cameras that haven't started yet
+        for name, frame_buffer in self.camera_buffers.items():
+            if name not in self.ai_threads:
+                self._start_ai_for_camera(name, frame_buffer)
+
+    def _start_ai_for_camera(self, name, frame_buffer):
+        """Helper to start the AI tracking thread for a camera."""
+        print(f"Initializing AI System for Camera {name}...")
+        ai_thread = threading.Thread(
+            target=Ai_System_thread, 
+            args=(name, "Faces_db", frame_buffer, self.ai_frame_processed_signal.emit, 3, 15, self.global_tracker, self.ai_instances), 
+            daemon=True
+        )
+        self.ai_threads[name] = ai_thread
+        ai_thread.start()
+        print(f"AI System for {name} started.")
+        
     # =========================================================================
     # Floor Map Person Position Visualization
     # =========================================================================
@@ -556,16 +596,12 @@ class MainWindow(QMainWindow):
         qt_thread.start()
         
         # =========================================================
-        # --- 9. AUTO-START AI DETECTION SYSTEM ---
+        # --- 9. CONDITIONAL START AI DETECTION SYSTEM ---
         # =========================================================
-        print(f"Initializing AI System for Camera{name}...")
-        
-        # Create and Start the AI Thread
-        ai_thread = threading.Thread(target=Ai_System_thread, args=(name, "Faces_db", frame_buffer, self.ai_frame_processed_signal.emit, 3, 15, self.global_tracker, self.ai_instances), daemon=True)
-        self.ai_threads[name] = ai_thread
-        ai_thread.start()
-        
-        print(f"AI System for {name} started.")
+        if self.camera_setup_done:
+            self._start_ai_for_camera(name, frame_buffer)
+        else:
+            print(f"AI System for {name} queued until camera setup is done.")
     
     def handle_maximize_toggle(self, widget_to_toggle: GridFeedWidget):
         """

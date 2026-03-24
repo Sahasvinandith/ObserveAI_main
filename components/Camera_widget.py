@@ -100,6 +100,25 @@ class CameraItem(QGraphicsObject):
     def boundingRect(self):
         # Return the combined bounding rect of the children
         return self.childrenBoundingRect()
+
+    def shape(self):
+        from PyQt6.QtGui import QPainterPath
+        path = QPainterPath()
+        
+        # Add the exact pixmap/icon shape (with 5px margin)
+        p_rect = self.pixmap_item.mapToParent(self.pixmap_item.boundingRect()).boundingRect()
+        p_rect.adjust(-5, -5, 5, 5)
+        path.addRect(p_rect)
+        
+        # Add the exact text shape
+        t_rect = self.text_item.mapToParent(self.text_item.boundingRect()).boundingRect()
+        path.addRect(t_rect)
+        
+        # Add the fov polygon shape
+        fov_poly = self.fov_item.polygon()
+        path.addPolygon(self.fov_item.mapToParent(fov_poly))
+        
+        return path
     
     def print(self):
         print(f"Camera Name:{self.name}-url({self.url}) Position:{self.position} Rotation:{self.rotation_degree}")

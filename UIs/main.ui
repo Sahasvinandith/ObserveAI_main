@@ -171,6 +171,13 @@
              </property>
              <layout class="QHBoxLayout" name="horizontalLayout_5">
               <item>
+               <widget class="QPushButton" name="configure_cameras_btn">
+                <property name="text">
+                 <string>Configure Cameras</string>
+                </property>
+               </widget>
+              </item>
+              <item>
                <widget class="QPushButton" name="add_camera_btn">
                 <property name="text">
                  <string>Add Camera</string>
@@ -197,6 +204,13 @@
                <widget class="QPushButton" name="add_wall_btn">
                 <property name="text">
                  <string>Add Wall</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="done_setup_btn">
+                <property name="text">
+                 <string>Done</string>
                 </property>
                </widget>
               </item>
