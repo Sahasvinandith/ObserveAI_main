@@ -1,5 +1,5 @@
 {
-    "feature_threshold": 0.47,
+    "feature_threshold": 0.6,
     "reid_weight": 0.5,
     "color_weight": 0.3,
     "spatial_weight": 0.2,

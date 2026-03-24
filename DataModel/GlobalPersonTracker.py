@@ -44,11 +44,19 @@ class LocalTrack:
     def update(self, feature_vector: Optional[np.ndarray] = None, 
                color_hist: Optional[np.ndarray] = None,
                bbox: Optional[Tuple[int, int, int, int]] = None):
-        """Update track information"""
+        """Update track information. Color histogram is blended (EMA) rather than replaced."""
         if feature_vector is not None:
             self.feature_vector = feature_vector
         if color_hist is not None:
-            self.color_hist = color_hist
+            if self.color_hist is None:
+                # First observation — accept it directly
+                self.color_hist = color_hist.copy()
+            else:
+                # Exponential moving average: new frames have low weight (0.15)
+                # so ~20 stable frames needed to fully shift the histogram.
+                # Side-facing or partial frames can only nudge it slightly.
+                alpha = 0.15
+                self.color_hist = (1.0 - alpha) * self.color_hist + alpha * color_hist
         if bbox is not None:
             self.bbox = bbox
         self.last_seen = time.time()
@@ -60,6 +68,7 @@ class GlobalPerson:
     global_id: int
     feature_vector: Optional[np.ndarray] = None  # Most recent/best features
     color_hist: Optional[np.ndarray] = None
+    color_hist_count: int = 0  # How many observations have been blended in
     camera_tracks: Dict[str, LocalTrack] = field(default_factory=dict)
     
     # Face recognition results (legacy fields kept for compatibility)
@@ -167,7 +176,17 @@ class GlobalPerson:
         if feature_vector is not None:
             self.feature_vector = feature_vector
         if color_hist is not None:
-            self.color_hist = color_hist
+            if self.color_hist is None:
+                # Very first observation for this global person
+                self.color_hist = color_hist.copy()
+                self.color_hist_count = 1
+            else:
+                # EMA blend: weight new observation less as count grows,
+                # settling at alpha=0.10 after ~10 observations.
+                # This means brief side-angle frames barely shift the profile.
+                alpha = max(0.10, 1.0 / (self.color_hist_count + 1))
+                self.color_hist = (1.0 - alpha) * self.color_hist + alpha * color_hist
+                self.color_hist_count += 1
         
         self.last_seen = time.time()
     
@@ -856,7 +875,8 @@ class GlobalPersonTracker:
                 person.camera_tracks[camera_name].bbox = bbox
                 person.camera_tracks[camera_name].last_seen = time.time()
                 if color_hist is not None:
-                    person.camera_tracks[camera_name].color_hist = color_hist
+                    # Use LocalTrack's EMA blend method
+                    person.camera_tracks[camera_name].update(color_hist=color_hist)
             
             # Update Re-ID features if provided
             if feature_vector is not None:
@@ -865,7 +885,13 @@ class GlobalPersonTracker:
                     person.camera_tracks[camera_name].feature_vector = feature_vector
                     
             if color_hist is not None:
-                person.color_hist = color_hist
+                if person.color_hist is None:
+                    person.color_hist = color_hist.copy()
+                    person.color_hist_count = 1
+                else:
+                    alpha = max(0.10, 1.0 / (person.color_hist_count + 1))
+                    person.color_hist = (1.0 - alpha) * person.color_hist + alpha * color_hist
+                    person.color_hist_count += 1
             
             person.last_seen = time.time()
             person.last_camera = camera_name

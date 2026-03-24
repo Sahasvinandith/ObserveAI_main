@@ -857,7 +857,7 @@ class DetectionSystem:
                             crop = frame[t:t + h, l:l + w]
                             if crop.size > 0:
                                 person_obj.feature_vector = self.extract_person_features(crop)
-                                person_obj.color_hist = self.extract_color_features(crop)
+                                person_obj.color_hist = self.extract_color_features(crop, self.camera_name, tid)
                                 
                         if not hasattr(person_obj, '_no_feature_frames'):
                             person_obj._no_feature_frames = 0
@@ -906,7 +906,7 @@ class DetectionSystem:
                                 crop = frame[t:t + h, l:l + w]
                                 if crop.size > 0:
                                     refreshed_features = self.extract_person_features(crop)
-                                    refreshed_color = self.extract_color_features(crop)
+                                    refreshed_color = self.extract_color_features(crop, self.camera_name, tid)
                                     if refreshed_features is not None:
                                         person_obj.feature_vector = refreshed_features
                                     if refreshed_color is not None:
@@ -926,7 +926,7 @@ class DetectionSystem:
                         # Extract features once
                         crop = frame[t:t + h, l:l + w]
                         person_obj.feature_vector = self.extract_person_features(crop)
-                        person_obj.color_hist = self.extract_color_features(crop)
+                        person_obj.color_hist = self.extract_color_features(crop, self.camera_name, tid)
                         self.tracked_persons[tid] = person_obj
                         
                         # Register with global tracker
@@ -1064,8 +1064,17 @@ class DetectionSystem:
             print(f"Error extracting person features: {e}")
             return None
 
-    def extract_color_features(self, person_crop):
-        """Extract high-precision 3D HSV color histogram from the exact center of the torso"""
+    # Set to False once debugging is done to stop saving crops to disk
+    COLOR_DEBUG_SAVE = True
+    COLOR_DEBUG_DIR = "debug_crops"
+    _color_debug_counter = 0
+
+    def extract_color_features(self, person_crop, camera_name="cam", local_id="?"):
+        """Extract high-precision 3D HSV color histogram from the exact center of the torso.
+        
+        If COLOR_DEBUG_SAVE is True, saves both the full person crop and the isolated
+        torso crop to debug_crops/ so you can visually inspect the histogram input.
+        """
         try:
             h, w = person_crop.shape[:2]
             if h <= 2 or w <= 2:
@@ -1073,8 +1082,8 @@ class DetectionSystem:
             
             # Isolate the center torso: 15% to 60% height, 25% to 75% width.
             # This completely removes backgrounds, arms, and legs.
-            y_start = int(h * 0.15)
-            y_end = int(h * 0.60)
+            y_start = int(h * 0.35)
+            y_end = int(h * 0.70)
             x_start = int(w * 0.25)
             x_end = int(w * 0.75)
             
@@ -1082,6 +1091,30 @@ class DetectionSystem:
                 return None
                 
             torso_crop = person_crop[y_start:y_end, x_start:x_end]
+
+            # ── DEBUG: Save crops every N frames so you can inspect them ────────
+            if DetectionSystem.COLOR_DEBUG_SAVE:
+                import os, time
+                DetectionSystem._color_debug_counter += 1
+                # Only save every 30 extractions to avoid flooding disk
+                if DetectionSystem._color_debug_counter % 2 == 0:
+                    os.makedirs(DetectionSystem.COLOR_DEBUG_DIR, exist_ok=True)
+                    ts = int(time.time() * 1000) % 100000  # short timestamp
+                    safe_cam = str(camera_name).replace(" ", "_").replace("/", "-")
+                    # Annotate the full crop with a rectangle showing the torso region
+                    annotated = person_crop.copy()
+                    cv2.rectangle(annotated, (x_start, y_start), (x_end, y_end), (0, 255, 0), 2)
+                    cv2.putText(annotated, "torso", (x_start, y_start - 4),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
+                    full_path = os.path.join(DetectionSystem.COLOR_DEBUG_DIR,
+                                             f"{safe_cam}_L{local_id}_{ts}_full.jpg")
+                    torso_path = os.path.join(DetectionSystem.COLOR_DEBUG_DIR,
+                                              f"{safe_cam}_L{local_id}_{ts}_torso.jpg")
+                    cv2.imwrite(full_path, annotated)
+                    cv2.imwrite(torso_path, torso_crop)
+                    print(f"[COLOR DEBUG] Saved: {torso_path}")
+            # ────────────────────────────────────────────────────────────────────
+
             hsv_crop = cv2.cvtColor(torso_crop, cv2.COLOR_BGR2HSV)
             
             # Compute 3D histogram (Hue, Saturation, Value)
