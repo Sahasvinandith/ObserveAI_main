@@ -13,6 +13,7 @@ from PyQt6.QtWidgets import (
     QComboBox, QDoubleSpinBox, QDialogButtonBox, QTabWidget,
     QWidget, QPushButton, QListWidget, QListWidgetItem, QFrame
 )
+from DataModel.ActionManager import ActionManager
 from PyQt6.QtCore import Qt
 from PyQt6.QtGui import QFont
 
@@ -201,6 +202,22 @@ class AddCameraDialog(QDialog):
 
         root.addLayout(fov_row)
 
+        # ── Actions Selection ───────────────────────────────────
+        self.action_manager = ActionManager()
+        custom_actions = self.action_manager.get_action_list()
+
+        actions_col = QVBoxLayout()
+        actions_col.addWidget(QLabel("Select Actions to Track:"))
+        self.actions_list_widget = QListWidget()
+        self.actions_list_widget.setMaximumHeight(80)
+        for act in custom_actions:
+            item = QListWidgetItem(act)
+            item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
+            item.setCheckState(Qt.CheckState.Unchecked)
+            self.actions_list_widget.addItem(item)
+        actions_col.addWidget(self.actions_list_widget)
+        root.addLayout(actions_col)
+
         # ── Buttons ─────────────────────────────────────────────
         self.buttonBox = QDialogButtonBox(
             QDialogButtonBox.StandardButton.Ok | QDialogButtonBox.StandardButton.Cancel
@@ -281,12 +298,18 @@ class AddCameraDialog(QDialog):
 
     def get_details(self) -> tuple:
         """
-        Returns (name, url_or_device, fov, view_range).
+        Returns (name, url_or_device, fov, view_range, selected_actions).
         Works regardless of which tab is active.
         """
         name = self.name_input.text().strip() or "Camera"
         fov = self.fov_input.value()
         rng = self.view_range_input.value()
+
+        selected_actions = []
+        for i in range(self.actions_list_widget.count()):
+            item = self.actions_list_widget.item(i)
+            if item.checkState() == Qt.CheckState.Checked:
+                selected_actions.append(item.text())
 
         if self.tabs.currentIndex() == 0:
             # Local Camera tab
@@ -295,7 +318,7 @@ class AddCameraDialog(QDialog):
                 device = self._detected_cameras[row]["device"]
             else:
                 device = ""
-            return (name, device, fov, rng)
+            return (name, device, fov, rng, selected_actions)
         else:
             # URL tab
-            return (name, self.url_input.text().strip(), fov, rng)
+            return (name, self.url_input.text().strip(), fov, rng, selected_actions)

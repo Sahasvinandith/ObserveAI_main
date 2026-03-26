@@ -42,7 +42,9 @@ class SettingsManager:
         # Face Validation Settings (to filter bad detections)
         "min_face_width": 70,               # Minimum face width in pixels
         "min_face_height": 90,              # Minimum face height in pixels  
-        "min_face_confidence": 0.5          # Minimum YOLO face detection confidence
+        "min_face_confidence": 0.5,         # Minimum YOLO face detection confidence
+        # Camera Action assignments
+        "camera_actions": {}                # Dictionary mapping camera names to lists of enabled action names
     }
     
     def __init__(self, settings_file: Optional[str] = None):

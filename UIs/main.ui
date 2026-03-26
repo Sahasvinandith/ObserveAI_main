@@ -123,6 +123,19 @@
          </property>
         </widget>
        </item>
+       <item>
+        <widget class="QPushButton" name="actions_btn">
+         <property name="sizePolicy">
+          <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
+           <horstretch>0</horstretch>
+           <verstretch>2</verstretch>
+          </sizepolicy>
+         </property>
+         <property name="text">
+          <string>Actions</string>
+         </property>
+        </widget>
+       </item>
       </layout>
      </widget>
     </item>
@@ -889,6 +902,55 @@ border-color: rgb(34, 34, 34);</string>
           <layout class="QHBoxLayout" name="birds_eye_layout">
            <item>
             <widget class="QWidget" name="birds_eye_container"/>
+           </item>
+          </layout>
+         </widget>
+         <widget class="QWidget" name="actions_page">
+          <layout class="QVBoxLayout" name="actions_layout">
+           <item>
+            <widget class="QLabel" name="actions_title">
+             <property name="styleSheet">
+              <string notr="true"> font-size: 14px;font-weight: bold; color: #888; margin-top: 5px;</string>
+             </property>
+             <property name="text">
+              <string>── Custom Actions ──</string>
+             </property>
+             <property name="alignment">
+              <set>Qt::AlignmentFlag::AlignCenter</set>
+             </property>
+            </widget>
+           </item>
+           <item>
+            <widget class="QListWidget" name="actions_list">
+            </widget>
+           </item>
+           <item>
+            <layout class="QHBoxLayout" name="actions_buttons_layout">
+             <item>
+              <widget class="QPushButton" name="create_action_btn">
+               <property name="text">
+                <string>Create Action</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="delete_action_btn">
+               <property name="text">
+                <string>Delete Selected</string>
+               </property>
+              </widget>
+             </item>
+             <item>
+              <widget class="QPushButton" name="manage_camera_actions_btn">
+               <property name="text">
+                <string>Manage Camera Actions</string>
+               </property>
+               <property name="toolTip">
+                <string>Add or remove actions on existing cameras without restarting</string>
+               </property>
+              </widget>
+             </item>
+            </layout>
            </item>
           </layout>
          </widget>

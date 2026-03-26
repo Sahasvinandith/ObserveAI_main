@@ -1,6 +1,6 @@
 import json
 import time
-from PyQt6.QtWidgets import (QListWidgetItem,QFileDialog,QGraphicsScene,QApplication, QMainWindow, QLabel, QVBoxLayout,QLineEdit,QDialogButtonBox,QDialog, QGraphicsRectItem, QGraphicsEllipseItem, QMenu, QWidget, QGraphicsSimpleTextItem)
+from PyQt6.QtWidgets import (QListWidgetItem,QFileDialog,QGraphicsScene,QApplication, QMainWindow, QLabel, QVBoxLayout,QLineEdit,QDialogButtonBox,QDialog, QGraphicsRectItem, QGraphicsEllipseItem, QMenu, QWidget, QGraphicsSimpleTextItem, QInputDialog, QMessageBox)
 from PyQt6.QtCore import (QPointF,QThread,Qt, pyqtSignal,pyqtSlot)
 from PyQt6.QtGui import QImage, QBrush, QPen, QColor
 import threading
@@ -14,6 +14,7 @@ from components.Grid_feed_widget import GridFeedWidget
 from components.Camera_worker import CameraWorker
 from components.Database_viewer import DatabaseViewer
 from components.BirdsEyeViewWidget import BirdsEyeViewWidget
+from components.CameraActionManagerDialog import CameraActionManagerDialog
 import queue
 from DataModel.DetectionSystem import Ai_System_thread
 
@@ -46,6 +47,7 @@ class PopOutWindow(QMainWindow):
 class MainWindow(QMainWindow):
     ai_frame_processed_signal = pyqtSignal(str,object)
     person_position_signal = pyqtSignal(int, float, float, str)  # global_id, x, y, camera_name
+    action_detected_signal = pyqtSignal(str, str, str, float)    # camera, person, action, timestamp
     def __init__(self):
         super().__init__()
         loadUi("./UIs/main.ui", self)
@@ -89,6 +91,10 @@ class MainWindow(QMainWindow):
         # --- Settings Manager ---
         from DataModel.SettingsManager import SettingsManager
         self.settings = SettingsManager()
+        
+        # --- Action Manager ---
+        from DataModel.ActionManager import ActionManager
+        self.action_manager = ActionManager()
         
         # --- Person Position Tracking on Floor Map ---
         self.person_dots: dict[int, QGraphicsEllipseItem] = {}  # global_id -> dot item
@@ -152,6 +158,12 @@ class MainWindow(QMainWindow):
         # Connect person position signal for floor map visualization
         self.person_position_signal.connect(self._update_person_dot)
         
+        # Connect action detection signal to log panel
+        self.action_detected_signal.connect(self._on_action_detected)
+        
+        # Track whether the actions page log panel has been set up
+        self._actions_page_initialized = False
+        
         self.Content_stack.setCurrentIndex(0)
     
     def signal_setup(self):
@@ -171,6 +183,12 @@ class MainWindow(QMainWindow):
         self.birds_eye_btn.clicked.connect(self.show_birds_eye_view)
         self.settings_btn.clicked.connect(self.show_settings_page)
         
+        # --- Actions UI ---
+        self.actions_btn.clicked.connect(self.show_actions_page)
+        self.create_action_btn.clicked.connect(self.create_action)
+        self.delete_action_btn.clicked.connect(self.delete_action)
+        self.manage_camera_actions_btn.clicked.connect(self.manage_camera_actions)
+        
         # --- Right-click context menus for pop-out ---
         self._page_info = {
             0: ("Camera Settings", self.cam_set_btn),
@@ -179,6 +197,7 @@ class MainWindow(QMainWindow):
             3: ("Logs", self.logs_btn),
             4: ("Settings", self.settings_btn),
             5: ("Birds Eye View", self.birds_eye_btn),
+            6: ("Actions", self.actions_btn),
         }
         for page_idx, (title, btn) in self._page_info.items():
             btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -214,6 +233,7 @@ class MainWindow(QMainWindow):
         ai_thread = threading.Thread(
             target=Ai_System_thread, 
             args=(name, "Faces_db", frame_buffer, self.ai_frame_processed_signal.emit, 3, 15, self.global_tracker, self.ai_instances), 
+            kwargs={"action_callback": self.action_detected_signal.emit},
             daemon=True
         )
         self.ai_threads[name] = ai_thread
@@ -435,6 +455,97 @@ class MainWindow(QMainWindow):
             # Force update
             self.birds_eye_widget.update_visualization()
     
+    def show_actions_page(self):
+        """Switch to Actions page and update the list"""
+        self._switch_or_focus_page(6)
+        if not self._actions_page_initialized:
+            self._setup_actions_log_panel()
+            self._actions_page_initialized = True
+        self.update_actions_list()
+
+    def _setup_actions_log_panel(self):
+        """Inject the Recent Detections log widget into the Actions page."""
+        from PyQt6.QtWidgets import QListWidget, QLabel, QVBoxLayout
+        # Find the actions page layout (it should already exist from .ui)
+        page = self.Content_stack.widget(6)  # Actions page index
+        layout = page.layout()
+        if layout is None:
+            layout = QVBoxLayout(page)
+
+        sep = QLabel("Recent Detections:")
+        sep.setStyleSheet("color: #ccc; font-weight: bold; font-size: 11pt; margin-top: 8px;")
+        layout.addWidget(sep)
+
+        self.action_log_list = QListWidget()
+        self.action_log_list.setStyleSheet(
+            "background-color: rgb(30, 10, 35); color: #00ff88; "
+            "border: 1px solid #7a3a8a; border-radius: 4px; font-size: 10pt;"
+        )
+        self.action_log_list.setMaximumHeight(220)
+        layout.addWidget(self.action_log_list)
+
+    @pyqtSlot(str, str, str, float)
+    def _on_action_detected(self, camera: str, person: str, action: str, timestamp: float):
+        """Receives an action detection event from the AI thread and logs it."""
+        import datetime
+        ts_str = datetime.datetime.fromtimestamp(timestamp).strftime("%H:%M:%S")
+        entry = f"[{camera}]  {person}  →  {action}  at {ts_str}"
+        if hasattr(self, 'action_log_list'):
+            from PyQt6.QtWidgets import QListWidgetItem
+            self.action_log_list.insertItem(0, QListWidgetItem(entry))
+            # Cap at 100 entries to avoid memory growth
+            while self.action_log_list.count() > 100:
+                self.action_log_list.takeItem(self.action_log_list.count() - 1)
+        print(f"[ACTION LOG] {entry}")
+
+    def manage_camera_actions(self):
+        """Open the Camera Action Manager dialog."""
+        if not self.scene_cameras:
+            from PyQt6.QtWidgets import QMessageBox
+            QMessageBox.information(self, "No Cameras", "Add at least one camera first.")
+            return
+        dlg = CameraActionManagerDialog(
+            camera_names=list(self.scene_cameras.keys()),
+            ai_instances=self.ai_instances,
+            parent=self
+        )
+        dlg.exec()
+        # Refresh the actions list in case names changed
+        self.update_actions_list()
+
+    def update_actions_list(self):
+        self.actions_list.clear()
+        actions = self.action_manager.get_action_list()
+        for act in actions:
+            self.actions_list.addItem(act)
+
+    def create_action(self):
+        action_name, ok1 = QInputDialog.getText(self, "Create Action", "Enter Action Name:")
+        if not ok1 or not action_name.strip():
+            return
+            
+        file_path, _ = QFileDialog.getOpenFileName(self, "Select Pose Data File", "", "JSON Files (*.json)")
+        if not file_path:
+            return
+            
+        try:
+            with open(file_path, 'r') as f:
+                import json
+                pose_data = json.load(f)
+            self.action_manager.save_action(action_name.strip(), pose_data)
+            self.update_actions_list()
+            QMessageBox.information(self, "Success", f"Action '{action_name}' created successfully!")
+        except Exception as e:
+            QMessageBox.critical(self, "Error", f"Failed to load pose data: {e}")
+
+    def delete_action(self):
+        selected_items = self.actions_list.selectedItems()
+        if not selected_items:
+            return
+        action_name = selected_items[0].text()
+        if self.action_manager.delete_action(action_name):
+            self.update_actions_list()
+
     @pyqtSlot(str, object)
     def update_grid_from_ai(self, cam_name, frame):
         """
@@ -480,7 +591,7 @@ class MainWindow(QMainWindow):
         dialog = AddCameraDialog(self)
         
         if dialog.exec():
-            name, url, fov, view_range = dialog.get_details()
+            name, url, fov, view_range, selected_actions = dialog.get_details()
             if name and url:
                 # Check if camera name already exists
                 if name in self.scene_cameras:
@@ -488,9 +599,17 @@ class MainWindow(QMainWindow):
                     # TODO: Show a QMessageBox to the user
                     return
                 
+                # Update camera actions in settings
+                cam_actions = self.settings.get("camera_actions")
+                if not cam_actions:
+                    cam_actions = {}
+                cam_actions[name] = selected_actions
+                self.settings.set("camera_actions", cam_actions)
+                self.settings.save()
+                
                 # --- 6. CALL THE NEW CENTRAL FUNCTION ---
                 self.create_camera_items(name, url, fov=fov, view_range=view_range)
-                print(f"Camera added: {name} (fov={fov}°, range={view_range})")
+                print(f"Camera added: {name} (fov={fov}°, range={view_range}, actions={selected_actions})")
     
     def create_camera_items(self, name, url, pos=None, rot=None, fov=70.0, view_range=200.0):
         """

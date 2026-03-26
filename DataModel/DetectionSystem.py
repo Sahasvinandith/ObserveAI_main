@@ -20,8 +20,11 @@ from DataModel.EmbeddingCache import get_embedding_cache
 from DataModel.GlobalPersonTracker import GlobalPersonTracker
 from DataModel.SettingsManager import get_settings
 from DataModel.Face import Face
+from DataModel.ActionManager import ActionManager
+from DataModel.Face import Face
+from DataModel.ActionManager import ActionManager
 
-def Ai_System_thread(camera_name, db_path="Faces_db", camera_buffer=None, output_callback=None, frame_skip_interval=3, gui_fps_limit=15, global_tracker=None, Main_Detection_system=None):
+def Ai_System_thread(camera_name, db_path="Faces_db", camera_buffer=None, output_callback=None, frame_skip_interval=3, gui_fps_limit=15, global_tracker=None, Main_Detection_system=None, action_callback=None):
     detection_system = DetectionSystem(
         camera_name=camera_name,
         db_path=db_path,
@@ -29,7 +32,8 @@ def Ai_System_thread(camera_name, db_path="Faces_db", camera_buffer=None, output
         output_callback=output_callback,
         frame_skip_interval=frame_skip_interval,
         gui_fps_limit=gui_fps_limit,
-        global_tracker=global_tracker
+        global_tracker=global_tracker,
+        action_callback=action_callback
     )
     Main_Detection_system[camera_name] = detection_system
     detection_system.start()
@@ -88,7 +92,7 @@ class Person:
 
 
 class DetectionSystem:
-    def __init__(self, camera_name, db_path="Faces_db", camera_buffer=None, output_callback=None, frame_skip_interval=3, gui_fps_limit=15, global_tracker:GlobalPersonTracker=None):
+    def __init__(self, camera_name, db_path="Faces_db", camera_buffer=None, output_callback=None, frame_skip_interval=3, gui_fps_limit=15, global_tracker:GlobalPersonTracker=None, action_callback=None):
         print("[INFO] Initializing Detection System...")
 
         self.camera_name = camera_name
@@ -98,6 +102,8 @@ class DetectionSystem:
         # Global person tracking
         self.global_tracker = global_tracker
         
+        # Action detection callback (called on the AI thread, must be thread-safe)
+        self.action_callback = action_callback
         
         self.settings = get_settings()
         
@@ -154,6 +160,19 @@ class DetectionSystem:
         self.reid_model = None
         self.person_tracker = None
 
+        # --- Actions Configuration ---
+        self.enabled_actions = self.settings.get("camera_actions", {}).get(self.camera_name, [])
+        self.action_manager = ActionManager()
+        self.reference_actions = {}
+        for act in self.enabled_actions:
+            data = self.action_manager.get_action_data(act)
+            if data:
+                self.reference_actions[act] = data
+
+        # Cooldown: key = "action_name:person_id", value = last_fired timestamp
+        self._action_cooldowns: dict = {}
+        self.ACTION_COOLDOWN_SECONDS = 5.0
+
         self.initialize_models()
         
         # Get starting ID
@@ -182,8 +201,34 @@ class DetectionSystem:
         self.reid_model.eval()
         
         self.person_tracker = DeepSort(max_age=self.PERSON_TRACKING_MAX_AGE, n_init=self.PERSON_TRACKING_N_INIT)
+        
+        # Initialize YOLOv8-Pose for actions
+        self.pose_model = None
+        if hasattr(self, 'enabled_actions') and self.enabled_actions:
+            print(f"[{self.camera_name}] Loading YOLOv8-Pose for actions: {self.enabled_actions}")
+            self.pose_model = YOLO("yolov8n-pose.pt")
+            
         print("[INFO] Models loaded.")
         time.sleep(3.0)
+
+    def reload_actions(self):
+        """Hot-reload enabled actions from settings — can be called while the system is running."""
+        self.settings.load()  # Re-read settings.json from disk
+        self.action_manager.load_all_actions()  # Re-scan Actions_db
+        new_enabled = self.settings.get("camera_actions", {}).get(self.camera_name, [])
+        new_refs = {}
+        for act in new_enabled:
+            data = self.action_manager.get_action_data(act)
+            if data:
+                new_refs[act] = data
+        with self.lock:
+            self.enabled_actions = new_enabled
+            self.reference_actions = new_refs
+            # Lazy-load pose model if actions are being enabled for the first time
+            if self.enabled_actions and self.pose_model is None:
+                print(f"[{self.camera_name}] Lazy-loading YOLOv8-Pose for newly assigned actions")
+                self.pose_model = YOLO("yolov8n-pose.pt")
+        print(f"[{self.camera_name}] Actions reloaded: {new_enabled}")
 
     def get_next_available_face_id(self):
         """Scans Faces_db to find the next 'User_X' ID"""
@@ -787,6 +832,78 @@ class DetectionSystem:
         return detected_face_ids
         
 
+    def process_actions(self, crop, person_obj, frame):
+        """Runs YOLOv8-Pose on person crop and checks for active actions."""
+        try:
+            # Run YOLOv8-Pose detection
+            results = self.pose_model(crop, verbose=False)
+            
+            if len(results) > 0 and results[0].keypoints is not None and len(results[0].keypoints.data) > 0:
+                h, w = crop.shape[:2]
+                # Extract normalized xyn keypoints [17, 2]
+                kpts = results[0].keypoints.xyn[0].cpu().numpy() # Normalized 0-1
+                
+                # Format to [17, 3] for compatibility (x, y, z=0)
+                landmarks = np.zeros((17, 3))
+                landmarks[:, :2] = kpts
+                
+                # Compare against reference actions
+                for act_name, ref_data in self.reference_actions.items():
+                    if "landmarks" in ref_data:
+                        active_indices = ref_data.get("active_keypoints", list(range(17)))
+                        
+                        # Filter out indices that might be from old 33-point MediaPipe files
+                        active_indices = [i for i in active_indices if i < 17]
+                        
+                        # Support dict format from new pose_creator
+                        if isinstance(ref_data["landmarks"], dict):
+                            # Try to extract 17 points, if the file has 33 it will just take the first 17
+                            ref_marks_list = []
+                            for i in range(17):
+                                if str(i) in ref_data["landmarks"]:
+                                    lm = ref_data["landmarks"][str(i)]
+                                    ref_marks_list.append([lm["x"], lm["y"], lm.get("z", 0.0)])
+                                else:
+                                    ref_marks_list.append([0, 0, 0])
+                            ref_marks = np.array(ref_marks_list)
+                        else:
+                            ref_marks = np.array(ref_data["landmarks"])[:17]
+                            
+                        if ref_marks.shape == landmarks.shape:
+                            # Filter to active keypoints
+                            current_active = np.array([landmarks[i] for i in active_indices])
+                            ref_active = np.array([ref_marks[i] for i in active_indices])
+                            
+                            if len(active_indices) > 0:
+                                # Euclidean distance
+                                dist = np.linalg.norm(current_active - ref_active) / len(active_indices)
+                                if dist < 0.10: # Lower threshold for YOLO normalized coords
+                                    # --- Cooldown check ---
+                                    cooldown_key = f"{act_name}:{person_obj.person_id}"
+                                    now = time.time()
+                                    last_fired = self._action_cooldowns.get(cooldown_key, 0.0)
+                                    if now - last_fired < self.ACTION_COOLDOWN_SECONDS:
+                                        # Still in cooldown — draw overlay but don't fire callback
+                                        cv2.putText(frame, f"Action: {act_name}", (person_obj.x, max(0, person_obj.y - 10)),
+                                                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                                        continue
+                                    
+                                    self._action_cooldowns[cooldown_key] = now
+                                    person_name = person_obj.get_primary_face_name(self.global_tracker)
+                                    print(f"[ACTION DETECTED] {act_name} detected for person {person_obj.person_id} ({person_name}) on {self.camera_name}!")
+                                    cv2.putText(frame, f"Action: {act_name}", (person_obj.x, max(0, person_obj.y - 10)), 
+                                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                                    # --- Fire callback to UI ---
+                                    if self.action_callback:
+                                        try:
+                                            self.action_callback(self.camera_name, person_name, act_name, now)
+                                        except Exception as cb_err:
+                                            print(f"[ACTION CALLBACK ERROR] {cb_err}")
+                                            
+                    # Extend here for DTW / Angle Check or Custom Classifier based on pose format
+        except Exception as e:
+            print(f"[ACTION ERROR] Failed to process actions: {e}")
+
     def processing_thread_function(self):
         print("[THREAD] Processing thread started")
         
@@ -850,8 +967,8 @@ class DetectionSystem:
 
                     # ── Minimum-size gate ──────────────────────────────────────────
                     # Ignore tiny/partial detections (person just entering the frame)
-                    MIN_CROP_W = 50   # pixels
-                    MIN_CROP_H = 100  # pixels
+                    MIN_CROP_W = 100   # pixels
+                    MIN_CROP_H = 200  # pixels
                     WARMUP_FRAMES = 5  # how many valid crops to collect before using the best one
 
                     # Update/Create Person already tracked person
@@ -859,6 +976,13 @@ class DetectionSystem:
                         person_obj = self.tracked_persons[tid] 
                         person_obj.update_position(l, t, w, h, 0.9)
                         
+                        # --- Action Detection ---
+                        if hasattr(self, 'pose_model') and self.pose_model and w > 50 and h > 100:
+                            # Run pose estimation
+                            crop = frame[t:t+h, l:l+w]
+                            if crop.size > 0:
+                                self.process_actions(crop, person_obj, frame)
+                                
                         # ── Warm-up buffer: collect crops, wait for best ────────
                         if person_obj.feature_vector is None:
                             if w >= MIN_CROP_W and h >= MIN_CROP_H:

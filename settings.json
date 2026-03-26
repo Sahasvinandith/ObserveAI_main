@@ -12,5 +12,13 @@
     "identity_change_margin": 0.15,
     "min_face_width": 70,
     "min_face_height": 90,
-    "min_face_confidence": 0.7500000000000002
+    "min_face_confidence": 0.7500000000000002,
+    "camera_actions": {
+        "HD Webcam": [
+            "right_check_smoke"
+        ],
+        "USB": [
+            "right_check_smoke"
+        ]
+    }
 }
