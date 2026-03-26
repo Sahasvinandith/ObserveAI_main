@@ -56,6 +56,10 @@ class Person:
         # Cross-camera identity inheritance
         self.inherited_identity = None      # Identity inherited from global tracker (e.g., "User_1")
         self.inherited_confidence = None    # Confidence of the inherited identity
+        
+        # --- Actions data (for async display) ---
+        self.active_action = None           # Name of the currently detected action
+        self.action_timestamp = 0.0          # Last time an action was detected
 
     def update_position(self, x, y, w, h, confidence):
         self.x = x
@@ -136,8 +140,10 @@ class DetectionSystem:
         self.db_update_queue = queue.Queue(maxsize=self.DB_UPDATE_QUEUE_SIZE)  # Async DB updates
         
         # Quality cache: user_name -> min_quality_on_disk (avoids disk reads)
-        self.quality_cache = {}
         self.quality_cache_lock = threading.Lock()
+        
+        # Action Queue (Buffer for async pose estimation)
+        self.action_queue = queue.Queue(maxsize=10)
         
         self.stop_event = threading.Event()
         self.lock = threading.Lock()
@@ -184,6 +190,7 @@ class DetectionSystem:
         self.disp_thread = None
         self.recog_thread = None # RESTORED WORKER
         self.db_update_thread = None  # Database update worker
+        self.action_thread = None     # Action detection worker
         self.watchdog_thread = None
 
         print("[INFO] System initialized successfully.")
@@ -301,9 +308,12 @@ class DetectionSystem:
             self.disp_thread = threading.Thread(target=self.display_thread_function, daemon=True)
             self.disp_thread.start()
 
-            # Database Update Worker Thread
             self.db_update_thread = threading.Thread(target=self.db_update_worker, daemon=True)
             self.db_update_thread.start()
+
+            # NEW: Action Worker Thread
+            self.action_thread = threading.Thread(target=self.action_worker_function, daemon=True)
+            self.action_thread.start()
 
             self.watchdog_thread = threading.Thread(target=self.watchdog_thread_function, daemon=True)
             self.watchdog_thread.start()
@@ -315,7 +325,7 @@ class DetectionSystem:
         self.stop_event.set()
         
         # Wait for threads to finish
-        for t in [self.proc_thread, self.disp_thread, self.recog_thread, self.db_update_thread, self.watchdog_thread, self.cam_thread]:
+        for t in [self.proc_thread, self.disp_thread, self.recog_thread, self.db_update_thread, self.action_thread, self.watchdog_thread, self.cam_thread]:
             if t and t.is_alive():
                 t.join(timeout=2.0)
         cv2.destroyAllWindows()
@@ -597,6 +607,35 @@ class DetectionSystem:
                 min_quality = 0  # Old format without quality score
         
         return min_quality if min_quality != float('inf') else 0
+
+    # --- 1.6 ACTION WORKER ---
+    def action_worker_function(self):
+        """
+        Background thread. Pulls person crops from action_queue,
+        runs YOLOv8-pose, and processes any detected actions.
+        """
+        print("[THREAD] Action Worker started")
+        
+        while not self.stop_event.is_set():
+            try:
+                # Get task: (crop, person_id, frame_timestamp)
+                task = self.action_queue.get(timeout=1.0)
+                crop, person_id, _ = task
+                
+                # Find the person object
+                with self.lock:
+                    person_obj = self.tracked_persons.get(person_id)
+                
+                if person_obj:
+                    self.process_actions(crop, person_obj)
+                    
+            except queue.Empty:
+                continue
+            except Exception as e:
+                print(f"[ACTION WORKER ERROR] {e}")
+        
+        print("[THREAD] Action Worker stopped")
+
     
     def _push_db_update(self, user_name: str, face_img, quality_score: float, max_faces: int = 5):
         """
@@ -832,7 +871,7 @@ class DetectionSystem:
         return detected_face_ids
         
 
-    def process_actions(self, crop, person_obj, frame):
+    def process_actions(self, crop, person_obj):
         """Runs YOLOv8-Pose on person crop and checks for active actions."""
         try:
             # Run YOLOv8-Pose detection
@@ -861,8 +900,11 @@ class DetectionSystem:
                             ref_marks_list = []
                             for i in range(17):
                                 if str(i) in ref_data["landmarks"]:
-                                    lm = ref_data["landmarks"][str(i)]
-                                    ref_marks_list.append([lm["x"], lm["y"], lm.get("z", 0.0)])
+                                    ref_marks_list.append([
+                                        ref_data["landmarks"][str(i)]["x"],
+                                        ref_data["landmarks"][str(i)]["y"],
+                                        ref_data["landmarks"][str(i)].get("z", 0.0)
+                                    ])
                                 else:
                                     ref_marks_list.append([0, 0, 0])
                             ref_marks = np.array(ref_marks_list)
@@ -878,21 +920,21 @@ class DetectionSystem:
                                 # Euclidean distance
                                 dist = np.linalg.norm(current_active - ref_active) / len(active_indices)
                                 if dist < 0.10: # Lower threshold for YOLO normalized coords
+                                    # Update person object for display visibility
+                                    person_obj.active_action = act_name
+                                    person_obj.action_timestamp = time.time()
+
                                     # --- Cooldown check ---
                                     cooldown_key = f"{act_name}:{person_obj.person_id}"
                                     now = time.time()
                                     last_fired = self._action_cooldowns.get(cooldown_key, 0.0)
                                     if now - last_fired < self.ACTION_COOLDOWN_SECONDS:
-                                        # Still in cooldown — draw overlay but don't fire callback
-                                        cv2.putText(frame, f"Action: {act_name}", (person_obj.x, max(0, person_obj.y - 10)),
-                                                    cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
                                         continue
                                     
                                     self._action_cooldowns[cooldown_key] = now
                                     person_name = person_obj.get_primary_face_name(self.global_tracker)
                                     print(f"[ACTION DETECTED] {act_name} detected for person {person_obj.person_id} ({person_name}) on {self.camera_name}!")
-                                    cv2.putText(frame, f"Action: {act_name}", (person_obj.x, max(0, person_obj.y - 10)), 
-                                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
+                                    
                                     # --- Fire callback to UI ---
                                     if self.action_callback:
                                         try:
@@ -978,10 +1020,13 @@ class DetectionSystem:
                         
                         # --- Action Detection ---
                         if hasattr(self, 'pose_model') and self.pose_model and w > 50 and h > 100:
-                            # Run pose estimation
+                            # Run pose estimation asynchronously
                             crop = frame[t:t+h, l:l+w]
                             if crop.size > 0:
-                                self.process_actions(crop, person_obj, frame)
+                                try:
+                                    self.action_queue.put_nowait((crop.copy(), tid, time.time()))
+                                except queue.Full:
+                                    pass # Busy, skip this frame
                                 
                         # ── Warm-up buffer: collect crops, wait for best ────────
                         if person_obj.feature_vector is None:
@@ -1171,6 +1216,11 @@ class DetectionSystem:
                 label = f"G:{gid} L:{pid} {prim_face} {status}"
                 cv2.putText(frame, label, (px, py - 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+                
+                # Draw active action if recent (within 2 seconds)
+                if getattr(person_obj, 'active_action', None) and (current_time - getattr(person_obj, 'action_timestamp', 0) < 2.0):
+                    cv2.putText(frame, f"Action: {person_obj.active_action}", (px, py - 60),
+                                cv2.FONT_HERSHEY_SIMPLEX, 0.8, (0, 0, 255), 2)
             
             # Send to PyQt
             if self.output_callback:
