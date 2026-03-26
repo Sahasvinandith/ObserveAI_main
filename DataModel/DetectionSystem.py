@@ -60,6 +60,11 @@ class Person:
         # --- Actions data (for async display) ---
         self.active_action = None           # Name of the currently detected action
         self.action_timestamp = 0.0          # Last time an action was detected
+        
+        # --- Debug data (for ghost check) ---
+        self.hits = 0
+        self.age = 0
+        self.time_since_update = 0
 
     def update_position(self, x, y, w, h, confidence):
         self.x = x
@@ -140,6 +145,7 @@ class DetectionSystem:
         self.db_update_queue = queue.Queue(maxsize=self.DB_UPDATE_QUEUE_SIZE)  # Async DB updates
         
         # Quality cache: user_name -> min_quality_on_disk (avoids disk reads)
+        self.quality_cache = {}
         self.quality_cache_lock = threading.Lock()
         
         # Action Queue (Buffer for async pose estimation)
@@ -149,6 +155,9 @@ class DetectionSystem:
         self.lock = threading.Lock()
         
         self.last_frame_buffer = {"frame": None, "timestamp": 0.0}
+        
+        # Debug: raw YOLO detections (for ghost check)
+        self.raw_detections = []
 
         # Data
         self.tracked_persons:dict[int, Person] = {}
@@ -985,11 +994,17 @@ class DetectionSystem:
                                 if conf >= self.PERSON_CONFIDENCE_THRESHOLD:
                                     x1, y1, x2, y2 = map(int, box.xyxy[0])
                                     detections.append(([x1, y1, x2 - x1, y2 - y1], conf, 0))
+                    
+                    with self.lock:
+                        self.raw_detections = [([dx, dy, dw, dh], dc) for ([dx, dy, dw, dh], dc, _) in detections]
+                        
                     # Only update tracker when we have fresh detections
                     tracks = self.person_tracker.update_tracks(detections, frame=frame) #check the track of user. i think this is local id
                 else:
                     # Between detection frames, still update tracker with empty detections
                     # This keeps existing tracks alive
+                    with self.lock:
+                        self.raw_detections = []
                     tracks = self.person_tracker.update_tracks([], frame=frame) 
 
                 # 3. Process tracked persons
@@ -999,10 +1014,23 @@ class DetectionSystem:
                     # Process only confirmed tracks
                     # With n_init=1, tracks confirm immediately after first detection
                     if not track.is_confirmed():
-                        print(f"deepsort track for user in {self.camera_name} is not yet confirmed")
+                        # print(f"deepsort track for user in {self.camera_name} is not yet confirmed")
                         continue
 
                     tid = track.track_id
+                    current_tracked_ids.append(tid)
+                    l, t, r, b = map(int, track.to_ltrb())
+                    w, h = r - l, b - t
+
+                    # Update/Create Person already tracked person
+                    if tid in self.tracked_persons:
+                        person_obj = self.tracked_persons[tid] 
+                        person_obj.update_position(l, t, w, h, 0.9)
+                        
+                        # Store debug info (Ghost check)
+                        person_obj.hits = track.hits
+                        person_obj.age = track.age
+                        person_obj.time_since_update = track.time_since_update
                     current_tracked_ids.append(tid)
                     l, t, r, b = map(int, track.to_ltrb())
                     w, h = r - l, b - t
@@ -1177,13 +1205,20 @@ class DetectionSystem:
             
             if frame is None: time.sleep(0.01); continue
 
-            # 2. Snapshot Data (Safe Copy)
             with self.lock:
                 display_persons = list(self.tracked_persons.values())
+                raw_dets = list(self.raw_detections)
                 q_size = self.recognition_queue.qsize()
 
             # 3. Drawing Loop
             current_time = time.time()
+            
+            # --- DEBUG: Raw YOLO Bboxes (Yellow) ---
+            for box, conf in raw_dets:
+                lx, ly, lw, lh = box
+                cv2.rectangle(frame, (lx, ly), (lx + lw, ly + lh), (0, 255, 255), 1)
+                cv2.putText(frame, f"YOLO:{conf:.2f}", (lx, ly + 15),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 255), 1)
             for person_obj in display_persons:
                 # Skip drawing if marked obsolete (e.g. tracking fragment merged into new track)
                 if getattr(person_obj, 'is_obsolete', False):
@@ -1216,6 +1251,11 @@ class DetectionSystem:
                 label = f"G:{gid} L:{pid} {prim_face} {status}"
                 cv2.putText(frame, label, (px, py - 30),
                             cv2.FONT_HERSHEY_SIMPLEX, 0.7, color, 2)
+                
+                # --- Debug Label (Ghost check) ---
+                debug_label = f"Hits:{person_obj.hits} Age:{person_obj.age} Upd:{person_obj.time_since_update}"
+                cv2.putText(frame, debug_label, (px, py + ph + 20),
+                            cv2.FONT_HERSHEY_SIMPLEX, 0.4, (0, 255, 0), 1)
                 
                 # Draw active action if recent (within 2 seconds)
                 if getattr(person_obj, 'active_action', None) and (current_time - getattr(person_obj, 'action_timestamp', 0) < 2.0):
