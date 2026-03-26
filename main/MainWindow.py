@@ -532,6 +532,7 @@ class MainWindow(QMainWindow):
             worker = self.camera_workers[camera]
             if hasattr(worker, 'latest_frame') and worker.latest_frame is not None:
                 # Save as JPG in detections/ folder
+                os.makedirs("detections", exist_ok=True)
                 filename = f"act_{int(timestamp)}_{camera.replace(' ','_')}.jpg"
                 save_path = os.path.join("detections", filename)
                 try:
