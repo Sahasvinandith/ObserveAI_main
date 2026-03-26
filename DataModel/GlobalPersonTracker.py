@@ -371,6 +371,18 @@ class GlobalPersonTracker:
             )
             print(f"[GLOBAL TRACKER] Registered camera '{name}' at pos={position}, rot={rotation}°, fov={fov}°, range={view_range}")
     
+    def update_camera_params(self, name: str, fov: Optional[float] = None, range_val: Optional[float] = None):
+        """
+        Update a camera's FOV or view range at runtime.
+        """
+        with self.lock:
+            if name in self.cameras:
+                if fov is not None:
+                    self.cameras[name].fov = fov
+                if range_val is not None:
+                    self.cameras[name].view_range = range_val
+                print(f"[GLOBAL TRACKER] Updated camera '{name}': fov={self.cameras[name].fov}, range={self.cameras[name].view_range}")
+    
     def update_camera_frame_size(self, name: str, width: int, height: int):
         """Update frame dimensions for a camera (call when actual frame size is known)"""
         with self.lock:

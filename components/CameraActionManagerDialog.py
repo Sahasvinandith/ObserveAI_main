@@ -75,7 +75,7 @@ class CameraActionManagerDialog(QDialog):
         super().__init__(parent)
         self.setWindowTitle("Manage Camera Actions")
         self.setMinimumSize(540, 380)
-        self.setStyleSheet(_STYLE)
+        # Inherits global style from QApplication
 
         self._camera_names = camera_names
         self._ai_instances = ai_instances

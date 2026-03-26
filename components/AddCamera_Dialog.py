@@ -138,11 +138,17 @@ class AddCameraDialog(QDialog):
       • Network / URL tab – manual URL / device path entry
     """
 
-    def __init__(self, parent=None):
+    def __init__(self, parent=None, camera_info=None):
         super().__init__(parent)
-        self.setWindowTitle("Add Camera")
+        self.camera_info = camera_info # If present, we are in EDIT mode
+        
+        if self.camera_info:
+            self.setWindowTitle(f"Configure Camera: {self.camera_info.get('name', 'Unknown')}")
+        else:
+            self.setWindowTitle("Add Camera")
+            
         self.setMinimumWidth(420)
-        self.setStyleSheet(_STYLE)
+        # Inherits global stylesheet from QApplication
 
         self._detected_cameras: list[dict] = []
 
@@ -151,7 +157,8 @@ class AddCameraDialog(QDialog):
         root.setContentsMargins(18, 18, 18, 16)
 
         # ── Title ──────────────────────────────────────────────
-        title = QLabel("Add a Camera")
+        title_text = "Configure Camera" if self.camera_info else "Add a Camera"
+        title = QLabel(title_text)
         title_font = QFont()
         title_font.setPointSize(13)
         title_font.setBold(True)
@@ -167,6 +174,10 @@ class AddCameraDialog(QDialog):
         root.addWidget(QLabel("Camera Name"))
         self.name_input = QLineEdit()
         self.name_input.setPlaceholderText("e.g. Lobby Camera")
+        if self.camera_info:
+            self.name_input.setText(self.camera_info.get("name", ""))
+            # Usually better to not rename once created, or handle carefully.
+            # I'll allow renaming but MainWindow will need to handle it.
         root.addWidget(self.name_input)
 
         # ── Tabs ────────────────────────────────────────────────
@@ -185,7 +196,7 @@ class AddCameraDialog(QDialog):
         self.fov_input = QDoubleSpinBox()
         self.fov_input.setRange(10, 180)
         self.fov_input.setSingleStep(5)
-        self.fov_input.setValue(70)
+        self.fov_input.setValue(self.camera_info.get("fov", 70) if self.camera_info else 70)
         self.fov_input.setSuffix("°")
         fov_col.addWidget(self.fov_input)
         fov_row.addLayout(fov_col)
@@ -195,7 +206,7 @@ class AddCameraDialog(QDialog):
         self.view_range_input = QDoubleSpinBox()
         self.view_range_input.setRange(50, 1000)
         self.view_range_input.setSingleStep(10)
-        self.view_range_input.setValue(200)
+        self.view_range_input.setValue(self.camera_info.get("range", 200) if self.camera_info else 200)
         self.view_range_input.setSuffix(" px")
         rng_col.addWidget(self.view_range_input)
         fov_row.addLayout(rng_col)
@@ -213,10 +224,30 @@ class AddCameraDialog(QDialog):
         for act in custom_actions:
             item = QListWidgetItem(act)
             item.setFlags(item.flags() | Qt.ItemFlag.ItemIsUserCheckable)
-            item.setCheckState(Qt.CheckState.Unchecked)
+            
+            # Pre-check if in Edit mode
+            if self.camera_info and act in self.camera_info.get("actions", []):
+                item.setCheckState(Qt.CheckState.Checked)
+            else:
+                item.setCheckState(Qt.CheckState.Unchecked)
+                
             self.actions_list_widget.addItem(item)
         actions_col.addWidget(self.actions_list_widget)
         root.addLayout(actions_col)
+
+        # ── Pre-select Tab ──────────────────────────────────────
+        if self.camera_info:
+            url = self.camera_info.get("url", "")
+            # If URL doesn't look like a simple integer or /dev/video
+            is_network = False
+            if url:
+                if not (url.isdigit() or url.startswith("/dev/video") or "video" in url.lower()):
+                    is_network = True
+            
+            if is_network:
+                self.tabs.setCurrentIndex(1) # URL Tab
+            else:
+                self.tabs.setCurrentIndex(0) # Local Tab
 
         # ── Buttons ─────────────────────────────────────────────
         self.buttonBox = QDialogButtonBox(
@@ -278,6 +309,8 @@ class AddCameraDialog(QDialog):
         layout.addWidget(QLabel("Camera URL, IP stream, or device path:"))
         self.url_input = QLineEdit()
         self.url_input.setPlaceholderText("rtsp://192.168.1.x:554/stream  or  /dev/video2")
+        if self.camera_info:
+            self.url_input.setText(self.camera_info.get("url", ""))
         layout.addWidget(self.url_input)
 
         hint = QLabel(

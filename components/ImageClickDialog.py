@@ -23,15 +23,7 @@ class ImageClickDialog(QDialog):
     def __init__(self, frame, camera_name, parent=None):
         super().__init__(parent)
         self.setWindowTitle(f"Click the matching point in {camera_name}")
-        self.setStyleSheet("""
-            QDialog { background-color: rgb(39, 7, 40); color: white; }
-            QLabel { color: white; background-color: transparent; border: none; font-size: 14px; font-weight: bold; }
-            QPushButton { 
-                background-color: rgb(60, 30, 65); color: white; 
-                border: 1px solid rgb(100, 50, 110); border-radius: 4px; padding: 5px 15px;
-            }
-            QPushButton:hover { background-color: rgb(100, 50, 110); border: 1px solid rgb(0, 255, 100); }
-        """)
+        # Inherits global style from QApplication
         
         self.normalized_x = None
         self.normalized_y = None  # NEW: Capture Y coordinate

@@ -1,3 +1,4 @@
+import os
 import json
 import time
 from PyQt6.QtWidgets import (QListWidgetItem,QFileDialog,QGraphicsScene,QApplication, QMainWindow, QLabel, QVBoxLayout,QLineEdit,QDialogButtonBox,QDialog, QGraphicsRectItem, QGraphicsEllipseItem, QMenu, QWidget, QGraphicsSimpleTextItem, QInputDialog, QMessageBox)
@@ -7,7 +8,7 @@ import threading
 import cv2
 from PyQt6.uic import loadUi
 from components.Wall import WallItem
-from components.AddCamera_Dialog import AddCameraDialog
+from components.AddCamera_Dialog import AddCameraDialog, detect_local_cameras
 from components.Camera_widget import CameraItem
 from components.Camera_list_widget import CameraFeedWidget
 from components.Grid_feed_widget import GridFeedWidget
@@ -32,7 +33,7 @@ class PopOutWindow(QMainWindow):
         
         self.setWindowTitle(f"ObserveAI — {page_title}")
         self.setMinimumSize(600, 400)
-        self.setStyleSheet("background-color: rgb(39, 7, 40); color: rgb(255, 255, 255);")
+        # Inherits global style from StyleHelper
         
         # Reparent the page widget into this window
         self.setCentralWidget(page_widget)
@@ -628,6 +629,7 @@ class MainWindow(QMainWindow):
         # --- 2. Create UI Widgets ---
         list_widget = CameraFeedWidget(name)
         grid_widget = GridFeedWidget(name)
+        grid_widget.configure_clicked.connect(self._on_configure_camera_clicked)
         cam_item = CameraItem(name=name, url=url, view_angle=fov, view_range=view_range)
         cam_item.context_menu_callback = self._on_camera_context_menu
         
@@ -851,18 +853,49 @@ class MainWindow(QMainWindow):
                 print(f"Error loading a wall: {e}")
 
         # Load cameras
+        detected_cams = None # Lazy-load if needed
+        
         for cam_data in layout_data.get("cameras", []):
             try:
+                name = cam_data["name"]
+                url = cam_data["url"]
+                
+                # --- Robust Camera Re-detection for Local Devices ---
+                if isinstance(url, str) and url.startswith("/dev/video"):
+                    if not os.path.exists(url):
+                        print(f"[MAIN] Camera '{name}' saved at {url} not found. Attempting re-detection...")
+                        if detected_cams is None:
+                            detected_cams = detect_local_cameras()
+                        
+                        # Fallback 1: Match by name
+                        match = next((c for c in detected_cams if c['name'] == name), None)
+                        if match:
+                            url = match['device']
+                            print(f"[MAIN] Camera '{name}' re-detected at {url}")
+                        else:
+                            # Fallback 2: Manual selection
+                            choices = [f"{c['name']} ({c['device']})" for c in detected_cams]
+                            if choices:
+                                from PyQt6.QtWidgets import QInputDialog
+                                item, ok = QInputDialog.getItem(
+                                    self, "Camera Not Found", 
+                                    f"Could not find '{name}' at {url}.\nPlease select the camera from the list:",
+                                    choices, 0, False
+                                )
+                                if ok and item:
+                                    # Extract device path from "Name (/dev/videoX)"
+                                    url = item.split("(")[-1].rstrip(")")
+                                    print(f"[MAIN] Camera '{name}' manually rebound to {url}")
+                
                 self.create_camera_items(
-                    cam_data["name"],
-                    cam_data["url"],
+                    name,
+                    url,
                     QPointF(cam_data["pos"][0], cam_data["pos"][1]),
                     cam_data["rot"],
                     fov=cam_data.get("fov", 70.0),
                     view_range=cam_data.get("view_range", 200.0)
                 )
             except Exception as e:
-                
                 print(f"Error loading camera '{cam_data.get('name')}': {e}")
                 print(f"Camera data: {cam_data}")
         
@@ -930,10 +963,7 @@ class MainWindow(QMainWindow):
     def _show_popout_menu(self, pos, page_index, page_title, button):
         """Show right-click context menu with pop-out option."""
         menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu { background-color: rgb(60, 30, 65); color: white; border: 1px solid #555; }
-            QMenu::item:selected { background-color: rgb(100, 50, 110); }
-        """)
+        # Inherits global style from StyleHelper
         
         if page_index in self.popout_windows:
             dock_action = menu.addAction("⬅ Dock Back")
@@ -1172,7 +1202,7 @@ class MainWindow(QMainWindow):
             
         frame = worker.latest_frame
         if frame is None:
-            self._styled_msgbox("Calibration", "Failed to grab frame from video feed.", "warning")
+            QMessageBox.warning(self, "Calibration", "Failed to grab frame from video feed.")
             return
             
         # Open the image click dialog
@@ -1287,7 +1317,8 @@ class MainWindow(QMainWindow):
         
         result_text += f"Apply these changes?"
         
-        reply = self._styled_msgbox("Calibration Result", result_text, "question")
+        reply = QMessageBox.question(self, "Calibration Result", result_text, 
+                                     QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
         
         from PyQt6.QtWidgets import QMessageBox
         if reply == QMessageBox.StandardButton.Yes:
@@ -1347,16 +1378,78 @@ class MainWindow(QMainWindow):
         """
         from PyQt6.QtWidgets import QMenu
         menu = QMenu(self)
-        menu.setStyleSheet("""
-            QMenu { background-color: rgb(40, 40, 55); color: white; border: 1px solid #555; }
-            QMenu::item:selected { background-color: rgb(80, 80, 120); }
-        """)
+        # Inherits global style from StyleHelper
         
         calibrate_action = menu.addAction("📐 Calibrate Position")
         calibrate_action.triggered.connect(lambda: self._start_calibration(camera_name))
         
+        config_action = menu.addAction("⚙ Configure Feed")
+        config_action.triggered.connect(lambda: self._on_configure_camera_clicked(camera_name))
+        
         menu.exec(global_pos)
-    
+        
+    def _on_configure_camera_clicked(self, camera_name: str):
+        """
+        Open the configuration dialog for an existing camera and apply changes.
+        """
+        if camera_name not in self.scene_cameras:
+            return
+            
+        cam_item = self.scene_cameras[camera_name]
+        worker = self.camera_workers.get(camera_name)
+        
+        # Get current actions for this camera
+        current_actions = []
+        if camera_name in self.ai_instances:
+            current_actions = list(self.ai_instances[camera_name].actions.keys())
+            
+        # Prepare current info
+        camera_info = {
+            "name": camera_name,
+            "url": worker.url if worker else "",
+            "fov": cam_item.view_angle,
+            "range": cam_item.view_range,
+            "actions": current_actions
+        }
+        
+        from components.AddCamera_Dialog import AddCameraDialog
+        dialog = AddCameraDialog(self, camera_info=camera_info)
+        
+        if dialog.exec():
+            new_name, new_url, new_fov, new_range, selected_actions = dialog.get_details()
+            
+            # 1. Update FOV and Range (Visual and Tracking)
+            cam_item.view_angle = new_fov
+            cam_item.view_range = new_range
+            cam_item.update() # Refresh the cone in the map
+            
+            if self.global_tracker:
+                self.global_tracker.update_camera_params(camera_name, fov=new_fov, range_val=new_range)
+            
+            # 2. Update Actions
+            if camera_name in self.ai_instances:
+                ai_system = self.ai_instances[camera_name]
+                # Sync actions with selected ones
+                ai_system.set_actions(selected_actions)
+                print(f"[{camera_name}] Actions updated: {selected_actions}")
+            
+            # 3. Update URL (Source)
+            if worker and worker.url != new_url:
+                print(f"[{camera_name}] URL changed to {new_url}. Restarting worker...")
+                worker.url = new_url
+                cam_item.url = new_url
+                worker.restart()
+            
+            # 4. Handle Name Change (If different)
+            if new_name != camera_name:
+                # This would require updating all dict keys. 
+                # For now, we'll suggest adding a new camera or inform the user.
+                # But since the user might expect it, let's at least update the UI label.
+                # Handling full rename is complex, let's keep name read-only in dialog if possible.
+                print(f"[MAIN] Note: Camera renaming at runtime is not fully supported yet.")
+                
+            print(f"[{camera_name}] Configuration updated successfully.")
+
     def _styled_msgbox(self, title: str, text: str, msg_type: str = "info"):
         """
         Create a QMessageBox styled to match the app's dark theme.
@@ -1374,32 +1467,9 @@ class MainWindow(QMainWindow):
         msg = QMessageBox(self)
         msg.setWindowTitle(title)
         msg.setText(text)
-        msg.setStyleSheet("""
-            QMessageBox {
-                background-color: rgb(39, 7, 40);
-                color: rgb(255, 255, 255);
-            }
-            QMessageBox QLabel {
-                color: rgb(255, 255, 255);
-                font-size: 13px;
-            }
-            QPushButton {
-                background-color: rgb(60, 30, 65);
-                color: white;
-                border: 1px solid rgb(100, 50, 110);
-                padding: 6px 20px;
-                border-radius: 4px;
-                min-width: 80px;
-            }
-            QPushButton:hover {
-                background-color: rgb(100, 50, 110);
-            }
-            QPushButton:pressed {
-                background-color: rgb(120, 60, 130);
-            }
-        """)
+        # Inherits global style from StyleHelper
         
-        if msg_type == "warning":
+        if msg_type == "warning" or msg_type == "critical":
             msg.setIcon(QMessageBox.Icon.Warning)
         elif msg_type == "question":
             msg.setIcon(QMessageBox.Icon.Question)

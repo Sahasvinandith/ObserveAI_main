@@ -12,6 +12,7 @@ from PyQt6.QtCore import Qt, QTimer
 from PyQt6.QtGui import QImage, QPixmap, QPainter, QPen, QColor
 
 from ultralytics import YOLO
+from components.StyleHelper import apply_global_style
 
 # YOLOv8-Pose (COCO) Landmark names (17 points)
 LANDMARK_NAMES = [
@@ -31,7 +32,7 @@ class PoseCreator(QMainWindow):
         super().__init__()
         self.setWindowTitle("Action Pose Creator (YOLOv8-Pose)")
         self.resize(1000, 700)
-        self.setStyleSheet("background-color: rgb(39, 7, 40); color: white;")
+        # Inherits style from StyleHelper
 
         # Initialize YOLOv8-Pose
         print("[INFO] Loading YOLOv8-Pose model...")
@@ -363,6 +364,7 @@ class PoseCreator(QMainWindow):
 
 if __name__ == "__main__":
     app = QApplication(sys.argv)
+    apply_global_style(app)
     window = PoseCreator()
     window.show()
     sys.exit(app.exec())

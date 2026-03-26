@@ -24,10 +24,32 @@ class CameraWorker(QObject):
         self.is_running = True # Flag to control the loop
         self.should_reconnect = False  # Flag to trigger reconnection attempt
 
-        try:
-            self.url_int = int(self.url_str)
-        except ValueError:
+        self.url_int = None
+        self._parse_url()
+
+    def _parse_url(self):
+        """Parse url_str into url_int if it's a local device index or path"""
+        import re
+        if isinstance(self.url_str, str):
+            match = re.search(r'/dev/video(\d+)', self.url_str)
+            if match:
+                self.url_int = int(match.group(1))
+            else:
+                try:
+                    self.url_int = int(self.url_str)
+                except ValueError:
+                    self.url_int = None
+        else:
             self.url_int = None
+
+    @property
+    def url(self):
+        return self.url_str
+    
+    @url.setter
+    def url(self, value):
+        self.url_str = value
+        self._parse_url()
             
     def run(self):
         """
@@ -133,6 +155,7 @@ class CameraWorker(QObject):
         - Sets buffer size to 1 to prevent stale frame buildup
         Falls back to standard open if MJPEG negotiation fails.
         """
+        self._parse_url()
         is_device_path = isinstance(self.url_str, str) and self.url_str.startswith("/dev/video")
         url_to_try = self.url_int if self.url_int is not None else self.url_str
 

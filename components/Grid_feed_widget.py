@@ -13,6 +13,8 @@ class GridFeedWidget(QWidget):
     
     # Signal to tell MainWindow to maximize/minimize this widget
     toggle_maximize = pyqtSignal()
+    # Signal to tell MainWindow to open configuration for this camera
+    configure_clicked = pyqtSignal(str)
 
     def __init__(self, camera_name: str, parent=None):
         super().__init__(parent)
@@ -56,6 +58,15 @@ class GridFeedWidget(QWidget):
         # Connect the refresh button
         self.refresh_button.clicked.connect(self.on_refresh_clicked)
         
+        self.configure_button = QToolButton(self)
+        self.configure_button.setText("⚙") # Gear symbol
+        self.configure_button.setToolTip("Configure Camera Feed")
+        self.configure_button.setStyleSheet("""
+            QToolButton { color: white; border: none; font-size: 16px; }
+            QToolButton:hover { background-color: #555; }
+        """)
+        self.configure_button.clicked.connect(lambda: self.configure_clicked.emit(self.camera_name))
+
         self.maximize_button = QToolButton(self)
         self.maximize_button.setText("□") # "Maximize" character
         self.maximize_button.setToolTip("Toggle Fullscreen")
@@ -69,6 +80,7 @@ class GridFeedWidget(QWidget):
         title_layout.addWidget(self.title_label)
         title_layout.addStretch()
         title_layout.addWidget(self.refresh_button)
+        title_layout.addWidget(self.configure_button)
         title_layout.addWidget(self.maximize_button)
 
         # --- 2. Video Label ---
