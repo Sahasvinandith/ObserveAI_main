@@ -1,9 +1,9 @@
 import os
 import json
 import time
-from PyQt6.QtWidgets import (QListWidgetItem,QFileDialog,QGraphicsScene,QApplication, QMainWindow, QLabel, QVBoxLayout,QLineEdit,QDialogButtonBox,QDialog, QGraphicsRectItem, QGraphicsEllipseItem, QMenu, QWidget, QGraphicsSimpleTextItem, QInputDialog, QMessageBox)
-from PyQt6.QtCore import (QPointF,QThread,Qt, pyqtSignal,pyqtSlot)
-from PyQt6.QtGui import QImage, QBrush, QPen, QColor
+from PyQt6.QtCore import (QPointF, QThread, Qt, pyqtSignal, pyqtSlot, QPropertyAnimation, QPoint, QRect, QEasingCurve, QTimer)
+from PyQt6.QtGui import QImage, QBrush, QPen, QColor, QPixmap
+from PyQt6.QtWidgets import (QListWidgetItem, QFileDialog, QGraphicsScene, QApplication, QMainWindow, QLabel, QVBoxLayout, QLineEdit, QDialogButtonBox, QDialog, QGraphicsRectItem, QGraphicsEllipseItem, QMenu, QWidget, QGraphicsSimpleTextItem, QInputDialog, QMessageBox, QHBoxLayout, QListWidget, QGraphicsOpacityEffect)
 import threading
 import cv2
 from PyQt6.uic import loadUi
@@ -477,27 +477,137 @@ class MainWindow(QMainWindow):
         sep.setStyleSheet("color: #ccc; font-weight: bold; font-size: 11pt; margin-top: 8px;")
         layout.addWidget(sep)
 
+        # Horizontal layout for Log + Preview
+        h_layout = QHBoxLayout()
+        h_layout.setSpacing(10)
+        
         self.action_log_list = QListWidget()
         self.action_log_list.setStyleSheet(
             "background-color: rgb(30, 10, 35); color: #00ff88; "
             "border: 1px solid #7a3a8a; border-radius: 4px; font-size: 10pt;"
         )
-        self.action_log_list.setMaximumHeight(220)
-        layout.addWidget(self.action_log_list)
+        self.action_log_list.setMaximumHeight(250)
+        self.action_log_list.currentItemChanged.connect(self._on_action_log_selection_changed)
+        h_layout.addWidget(self.action_log_list, stretch=2)
+
+        # Preview Label
+        self.action_preview_label = QLabel("Select an action to view frame")
+        self.action_preview_label.setAlignment(Qt.AlignmentFlag.AlignCenter)
+        self.action_preview_label.setStyleSheet(
+            "background-color: rgb(20, 5, 25); color: #888; "
+            "border: 1px solid #7a3a8a; border-radius: 4px;"
+        )
+        self.action_preview_label.setFixedSize(320, 240) # Fixed size for preview
+        h_layout.addWidget(self.action_preview_label, stretch=3)
+        
+        layout.addLayout(h_layout)
+
+    def _on_action_log_selection_changed(self, current, previous):
+        """Update the preview label when an action log entry is selected."""
+        if current is None:
+            self.action_preview_label.clear()
+            self.action_preview_label.setText("Select an action to view frame")
+            return
+            
+        img_path = current.data(Qt.ItemDataRole.UserRole)
+        if img_path and os.path.exists(img_path):
+            pixmap = QPixmap(img_path)
+            # Scale to fit while maintaining aspect ratio
+            scaled = pixmap.scaled(self.action_preview_label.size(), Qt.AspectRatioMode.KeepAspectRatio, Qt.TransformationMode.SmoothTransformation)
+            self.action_preview_label.setPixmap(scaled)
+        else:
+            self.action_preview_label.clear()
+            self.action_preview_label.setText("No evidence frame available")
 
     @pyqtSlot(str, str, str, float)
     def _on_action_detected(self, camera: str, person: str, action: str, timestamp: float):
-        """Receives an action detection event from the AI thread and logs it."""
+        """Receives an action detection event from the AI thread and logs it with evidence."""
         import datetime
         ts_str = datetime.datetime.fromtimestamp(timestamp).strftime("%H:%M:%S")
         entry = f"[{camera}]  {person}  →  {action}  at {ts_str}"
+        
+        # 1. Capture and Save Evidence Frame
+        image_path = None
+        if camera in self.camera_workers:
+            worker = self.camera_workers[camera]
+            if hasattr(worker, 'latest_frame') and worker.latest_frame is not None:
+                # Save as JPG in detections/ folder
+                filename = f"act_{int(timestamp)}_{camera.replace(' ','_')}.jpg"
+                save_path = os.path.join("detections", filename)
+                try:
+                    import cv2
+                    cv2.imwrite(save_path, worker.latest_frame)
+                    image_path = os.path.abspath(save_path)
+                except Exception as e:
+                    print(f"[ACTION LOG] Failed to save evidence frame: {e}")
+
+        # 2. Add to Log List
         if hasattr(self, 'action_log_list'):
-            from PyQt6.QtWidgets import QListWidgetItem
-            self.action_log_list.insertItem(0, QListWidgetItem(entry))
+            item = QListWidgetItem(entry)
+            if image_path:
+                item.setData(Qt.ItemDataRole.UserRole, image_path)
+            self.action_log_list.insertItem(0, item)
             # Cap at 100 entries to avoid memory growth
             while self.action_log_list.count() > 100:
                 self.action_log_list.takeItem(self.action_log_list.count() - 1)
+        
+        # 3. Toast Notification
+        self._show_notification(f"<b>{action}</b> detected on <i>{camera}</i>")
+        
         print(f"[ACTION LOG] {entry}")
+
+    def _show_notification(self, message: str):
+        """Show an animated toast notification in the top-right corner."""
+        notification = QLabel(message, self)
+        # High-end neon styling
+        notification.setStyleSheet("""
+            background-color: rgba(30, 10, 35, 230);
+            color: #00ff88;
+            border: 2px solid #7a3a8a;
+            border-radius: 10px;
+            padding: 12px 20px;
+            font-size: 11pt;
+        """)
+        notification.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        notification.adjustSize()
+        
+        # Position at top-right
+        margin = 20
+        x = self.width() - notification.width() - margin
+        y = margin
+        notification.move(x, y)
+        
+        # Animation: Fade in and out
+        effect = QGraphicsOpacityEffect(notification)
+        notification.setGraphicsEffect(effect)
+        
+        anim = QPropertyAnimation(effect, b"opacity")
+        anim.setDuration(500)
+        anim.setStartValue(0.0)
+        anim.setEndValue(1.0)
+        anim.setEasingCurve(QEasingCurve.Type.OutCubic)
+        
+        notification.show()
+        anim.start()
+        
+        # Keep reference to avoid GC
+        if not hasattr(self, '_active_notifications'):
+            self._active_notifications = []
+        self._active_notifications.append((notification, anim))
+        
+        # Fade out after 3 seconds
+        def fade_out():
+            self._out_anim = QPropertyAnimation(effect, b"opacity")
+            self._out_anim.setDuration(800)
+            self._out_anim.setStartValue(1.0)
+            self._out_anim.setEndValue(0.0)
+            self._out_anim.finished.connect(notification.deleteLater)
+            self._out_anim.start()
+            # Remove from tracking list
+            if (notification, anim) in self._active_notifications:
+                self._active_notifications.remove((notification, anim))
+                
+        QTimer.singleShot(3000, fade_out)
 
     def manage_camera_actions(self):
         """Open the Camera Action Manager dialog."""
