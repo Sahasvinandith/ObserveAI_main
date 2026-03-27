@@ -19,16 +19,26 @@ from dataclasses import dataclass, field
 from typing import Dict, Optional, List, Tuple, Callable
 
 
-@dataclass
 class CameraInfo:
-    """Stores camera spatial information for cross-camera tracking"""
-    name: str
-    position: Tuple[float, float]  # (x, y) on floor plan
-    rotation: float  # Degrees, 0 = pointing right, increases counter-clockwise
-    fov: float = 70.0  # Field of view in degrees
-    view_range: float = 200.0  # Max effective detection range in floor plan units
-    frame_width: int = 1920  # Frame width for bbox normalization
-    frame_height: int = 1080  # Frame height
+    """Stores calibration and state for a single camera feed."""
+    def __init__(self, name: str, position: Tuple[float, float], rotation: float, 
+                 fov: float = 70.0, view_range: float = 200.0,
+                 frame_width: int = 1920, frame_height: int = 1080):
+        self.name = name
+        self.position = position      # (x, y) on floor map
+        self.rotation = rotation      # Degrees
+        self.rotation_rad = math.radians(rotation)
+        self.fov = fov                # Field of View in degrees
+        self.fov_rad = math.radians(fov)
+        self.view_range = view_range  # Max distance in pixels
+        
+        # Performance/Visuals
+        self.frame_width = frame_width
+        self.frame_height = frame_height
+        
+        # Calibration points for spatial scoring
+        # List of CalibrationPoint objects (world_x, world_y, frame_x_normalized, frame_y_normalized)
+        self.calibration_points = []
 
 
 @dataclass
@@ -346,9 +356,10 @@ class GlobalPersonTracker:
     
     def register_camera(self, name: str, position: Tuple[float, float], 
                        rotation: float, fov: float = 70.0, view_range: float = 200.0,
-                       frame_width: int = 1920, frame_height: int = 1080):
+                       frame_width: int = 1920, frame_height: int = 1080,
+                       calibration_points: Optional[List] = None):
         """
-        Register a camera with its spatial information.
+        Register a camera with its spatial information and calibration points.
         
         Args:
             name: Camera name (must match name used in create_or_update)
@@ -358,9 +369,10 @@ class GlobalPersonTracker:
             view_range: Max effective detection range in floor plan units (default 200)
             frame_width: Frame width in pixels for bbox normalization
             frame_height: Frame height in pixels
+            calibration_points: Optional list of (world_x, world_y, frame_x_norm, frame_y_norm)
         """
         with self.lock:
-            self.cameras[name] = CameraInfo(
+            cam = CameraInfo(
                 name=name,
                 position=position,
                 rotation=rotation,
@@ -369,7 +381,13 @@ class GlobalPersonTracker:
                 frame_width=frame_width,
                 frame_height=frame_height
             )
-            print(f"[GLOBAL TRACKER] Registered camera '{name}' at pos={position}, rot={rotation}°, fov={fov}°, range={view_range}")
+            if calibration_points:
+                # Store list of (world_x, world_y, frame_x_norm, frame_y_norm)
+                cam.calibration_points = calibration_points
+            self.cameras[name] = cam
+            print(f"[TRACKER] Registered camera '{name}' at {position}, rot={rotation}°, fov={fov}°, "
+                  f"frame_size={frame_width}x{frame_height}, "
+                  f"{len(cam.calibration_points) if calibration_points else 0} cal points")
     
     def update_camera_params(self, name: str, fov: Optional[float] = None, range_val: Optional[float] = None):
         """
@@ -390,6 +408,66 @@ class GlobalPersonTracker:
                 self.cameras[name].frame_width = width
                 self.cameras[name].frame_height = height
     
+    # =========================================================================
+    # Calibration-Based Mapping
+    # =========================================================================
+    
+    def _calculate_depth_from_bbox(self, camera: CameraInfo, bbox: Tuple[int, int, int, int]) -> float:
+        """
+        Estimate distance from camera based on BBox height (stable depth cue).
+        Uses inverse-proportional law: distance = k / height
+        k is calibrated from ref_human_height_px at 5m.
+        """
+        _, _, _, h = bbox
+        if h <= 0: return camera.view_range
+        
+        # Load calibration constants from settings/tracker
+        # We use height because it's more stable than width for rotating persons.
+        ref_h = getattr(self, 'ref_human_height_px', 250)
+        k = 5.0 * ref_h
+        
+        # Estimated distance in meters
+        dist_m = k / h
+        
+        # Convert meters to map pixels (using pixels_per_meter)
+        return dist_m * self.pixels_per_meter
+
+    def _get_person_region(self, camera: CameraInfo, bbox: Tuple[int, int, int, int]) -> Optional[int]:
+        """
+        Identify which "calibration region" the person is in.
+        Returns the index of the closest calibration point in the frame.
+        """
+        if not camera.calibration_points:
+            return None
+            
+        x, y, w, h = bbox
+        center_x_norm = (x + w/2) / camera.frame_width
+        
+        # Region matching: find the calibration point with closest frame_x
+        # This identifies the rough 'door' or 'aisle' the person is in.
+        best_pt_idx = -1
+        min_diff = 1.0
+        
+        for i, pt in enumerate(camera.calibration_points):
+            # pt is a CalibrationPoint object with frame_x_normalized attribute
+            # We use duck-typing or attribute access
+            try:
+                pt_x = pt.frame_x_normalized
+            except AttributeError:
+                # If it's a raw tuple (world_x, world_y, frame_x, frame_y)
+                pt_x = pt[2]
+                
+            diff = abs(center_x_norm - pt_x)
+            if diff < min_diff:
+                min_diff = diff
+                best_pt_idx = i
+                
+        # Only return a region if they are within 20% of the frame width of the marker
+        if min_diff > 0.25:
+            return None
+            
+        return best_pt_idx
+
     # =========================================================================
     # Spatial Calculations
     # =========================================================================
@@ -436,30 +514,29 @@ class GlobalPersonTracker:
         
         return world_angle
     
-    def _estimate_person_position(self, camera_name: str, 
-                                   bbox: Tuple[int, int, int, int],
-                                   distance_estimate: Optional[float] = None,
-                                   last_known_pos: Optional[Tuple[float, float]] = None) -> Optional[Tuple[float, float]]:
+    def _estimate_person_position(self, camera_name: str, bbox: Tuple[int, int, int, int], 
+                                 last_known_pos: Optional[Tuple[float, float]] = None,
+                                 depth_override: Optional[float] = None) -> Optional[Tuple[float, float]]:
         """
-        Estimate person's world position based on camera location and viewing angle.
-        
-        This is an approximation that projects the person along the viewing ray.
-        Uses the camera's configured view_range to scale the distance estimate.
-        If last_known_pos is provided, it maintains the previous depth to prevent jumping.
+        Estimate a person's position on the floor map.
         
         Args:
-            camera_name: Name of the camera
+            camera_name: Camera reporting the detection
             bbox: (x, y, w, h) bounding box
-            distance_estimate: Override distance from camera. If None, uses half the camera's view_range.
-            last_known_pos: (x, y) previous position to estimate depth.
-            
-        Returns:
-            (x, y) estimated position on floor plan, or None
+            last_known_pos: Optional previous position to improve depth estimate
+            depth_override: Optional explicit depth in pixels (bypasses heuristics)
         """
-        if camera_name not in self.cameras:
+        camera = self.cameras.get(camera_name)
+        if not camera:
             return None
         
-        camera = self.cameras[camera_name]
+        # 1. Use existing _bbox_to_world_angle
+        world_angle = self._bbox_to_world_angle(camera_name, bbox)
+        if world_angle is None:
+            return None
+            
+        # 2. Determine Depth (Distance from camera)
+        distance_estimate = depth_override
         
         if distance_estimate is None:
             if last_known_pos is not None:
@@ -467,35 +544,13 @@ class GlobalPersonTracker:
                 dx = last_known_pos[0] - camera.position[0]
                 dy = last_known_pos[1] - camera.position[1]
                 dist = math.hypot(dx, dy)
-                # Keep distance within reasonable bounds (10% to 100% of view range)
                 distance_estimate = max(camera.view_range * 0.1, min(dist, camera.view_range))
             else:
-                # Use Bounding Box feet position to estimate depth computationally
-                x, y, w, h = bbox
-                bottom_y = y + h
-                
-                # Normalize to 0.0 (top) to 1.0 (bottom of frame)
-                frame_height = getattr(camera, 'frame_height', 640)
-                normalized_y = min(1.0, max(0.0, bottom_y / frame_height))
-                
-                # Linear approximation of depth perspective:
-                # Feet near bottom of frame (1.0) = 10% of view range (very close)
-                # Feet at top of frame (0.0) = 100% of view range (very far)
-                distance_factor = 1.0 - (normalized_y * 0.9)
-                distance_estimate = camera.view_range * distance_factor
-                
-                # Floor constraint so they don't appear *inside* the camera
-                distance_estimate = max(20.0, distance_estimate)
+                # Fallback to calibration-based depth estimation
+                distance_estimate = self._calculate_depth_from_bbox(camera, bbox)
         
-        world_angle = self._bbox_to_world_angle(camera_name, bbox)
-        
-        if world_angle is None:
-            return None
-        
-        # Convert angle to radians
+        # 3. Project from camera position along the viewing angle
         angle_rad = math.radians(world_angle)
-        
-        # Project from camera position along the viewing angle
         est_x = camera.position[0] + distance_estimate * math.cos(angle_rad)
         est_y = camera.position[1] + distance_estimate * math.sin(angle_rad)
         
@@ -647,59 +702,79 @@ class GlobalPersonTracker:
     
     def _spatial_distance(self, camera_name: str, bbox: Tuple[int, int, int, int], person: 'GlobalPerson') -> float:
         """
-        Calculate spatial distance score between a new observation and a tracked person.
-        
-        Leverages the person's precise 2D floor `smoothed_position` (triangulated from 
-        multiple cameras) to accurately calculate the physical meter deviation of the 
-        new camera's ray from the person's true location.
-        
-        Returns:
-            Distance score (0 = highly confident same location, 1 = physically impossible)
+        Calculate spatial distance score (0.0 to 1.0) using calibration points,
+        depth estimation, and region matching.
         """
-        if camera_name not in self.cameras:
-            return 0.5  # Neutral - don't affect matching
+        camera = self.cameras.get(camera_name)
+        if camera is None:
+            return 1.0  # Unknown camera, high penalty
             
-        map_distance = None
+        # 1. Calculate Depth from BBox Height
+        current_depth = self._calculate_depth_from_bbox(camera, bbox)
         
-        # 1. Primary Method: Pinpoint Ray Deviation using Stereoscopic Known Position
-        if getattr(person, 'smoothed_position', None) is not None:
-            # Project the new camera's ray until it hits the depth of the known person
-            pos1 = self._estimate_person_position(camera_name, bbox, last_known_pos=person.smoothed_position)
-            
-            if pos1 is not None:
-                # The map distance is exactly the chord length (in pixels) between 
-                # where the ray *is pointing* and where the person *actually is*.
-                map_distance = math.hypot(pos1[0] - person.smoothed_position[0], pos1[1] - person.smoothed_position[1])
+        # 2. Identify Current Region
+        current_region_idx = self._get_person_region(camera, bbox)
+        
+        # 3. Find Best Spatial Match among existing sightings
+        min_spatial_score = 1.0
+        
+        # Get historical context (where was this person seen before?)
+        if person.camera_tracks:
+            for prev_cam_name, prev_track in person.camera_tracks.items():
+                if prev_cam_name == camera_name:
+                    continue # Usually handled by local tracker, but we score for continuity
+                    
+                prev_cam = self.cameras.get(prev_cam_name)
+                if not prev_cam: continue
                 
-        # 2. Fallback Method: Single-Camera Depth Approximation (for brand new targets)
-        if map_distance is None:
-            active_tracks = [t for c, t in person.camera_tracks.items() if c != camera_name and t.bbox is not None]
-            if not active_tracks:
-                return 0.5
+                # --- Map Distance Score ---
+                # Estimate world position on floor map for current sighting
+                pos_cur = self._estimate_person_position(camera_name, bbox, depth_override=current_depth)
                 
-            active_tracks.sort(key=lambda t: t.last_seen, reverse=True)
-            other_track = active_tracks[0]
-            
-            pos1 = self._estimate_person_position(camera_name, bbox)
-            pos2 = self._estimate_person_position(other_track.camera_name, other_track.bbox)
-            
-            if pos1 is None or pos2 is None:
-                return 0.5
+                map_dist = 1000.0 # Default huge distance
+                if pos_cur and person.smoothed_position:
+                    map_dist = math.hypot(pos_cur[0] - person.smoothed_position[0],
+                                          pos_cur[1] - person.smoothed_position[1])
                 
-            map_distance = math.hypot(pos1[0] - pos2[0], pos1[1] - pos2[1])
-        
-        # Determine maximum tolerable map distance
-        pixels_per_meter = getattr(self, 'pixels_per_meter', 30.0)
-        # 3.0 meters deviation bubble gracefully accommodates bbox cropping jitter.
-        max_valid_distance = 0.5 * pixels_per_meter
-        
-        # Normalize distance to 0.0 - 1.0 (Maximum Penalty) score
-        spatial_score = min(1.0, map_distance / max_valid_distance)
-        
-        # Add slight exponential curve to penalize farther distances more aggressively
-        spatial_score = spatial_score ** 0.8
-        
-        return spatial_score
+                # --- Region Matching Score ---
+                region_score = 1.0
+                if current_region_idx is not None and prev_cam.calibration_points:
+                    # Check if Cam A's Region X corresponds to Cam B's Region Y physical spot
+                    cur_pt = camera.calibration_points[current_region_idx]
+                    for pt_prev in prev_cam.calibration_points:
+                        # pt has world_x, world_y
+                        try:
+                            wx, wy = pt_prev.world_x, pt_prev.world_y
+                            cwx, cwy = cur_pt.world_x, cur_pt.world_y
+                        except AttributeError:
+                            wx, wy = pt_prev[0], pt_prev[1]
+                            cwx, cwy = cur_pt[0], cur_pt[1]
+                            
+                        dist_pts = math.hypot(cwx - wx, cwy - wy)
+                        if dist_pts < 5.0: # Spot match
+                            region_score = 0.0
+                            break
+                
+                # --- Temporal Uncertainty ---
+                time_since = time.time() - prev_track.last_seen
+                max_valid_dist = 3.0 * self.pixels_per_meter
+                uncertainty_growth = 0.5 * self.pixels_per_meter
+                dynamic_bubble = max_valid_dist + (time_since * uncertainty_growth)
+                
+                map_score = min(1.0, map_dist / dynamic_bubble)
+                
+                # --- Weighted Combined Score ---
+                w_region = getattr(self, 'spatial_region_weight', 0.6)
+                w_depth = getattr(self, 'spatial_depth_weight', 0.4)
+                
+                combined = (w_region * region_score) + (w_depth * map_score)
+                min_spatial_score = min(min_spatial_score, combined)
+        else:
+            # Fallback for brand new person: neutral score (0.5)
+            # This allows features (Re-ID) to dominate the first registration.
+            min_spatial_score = 0.5
+            
+        return min_spatial_score
     
     def _color_distance(self, hist1: np.ndarray, hist2: np.ndarray) -> float:
         """
@@ -810,18 +885,24 @@ class GlobalPersonTracker:
                           f"(track age={track_age:.1f}s >= {stale_threshold}s) - considering for re-match. cameras={cameras_in}")
             
             # Calculate Re-ID distance using a multi-view matching approach
-            reid_distance = float('inf')
+            reid_distance = 0.5  # Default neutral if features unavailable
             
-            # 1. Evaluate against the overarching global feature vector
-            if global_person.feature_vector is not None:
-                reid_distance = self._cosine_distance(feature_vector, global_person.feature_vector)
-                
-            # 2. Evaluate against every single camera's specific view (LocalTracks)
-            for track in global_person.camera_tracks.values():
-                if track.feature_vector is not None:
-                    track_dist = self._cosine_distance(feature_vector, track.feature_vector)
-                    if track_dist < reid_distance:
-                        reid_distance = track_dist
+            if feature_vector is not None:
+                reid_distance = float('inf')
+                # 1. Evaluate against the overarching global feature vector
+                if global_person.feature_vector is not None:
+                    reid_distance = self._cosine_distance(feature_vector, global_person.feature_vector)
+                    
+                # 2. Evaluate against every single camera's specific view (LocalTracks)
+                for track in global_person.camera_tracks.values():
+                    if track.feature_vector is not None:
+                        track_dist = self._cosine_distance(feature_vector, track.feature_vector)
+                        if track_dist < reid_distance:
+                            reid_distance = track_dist
+            elif global_person.feature_vector is not None:
+                # We have no features for the new detection, but the global person DOES.
+                # We can't compare, so we stay neutral (0.5).
+                reid_distance = 0.5
 
             # Calculate Color distance
             color_distance = 0.5
@@ -957,20 +1038,15 @@ class GlobalPersonTracker:
             self.update_camera_frame_size(camera_name, frame_shape[0], frame_shape[1])
         
         with self.lock:
-            # Try to find existing match using features + spatial data (lock already held!)
-            matched_id = None
-            if feature_vector is not None:
-                # Look for match in OTHER cameras (not this one)
-                matched_id = self._find_match_unsafe(
-                    feature_vector, 
-                    color_hist=color_hist,
-                    exclude_camera=camera_name,
-                    current_bbox=bbox,
-                    current_camera=camera_name,
-                    current_local_id=local_id
-                )
-            else:
-                print(f"[GLOBAL TRACKER] No features, skipping match search")
+            # Try to find existing match using features + spatial data
+            matched_id = self._find_match_unsafe(
+                feature_vector, 
+                color_hist=color_hist,
+                exclude_camera=camera_name,
+                current_bbox=bbox,
+                current_camera=camera_name,
+                current_local_id=local_id
+            )
             
             if matched_id is not None:
                 # Match found - update existing person

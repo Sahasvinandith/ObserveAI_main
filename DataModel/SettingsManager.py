@@ -30,6 +30,9 @@ class SettingsManager:
         "reid_weight": 0.5,
         "color_weight": 0.3,
         "spatial_weight": 0.2,
+        "spatial_region_weight": 0.6,       # Weight for region-matching within spatial score
+        "spatial_depth_weight": 0.4,        # Weight for depth consistency within spatial score
+        "ref_human_height_px": 250,         # Reference height of a human at 5m (calibrated)
         "default_fov": 70,
         "dot_radius": 8,
         # Face Quality Settings

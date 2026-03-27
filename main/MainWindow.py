@@ -1428,10 +1428,9 @@ class MainWindow(QMainWindow):
         
         result_text += f"Apply these changes?"
         
+        from PyQt6.QtWidgets import QMessageBox
         reply = QMessageBox.question(self, "Calibration Result", result_text, 
                                      QMessageBox.StandardButton.Yes | QMessageBox.StandardButton.No)
-        
-        from PyQt6.QtWidgets import QMessageBox
         if reply == QMessageBox.StandardButton.Yes:
             # Reposition camera item
             from PyQt6.QtCore import QPointF
@@ -1451,12 +1450,22 @@ class MainWindow(QMainWindow):
             
             # Update GlobalPersonTracker registration with new parameters
             if self.global_tracker:
+                # Get frame dimensions for bbox normalization
+                frame_width = 1920
+                frame_height = 1080
+                worker = self.camera_workers.get(camera_name)
+                if worker and hasattr(worker, 'latest_frame') and worker.latest_frame is not None:
+                    frame_height, frame_width = worker.latest_frame.shape[:2]
+
                 self.global_tracker.register_camera(
                     name=camera_name,
                     position=(new_x, new_y),
                     rotation=new_rotation,
                     fov=detected_fov,
-                    view_range=detected_range
+                    view_range=detected_range,
+                    frame_width=frame_width,
+                    frame_height=frame_height,
+                    calibration_points=self._calibration_points
                 )
             
             print(f"[CALIBRATION] ✓ Applied all parameters to camera '{camera_name}'")
