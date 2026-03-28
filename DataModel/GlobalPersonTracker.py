@@ -15,6 +15,7 @@ import numpy as np
 import math
 import time
 import threading
+from DataModel.LogManager import get_log_manager
 from dataclasses import dataclass, field
 from typing import Dict, Optional, List, Tuple, Callable
 
@@ -137,6 +138,13 @@ class GlobalPerson:
                 old_id_for_merge = old_id  # Return old_id so tracker can merge folders
             else:
                 print(f"[ID SET] Global {self.global_id}: Set to '{user_id}' ({confidence:.3f})")
+            
+            # Record identity match/update in persistent log
+            get_log_manager().add_log('detection', user_id, list(self.camera_tracks.keys()), message=f"Identity confirmed as {user_id} with confidence {confidence:.3f}")
+            
+            # If this is the FIRST time this person is identified (was Unknown), log an entry for the name
+            if old_id == "Unknown":
+                get_log_manager().add_log('entry', user_id, list(self.camera_tracks.keys()))
         else:
             # Log when incoming identity was rejected
             if user_id != self.local_user_id:
@@ -1027,7 +1035,8 @@ class GlobalPersonTracker:
                         feature_vector: Optional[np.ndarray] = None,
                         color_hist: Optional[np.ndarray] = None,
                         bbox: Optional[Tuple[int, int, int, int]] = None,
-                        frame_shape: Optional[Tuple[int, int]] = None) -> int:
+                        frame_shape: Optional[Tuple[int, int]] = None,
+                        name: Optional[str] = None) -> int:
         """
         Main entry point: Find matching person or create new one.
         """
@@ -1061,10 +1070,16 @@ class GlobalPersonTracker:
                 self.next_id += 1
                 
                 person = GlobalPerson(global_id=new_id)
+                if name and name not in ("Unknown", "Scanning..."):
+                    person.name = name
+                    person.local_user_id = name
                 person.update_from_camera(camera_name, local_id, feature_vector, color_hist, bbox)
                 self.global_persons[new_id] = person
                 global_id = new_id
-                print(f"[GLOBAL TRACKER] ✗ Created NEW person G:{new_id} in '{camera_name}' (no match found)")
+                print(f"[GLOBAL TRACKER] ✗ Created NEW person G:{new_id} in '{camera_name}' as '{person.local_user_id}' (no match found)")
+                
+                # Persistent log for entry
+                get_log_manager().add_log('entry', person.local_user_id, [camera_name])
             
             dominant_camera = person._get_dominant_camera()
             
@@ -1074,6 +1089,17 @@ class GlobalPersonTracker:
                 if estimated_pos:
                     try:
                         self.position_callback(global_id, estimated_pos[0], estimated_pos[1], camera_name)
+                        
+                        # Special log for stereo vision if visible in multiple cameras
+                        cameras_seen = person.get_cameras_seen_in()
+                        if len(cameras_seen) >= 1:
+                            get_log_manager().add_log(
+                                'detection', 
+                                person.local_user_id, 
+                                cameras_seen, 
+                                location=estimated_pos,
+                                message=f"{person.local_user_id} detected in {', '.join(cameras_seen)}. Stereo vision estimated location ({estimated_pos[0]:.1f}, {estimated_pos[1]:.1f})"
+                            )
                     except Exception as e:
                         print(f"[GLOBAL TRACKER] Position callback error: {e}")
             
@@ -1132,6 +1158,10 @@ class GlobalPersonTracker:
                         if (current_time - person.last_seen) > timeout]
             
             for pid in stale_ids:
+                person = self.global_persons[pid]
+                # Log exit before deleting
+                get_log_manager().add_log('exit', person.local_user_id, list(person.camera_tracks.keys()))
+                
                 del self.global_persons[pid]
                 print(f"[GLOBAL TRACKER] Removed stale person {pid}")
     

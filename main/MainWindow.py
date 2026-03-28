@@ -1,9 +1,9 @@
 import os
 import json
 import time
-from PyQt6.QtCore import (QPointF, QThread, Qt, pyqtSignal, pyqtSlot, QPropertyAnimation, QPoint, QRect, QEasingCurve, QTimer)
+from PyQt6.QtCore import (QPointF, QThread, Qt, pyqtSignal, pyqtSlot, QPropertyAnimation, QPoint, QRect, QEasingCurve, QTimer, QDateTime)
 from PyQt6.QtGui import QImage, QBrush, QPen, QColor, QPixmap
-from PyQt6.QtWidgets import (QListWidgetItem, QFileDialog, QGraphicsScene, QApplication, QMainWindow, QLabel, QVBoxLayout, QLineEdit, QDialogButtonBox, QDialog, QGraphicsRectItem, QGraphicsEllipseItem, QMenu, QWidget, QGraphicsSimpleTextItem, QInputDialog, QMessageBox, QHBoxLayout, QListWidget, QGraphicsOpacityEffect)
+from PyQt6.QtWidgets import (QListWidgetItem, QFileDialog, QGraphicsScene, QApplication, QMainWindow, QLabel, QVBoxLayout, QLineEdit, QDialogButtonBox, QDialog, QGraphicsRectItem, QGraphicsEllipseItem, QMenu, QWidget, QGraphicsSimpleTextItem, QInputDialog, QMessageBox, QHBoxLayout, QListWidget, QGraphicsOpacityEffect, QDateTimeEdit, QTextBrowser)
 import threading
 import cv2
 from PyQt6.uic import loadUi
@@ -18,6 +18,7 @@ from components.BirdsEyeViewWidget import BirdsEyeViewWidget
 from components.CameraActionManagerDialog import CameraActionManagerDialog
 import queue
 from DataModel.DetectionSystem import Ai_System_thread
+from DataModel.LogManager import get_log_manager
 
 
 class PopOutWindow(QMainWindow):
@@ -164,6 +165,10 @@ class MainWindow(QMainWindow):
         
         # Track whether the actions page log panel has been set up
         self._actions_page_initialized = False
+        
+        # --- Logs Page Setup ---
+        self.log_manager = get_log_manager()
+        self.setup_logs_page()
         
         self.Content_stack.setCurrentIndex(0)
     
@@ -554,6 +559,10 @@ class MainWindow(QMainWindow):
         
         # 3. Toast Notification
         self._show_notification(f"<b>{action}</b> detected on <i>{camera}</i>")
+        
+        # 4. Immediate Logs Page Refresh
+        if self.Content_stack.currentIndex() == 3:
+            self.search_logs()
         
         print(f"[ACTION LOG] {entry}")
 
@@ -1599,3 +1608,99 @@ class MainWindow(QMainWindow):
             msg.setIcon(QMessageBox.Icon.Information)
         
         msg.exec()
+    def setup_logs_page(self):
+        """Initializes the logs page UI components and connections."""
+        # Set default times: start of today to now
+        now = QDateTime.currentDateTime()
+        start = now.addDays(-1)  # Last 24 hours by default
+        
+        if hasattr(self, 'start_time_edit'):
+            self.start_time_edit.setDateTime(start)
+        if hasattr(self, 'end_time_edit'):
+            self.end_time_edit.setDateTime(now)
+            
+        # Connect search button
+        if hasattr(self, 'search_logs_btn'):
+            self.search_logs_btn.clicked.connect(self.search_logs)
+            
+        # Connect list widget selection
+        if hasattr(self, 'logs_list_widget'):
+            self.logs_list_widget.itemSelectionChanged.connect(self._on_log_selected)
+            
+        # Real-time refresh timer (every 3 seconds)
+        self.logs_refresh_timer = QTimer(self)
+        self.logs_refresh_timer.timeout.connect(self._auto_refresh_logs)
+        self.logs_refresh_timer.start(3000)
+            
+        # Initial log load
+        self.search_logs()
+
+    def _auto_refresh_logs(self):
+        """Periodically refreshes the logs list if the logs page is visible."""
+        # Only refresh if on logs page (index 3) and no search text or date changes by user
+        if self.Content_stack.currentIndex() == 3:
+            # We refresh even if searching, so the search results update live
+            self.search_logs()
+
+    def search_logs(self):
+        """Retrieves and displays logs based on search criteria."""
+        if not hasattr(self, 'logs_list_widget'):
+            return
+            
+        search_text = self.search_input.text() if hasattr(self, 'search_input') else ""
+        start_ts = self.start_time_edit.dateTime().toSecsSinceEpoch() if hasattr(self, 'start_time_edit') else None
+        
+        # If end time is very close to now (within 5 seconds), treat as "Live" and don't cap it
+        end_dt = self.end_time_edit.dateTime() if hasattr(self, 'end_time_edit') else None
+        end_ts = end_dt.toSecsSinceEpoch() if end_dt else None
+        if end_dt and abs(end_dt.secsTo(QDateTime.currentDateTime())) < 60:
+            end_ts = None # No upper limit for "live" logs
+            
+        logs = self.log_manager.get_logs(start_time=start_ts, end_time=end_ts, person_name=search_text)
+        
+        # Avoid clearing/jumping if count is the same (simple heuristic for "nothing new")
+        if hasattr(self, '_last_log_count') and len(logs) == self._last_log_count and not self.logs_list_widget.count() == 0:
+             return
+        
+        self._last_log_count = len(logs)
+        self.logs_list_widget.clear()
+        for log in logs:
+            import datetime
+            ts_str = datetime.datetime.fromtimestamp(log['timestamp']).strftime("%Y-%m-%d %H:%M:%S")
+            msg = f"[{ts_str}] {log['message']}"
+            
+            item = QListWidgetItem(msg)
+            # Store person name in UserRole for summary retrieval
+            item.setData(Qt.ItemDataRole.UserRole, log['person_name'])
+            
+            # Color coding by type
+            if log['type'] == 'action':
+                item.setForeground(QColor("#ffaa00")) # Orange for actions
+            elif log['type'] == 'entry':
+                item.setForeground(QColor("#00ff00")) # Green for entry
+            elif log['type'] == 'exit':
+                item.setForeground(QColor("#ff5555")) # Red for exit
+                
+            self.logs_list_widget.addItem(item)
+
+    def _on_log_selected(self):
+        """Triggered when a log entry is selected. Shows person activity summary."""
+        if not hasattr(self, 'logs_list_widget') or not hasattr(self, 'detail_view_browser'):
+            return
+            
+        current_item = self.logs_list_widget.currentItem()
+        if not current_item:
+            return
+            
+        person_name = current_item.data(Qt.ItemDataRole.UserRole)
+        if not person_name or person_name == "Unknown":
+            self.detail_view_browser.setText("Select an identified person to see their activity summary.")
+            return
+            
+        summary = self.log_manager.get_person_activity_summary(person_name)
+        
+        # Format summary with some HTML for better readability
+        html_summary = f"<h2>Activity Summary: {person_name}</h2>"
+        html_summary += summary.replace("\n", "<br>")
+        
+        self.detail_view_browser.setHtml(html_summary)

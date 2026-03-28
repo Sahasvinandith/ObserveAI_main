@@ -1100,16 +1100,30 @@ class DetectionSystem:
                         if self.global_tracker and person_obj.global_id is None:
                             # If we have features, OR if we've waited 15 frames without features
                             if person_obj.feature_vector is not None or person_obj._no_feature_frames > 15:
+                                # Try to get identity if already discovered locally
+                                current_identity = person_obj.get_primary_face_name()
+                                
                                 global_id = self.global_tracker.create_or_update(
                                     camera_name=self.camera_name,
                                     local_id=tid,
                                     feature_vector=person_obj.feature_vector,
                                     color_hist=person_obj.color_hist,
                                     bbox=(l, t, w, h),
-                                    frame_shape=(frame.shape[1], frame.shape[0])
+                                    frame_shape=(frame.shape[1], frame.shape[0]),
+                                    name=current_identity
                                 )
                                 person_obj.global_id = global_id
                                 
+                                # Sync any faces that were identified BEFORE the global_id was assigned
+                                for face_obj in person_obj.faces.values():
+                                    if face_obj.locked_identity and face_obj.locked_identity not in ("Unknown", "Scanning..."):
+                                        print(f"[SYNC] Reporting pre-identified face {face_obj.face_id} ({face_obj.locked_identity}) for new G:{global_id}")
+                                        self.global_tracker.update_face_identity(
+                                            global_id,
+                                            face_obj.locked_identity,
+                                            face_obj.avg_confidence
+                                        )
+                                        
                                 # Hide obsolete same-camera fragments that merged into this ID
                                 for other_tid, other_person in self.tracked_persons.items():
                                     if other_tid != tid and other_person.global_id == global_id:

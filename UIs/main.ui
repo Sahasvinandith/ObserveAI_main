@@ -353,21 +353,63 @@ border-color: rgb(34, 34, 34);</string>
          <widget class="QWidget" name="database_page">
           <layout class="QHBoxLayout" name="horizontalLayout_3"/>
          </widget>
-         <widget class="QWidget" name="page">
-          <widget class="QLabel" name="label">
-           <property name="geometry">
-            <rect>
-             <x>258</x>
-             <y>300</y>
-             <width>161</width>
-             <height>81</height>
-            </rect>
-           </property>
-           <property name="text">
-            <string>Logs page</string>
-           </property>
+          <widget class="QWidget" name="logs_page">
+           <layout class="QVBoxLayout" name="verticalLayout_logs">
+            <item>
+             <layout class="QHBoxLayout" name="filter_layout">
+              <item>
+               <widget class="QLineEdit" name="search_input">
+                <property name="placeholderText">
+                 <string>Search person name...</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QDateTimeEdit" name="start_time_edit">
+                <property name="calendarPopup">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QDateTimeEdit" name="end_time_edit">
+                <property name="calendarPopup">
+                 <bool>true</bool>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="search_logs_btn">
+                <property name="text">
+                 <string>Search</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+            <item>
+             <layout class="QHBoxLayout" name="logs_content_layout">
+              <item>
+               <widget class="QListWidget" name="logs_list_widget">
+                <property name="styleSheet">
+                 <string notr="true">background-color: rgb(30, 10, 35); color: #00ff88; border: 1px solid #7a3a8a; border-radius: 4px; font-size: 10pt;</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QTextBrowser" name="detail_view_browser">
+                <property name="styleSheet">
+                 <string notr="true">background-color: rgb(20, 5, 25); color: #ccc; border: 1px solid #7a3a8a; border-radius: 4px; font-size: 10pt;</string>
+                </property>
+                <property name="placeholderText">
+                 <string>Search for a person to see activity summary...</string>
+                </property>
+               </widget>
+              </item>
+             </layout>
+            </item>
+           </layout>
           </widget>
-         </widget>
          <widget class="QWidget" name="settings_page">
           <layout class="QVBoxLayout" name="settings_layout">
            <item>
