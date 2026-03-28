@@ -1,13 +1,14 @@
 import os
-from PyQt6.QtWidgets import QWidget, QLabel, QListWidgetItem, QHBoxLayout, QSizePolicy
+from PyQt6.QtWidgets import QWidget, QLabel, QListWidgetItem, QHBoxLayout, QSizePolicy, QMenu, QInputDialog, QMessageBox
 from PyQt6.QtGui import QPixmap, QIcon
 from PyQt6.QtCore import Qt, QSize
 from PyQt6.uic import loadUi
 
 class DatabaseViewer(QWidget):
-    def __init__(self, db_path="Faces_db"):
+    def __init__(self, db_path="Faces_db", tracker=None):
         super().__init__()
         self.db_path = db_path
+        self.tracker = tracker
         
         # Load the new UI file
         loadUi("./UIs/database_viewer.ui", self)
@@ -20,10 +21,77 @@ class DatabaseViewer(QWidget):
         self.person_list.itemClicked.connect(self.load_person_details)
         self.search_bar.textChanged.connect(self.filter_list)
         
+        # Context menu for renaming
+        self.person_list.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
+        self.person_list.customContextMenuRequested.connect(self.show_context_menu)
+        
         # Initial Load
         self.refresh_database()
-    
+
+    def show_context_menu(self, pos):
+        """Shows context menu for the person list."""
+        item = self.person_list.itemAt(pos)
+        if not item:
+            return
+            
+        menu = QMenu(self)
+        rename_action = menu.addAction("Rename Person")
+        
+        # Execute menu
+        action = menu.exec(self.person_list.viewport().mapToGlobal(pos))
+        
+        if action == rename_action:
+            self.rename_current_person(item)
+
+    def rename_current_person(self, item):
+        """Triggers the renaming mechanism."""
+        old_name = item.text()
+        
+        new_name, ok = QInputDialog.getText(
+            self, "Rename Person", 
+            f"Enter new name for '{old_name}':",
+            text=old_name
+        )
+        
+        if not ok or not new_name.strip():
+            return
+            
+        new_name = new_name.strip()
+        
+        if new_name == old_name:
+            return
+            
+        # Validation: check if new name already exists
+        if new_name in self.all_ids:
+            QMessageBox.warning(self, "Rename Error", f"A person named '{new_name}' already exists.")
+            return
+
+        # Perform rename via tracker if available, otherwise fallback to cache
+        success = False
+        if self.tracker:
+            success = self.tracker.rename_user(old_name, new_name)
+        else:
+            # Fallback for standalone use
+            try:
+                from DataModel.EmbeddingCache import get_embedding_cache
+                success = get_embedding_cache().rename_user(old_name, new_name)
+            except Exception as e:
+                print(f"[DB VIEWER] Error in standalone rename: {e}")
+                
+        if success:
+            # Refresh list
+            self.refresh_database()
+            # Select the new name
+            items = self.person_list.findItems(new_name, Qt.MatchFlag.MatchExactly)
+            if items:
+                self.person_list.setCurrentItem(items[0])
+                self.load_person_details(items[0])
+            QMessageBox.information(self, "Success", f"Person renamed to '{new_name}'")
+        else:
+            QMessageBox.critical(self, "Error", "Failed to rename person. Check logs for details.")
+
     def resizeEvent(self, event):
+
         """
         Auto-scales the main image when the window is resized.
         """

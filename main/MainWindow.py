@@ -433,7 +433,8 @@ class MainWindow(QMainWindow):
         Injects the DatabaseViewer into the database_page widget.
         """
         # 1. Create the viewer instance
-        self.db_viewer = DatabaseViewer(db_path="Faces_db")
+        self.db_viewer = DatabaseViewer(db_path="Faces_db", tracker=self.global_tracker)
+
         
         # 2. Add it to the existing database_page layout
         # Note: Your XML for database_page has 'horizontalLayout_3'

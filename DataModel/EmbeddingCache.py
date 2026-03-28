@@ -249,6 +249,52 @@ class EmbeddingCache:
         except Exception as e:
             print(f"[MERGE] Error during merge: {e}")
             return False
+
+    def rename_user(self, old_name, new_name):
+        """
+        Rename a user's folder and update the embedding cache.
+        Thread-safe.
+        
+        Args:
+            old_name: Current user folder name
+            new_name: New user folder name
+            
+        Returns:
+            True if rename successful, False otherwise
+        """
+        old_path = os.path.join(self.db_path, old_name)
+        new_path = os.path.join(self.db_path, new_name)
+        
+        # Validate paths
+        if not os.path.isdir(old_path):
+            print(f"[CACHE] Rename error: Source folder {old_name} not found")
+            return False
+        if os.path.exists(new_path):
+            print(f"[CACHE] Rename error: Target folder {new_name} already exists")
+            return False
+            
+        try:
+            # Rename folder on disk
+            os.rename(old_path, new_path)
+            print(f"[CACHE] Renamed folder {old_name} -> {new_name}")
+            
+            # Update internal cache
+            with self._lock:
+                if old_name in self.embeddings:
+                    # Move embedding to new key
+                    self.embeddings[new_name] = self.embeddings.pop(old_name)
+                    print(f"[CACHE] Updated embedding key for {new_name}")
+                else:
+                    # If not in cache, refresh it from the new folder
+                    print(f"[CACHE] {old_name} was not in cache, loading from disk...")
+                    self.refresh_user(new_name)
+            
+            return True
+        except Exception as e:
+            print(f"[CACHE] Error renaming user: {e}")
+            return False
+
+
     
     def remove_user(self, user_folder: str):
         """Remove a user from the embedding cache (does not delete files)."""

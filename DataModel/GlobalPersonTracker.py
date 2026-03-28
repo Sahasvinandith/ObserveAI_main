@@ -349,7 +349,48 @@ class GlobalPersonTracker:
             
             return winner_id
     
+    def rename_user(self, old_name: str, new_name: str) -> bool:
+        """
+        Rename a user in the database and update active tracks.
+        
+        Args:
+            old_name: Current user name
+            new_name: New user name
+            
+        Returns:
+            True if rename successful, False otherwise
+        """
+        # 1. Update the embedding cache (renames folder and cache key)
+        try:
+            from DataModel.EmbeddingCache import get_embedding_cache
+            cache = get_embedding_cache()
+            if not cache.rename_user(old_name, new_name):
+                return False
+        except Exception as e:
+            print(f"[TRACKER] Rename error in cache: {e}")
+            return False
+            
+        # 2. Update all active global persons currently carrying this identity
+        with self.lock:
+            updated_count = 0
+            for person in self.global_persons.values():
+                if person.local_user_id == old_name:
+                    person.local_user_id = new_name
+                    person.name = new_name
+                    updated_count += 1
+            
+            if updated_count > 0:
+                print(f"[TRACKER] Updated {updated_count} active global persons: {old_name} -> {new_name}")
+                
+        # 3. Log the renaming event
+        from DataModel.LogManager import get_log_manager
+        get_log_manager().add_log('detection', new_name, [], 
+                                 message=f"User renamed from '{old_name}' to '{new_name}'")
+        
+        return True
+
     def get_consolidated_name(self, global_id: int) -> str:
+
         """
         Get the consolidated/best name for a global person.
         
