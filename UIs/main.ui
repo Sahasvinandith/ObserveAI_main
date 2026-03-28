@@ -365,6 +365,16 @@ border-color: rgb(34, 34, 34);</string>
                </widget>
               </item>
               <item>
+               <widget class="QComboBox" name="time_preset_combo">
+                <property name="minimumSize">
+                 <size>
+                  <width>100</width>
+                  <height>0</height>
+                 </size>
+                </property>
+               </widget>
+              </item>
+              <item>
                <widget class="QDateTimeEdit" name="start_time_edit">
                 <property name="calendarPopup">
                  <bool>true</bool>
@@ -382,6 +392,16 @@ border-color: rgb(34, 34, 34);</string>
                <widget class="QPushButton" name="search_logs_btn">
                 <property name="text">
                  <string>Search</string>
+                </property>
+               </widget>
+              </item>
+              <item>
+               <widget class="QPushButton" name="print_logs_btn">
+                <property name="text">
+                 <string>Print Logs</string>
+                </property>
+                <property name="toolTip">
+                 <string>Export currently filtered logs to a text file</string>
                 </property>
                </widget>
               </item>

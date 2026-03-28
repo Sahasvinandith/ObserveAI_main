@@ -127,6 +127,9 @@ class LogManager:
             elif lt == 'exit':
                 if current_session:
                     current_session['end'] = time_str
+                    # Check if this exit was due to system shutdown
+                    if log['message'] and "system shut down" in log['message']:
+                        current_session['shutdown'] = True
                     sessions.append(current_session)
                     current_session = None
             elif lt == 'action':
@@ -145,7 +148,9 @@ class LogManager:
         # Format sessions into summary
         for s in sessions:
             status = "is visible" if s['end'] == 'now' else "was visible"
-            summary_lines.append(f"{person_name} {status} from [{s['start']}] to [{s['end']}] in {s['cameras']} camera feeds")
+            # Special mention for system shutdown as requested
+            end_msg = " as system shut down" if s.get('shutdown') else ""
+            summary_lines.append(f"{person_name} {status} from [{s['start']}] to [{s['end']}]{end_msg} in {s['cameras']} camera feeds")
             for action in s['actions']:
                 summary_lines.append(action)
                 

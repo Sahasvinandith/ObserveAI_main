@@ -1,7 +1,8 @@
 import os
 import json
 import time
-from PyQt6.QtCore import (QPointF, QThread, Qt, pyqtSignal, pyqtSlot, QPropertyAnimation, QPoint, QRect, QEasingCurve, QTimer, QDateTime)
+from PyQt6.QtCore import (QPointF, QThread, Qt, pyqtSignal, pyqtSlot, QPropertyAnimation, QPoint, QRect, QEasingCurve, QTimer, QDateTime, QDate, QTime)
+from datetime import datetime
 from PyQt6.QtGui import QImage, QBrush, QPen, QColor, QPixmap
 from PyQt6.QtWidgets import (QListWidgetItem, QFileDialog, QGraphicsScene, QApplication, QMainWindow, QLabel, QVBoxLayout, QLineEdit, QDialogButtonBox, QDialog, QGraphicsRectItem, QGraphicsEllipseItem, QMenu, QWidget, QGraphicsSimpleTextItem, QInputDialog, QMessageBox, QHBoxLayout, QListWidget, QGraphicsOpacityEffect, QDateTimeEdit, QTextBrowser)
 import threading
@@ -1163,6 +1164,10 @@ class MainWindow(QMainWindow):
             win.close()
         self.popout_windows.clear()
         
+        # Log exits for all active persons before shutting down
+        if hasattr(self, 'global_tracker'):
+            self.global_tracker.shutdown()
+            
         self.clear_all()
         super().closeEvent(event)
     
@@ -1610,18 +1615,40 @@ class MainWindow(QMainWindow):
         msg.exec()
     def setup_logs_page(self):
         """Initializes the logs page UI components and connections."""
-        # Set default times: start of today to now
+        # Set default times: roughly 1 hour before to 1 hour after current time
         now = QDateTime.currentDateTime()
-        start = now.addDays(-1)  # Last 24 hours by default
+        
+        # Round 1 hour before to the hour (e.g. 2:38 -> 2:00 as per user example)
+        # Note: now.addSecs(-3600) gives '1 hour ago', then we take just the hour part
+        start_time = now.addSecs(-3600)
+        start_time = QDateTime(start_time.date(), QTime(start_time.time().hour(), 0))
+        
+        # 1 hour after, also rounded
+        end_time = now.addSecs(3600)
+        end_time = QDateTime(end_time.date(), QTime(end_time.time().hour(), 0))
         
         if hasattr(self, 'start_time_edit'):
-            self.start_time_edit.setDateTime(start)
+            self.start_time_edit.setDateTime(start_time)
         if hasattr(self, 'end_time_edit'):
-            self.end_time_edit.setDateTime(now)
+            self.end_time_edit.setDateTime(end_time)
+
+        # Set display format for better time picking
+        for edit in [self.start_time_edit, self.end_time_edit]:
+            if hasattr(edit, 'setDisplayFormat'):
+                edit.setDisplayFormat("yyyy-MM-dd HH:mm:ss")
+
+        # Initialize time presets
+        if hasattr(self, 'time_preset_combo'):
+            self.time_preset_combo.addItems(["Custom", "Last 15m", "Last Hour", "Today", "Last 24h", "All Time"])
+            self.time_preset_combo.currentIndexChanged.connect(self._on_time_preset_changed)
             
         # Connect search button
         if hasattr(self, 'search_logs_btn'):
             self.search_logs_btn.clicked.connect(self.search_logs)
+            
+        # Connect print button
+        if hasattr(self, 'print_logs_btn'):
+            self.print_logs_btn.clicked.connect(self.export_logs_to_file)
             
         # Connect list widget selection
         if hasattr(self, 'logs_list_widget'):
@@ -1704,3 +1731,58 @@ class MainWindow(QMainWindow):
         html_summary += summary.replace("\n", "<br>")
         
         self.detail_view_browser.setHtml(html_summary)
+
+    def _on_time_preset_changed(self, index):
+        """Updates start and end times based on preset selection."""
+        if index == 0: # Custom
+            return
+            
+        now = QDateTime.currentDateTime()
+        self.end_time_edit.setDateTime(now)
+        
+        if index == 1: # Last 15m
+            self.start_time_edit.setDateTime(now.addSecs(-15 * 60))
+        elif index == 2: # Last Hour
+            self.start_time_edit.setDateTime(now.addSecs(-3600))
+        elif index == 3: # Today
+            start_of_day = QDateTime(now.date(), QTime(0, 0))
+            self.start_time_edit.setDateTime(start_of_day)
+        elif index == 4: # Last 24h
+            self.start_time_edit.setDateTime(now.addDays(-1))
+        elif index == 5: # All Time
+            # Set to a very early date
+            self.start_time_edit.setDateTime(QDateTime(QDate(2000, 1, 1), QTime(0, 0)))
+
+        self.search_logs()
+
+    def export_logs_to_file(self):
+        """Exports currently filtered logs to a text file."""
+        search_text = self.search_input.text() if hasattr(self, 'search_input') else ""
+        start_ts = self.start_time_edit.dateTime().toSecsSinceEpoch() if hasattr(self, 'start_time_edit') else None
+        end_ts = self.end_time_edit.dateTime().toSecsSinceEpoch() if hasattr(self, 'end_time_edit') else None
+        
+        logs = self.log_manager.get_logs(start_time=start_ts, end_time=end_ts, person_name=search_text)
+        
+        if not logs:
+            self.show_message("Export", "No logs found to export with current filters.")
+            return
+            
+        # Generate filename with timestamp
+        filename = f"ObserveAI_Logs_{datetime.now().strftime('%Y%m%d_%H%M%S')}.txt"
+        file_path = os.path.join(os.getcwd(), filename)
+        
+        try:
+            with open(file_path, 'w') as f:
+                f.write(f"ObserveAI Logs Export\n")
+                f.write(f"Generated: {datetime.now().strftime('%Y-%m-%d %H:%M:%S')}\n")
+                f.write(f"Filters: Name='{search_text}', Start='{self.start_time_edit.dateTime().toString()}', End='{self.end_time_edit.dateTime().toString()}'\n")
+                f.write("-" * 50 + "\n\n")
+                
+                # Logs are sorted by timestamp DESC, so reverse for chronological export
+                for log in reversed(logs):
+                    log_ts = datetime.fromtimestamp(log['timestamp']).strftime("%Y-%m-%d %H:%M:%S")
+                    f.write(f"[{log_ts}] {log['message']}\n")
+            
+            self.show_message("Export Success", f"Logs exported successfully to:\n{filename}")
+        except Exception as e:
+            self.show_message("Export Error", f"Failed to export logs: {str(e)}", "critical")

@@ -288,6 +288,25 @@ class GlobalPersonTracker:
         print(f"[GLOBAL TRACKER] Initialized with threshold={feature_threshold}, "
               f"weights: reid={reid_weight}, spatial={spatial_weight}, "
               f"pixels_per_meter={pixels_per_meter}")
+
+    def shutdown(self):
+        """
+        Log exits for all active global persons as the system shuts down.
+        Ensures visibility periods are correctly closed in the logs.
+        """
+        from DataModel.LogManager import get_log_manager
+        
+        with self.lock:
+            if not self.global_persons:
+                return
+                
+            print(f"[GLOBAL TRACKER] Shutting down, logging exits for {len(self.global_persons)} persons.")
+            for gid, person in list(self.global_persons.items()):
+                cams = list(person.camera_tracks.keys())
+                if cams:
+                    # Provide a descriptive message for the user's summary view
+                    msg = f"Visibility ended as system shut down in {', '.join(cams)} camera feeds"
+                    get_log_manager().add_log('exit', person.local_user_id, cams, message=msg)
     
     # =========================================================================
     # Face Identity Consolidation
