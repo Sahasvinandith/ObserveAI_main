@@ -27,15 +27,22 @@ class LogManager:
                     location_x REAL,
                     location_y REAL,
                     action TEXT,
-                    message TEXT
+                    message TEXT,
+                    evidence_path TEXT
                 )
             """)
+            # Backward compatibility: Add evidence_path column if it doesn't exist
+            try:
+                cursor.execute("ALTER TABLE logs ADD COLUMN evidence_path TEXT")
+            except sqlite3.OperationalError:
+                pass # Already exists
             conn.commit()
 
     def add_log(self, log_type: str, person_name: str, cameras: List[str], 
                 location: Optional[Tuple[float, float]] = None, 
                 action: Optional[str] = None, 
-                message: Optional[str] = None):
+                message: Optional[str] = None,
+                evidence_path: Optional[str] = None):
         """
         Add a new log entry.
         
@@ -67,9 +74,9 @@ class LogManager:
         with sqlite3.connect(self.db_path, timeout=30.0) as conn:
             cursor = conn.cursor()
             cursor.execute("""
-                INSERT INTO logs (timestamp, type, person_name, cameras, location_x, location_y, action, message)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-            """, (timestamp, log_type, person_name, cameras_str, loc_x, loc_y, action, message))
+                INSERT INTO logs (timestamp, type, person_name, cameras, location_x, location_y, action, message, evidence_path)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (timestamp, log_type, person_name, cameras_str, loc_x, loc_y, action, message, evidence_path))
             conn.commit()
 
     def get_logs(self, start_time: Optional[float] = None, end_time: Optional[float] = None, 

@@ -164,12 +164,13 @@ class MainWindow(QMainWindow):
         # Connect action detection signal to log panel
         self.action_detected_signal.connect(self._on_action_detected)
         
-        # Track whether the actions page log panel has been set up
-        self._actions_page_initialized = False
-        
         # --- Logs Page Setup ---
         self.log_manager = get_log_manager()
         self.setup_logs_page()
+
+        # --- Actions UI Initialization (Always ready) ---
+        self._setup_actions_log_panel()
+        self._actions_page_initialized = True
         
         self.Content_stack.setCurrentIndex(0)
     
@@ -465,9 +466,6 @@ class MainWindow(QMainWindow):
     def show_actions_page(self):
         """Switch to Actions page and update the list"""
         self._switch_or_focus_page(6)
-        if not self._actions_page_initialized:
-            self._setup_actions_log_panel()
-            self._actions_page_initialized = True
         self.update_actions_list()
 
     def _setup_actions_log_panel(self):
@@ -562,6 +560,15 @@ class MainWindow(QMainWindow):
         self._show_notification(f"<b>{action}</b> detected on <i>{camera}</i>")
         
         # 4. Immediate Logs Page Refresh
+        self.log_manager.add_log(
+            log_type='action', 
+            person_name=person, 
+            cameras=[camera], 
+            action=action, 
+            message=f"{action} detected on {camera}",
+            evidence_path=image_path
+        )
+        
         if self.Content_stack.currentIndex() == 3:
             self.search_logs()
         
