@@ -66,6 +66,10 @@ class Person:
         self.age = 0
         self.time_since_update = 0
 
+        # --- Face size feedback ---
+        self.too_small_rejections = 0
+        self.too_small_logged = False
+
     def update_position(self, x, y, w, h, confidence):
         self.x = x
         self.y = y
@@ -87,7 +91,11 @@ class Person:
                 return consolidated
             
         if not self.faces:
+            # If no faces but many size rejections, return feedback
+            if getattr(self, 'too_small_rejections', 0) > 30:
+                return "Too Distant"
             return "Unknown"
+
         # Prioritize faces that are NOT scanning and NOT unknown if possible
         valid_faces = [f for f in self.faces.values() if f.name != "Scanning..." and f.name != "Unknown"]
         if valid_faces:
@@ -97,6 +105,17 @@ class Person:
             
         # Fallback: pick the most confident face overall
         best_face = max(self.faces.values(), key=lambda f: f.confidence)
+        
+        # If the best face is still Scanning/Unknown and we have many size rejections,
+        # it might be better to show "Too Distant" if the size rejections are very high,
+        # but usually if we have a face object, "Scanning..." is more accurate.
+        # However, if the user specifically asked for "Too Distant" when face is small,
+        # and we ARE getting size rejections even for existing face tracks (which we are tracking now),
+        # we can show it.
+        
+        if best_face.name in ("Scanning...", "Unknown") and getattr(self, 'too_small_rejections', 0) > 30:
+            return "Too Distant"
+            
         return best_face.name
 
 
@@ -775,7 +794,30 @@ class DetectionSystem:
                         # Check size requirements
                         if gw < min_width or gh < min_height:
                             print(f"[VALIDATION] Skipping face at ({gx}, {gy}): size ({gw} x {gh}) is too small")
+                            # Track rejections for the person
+                            with self.lock:
+                                person_obj = self.tracked_persons.get(person_id)
+                                if person_obj:
+                                    person_obj.too_small_rejections += 1
+                                    # Log once per session when threshold reached
+                                    if person_obj.too_small_rejections >= 30 and not person_obj.too_small_logged:
+                                        from DataModel.LogManager import get_log_manager
+                                        log_msg = f"Face too small for recognition ({gw}x{gh} < {min_width}x{min_height})"
+                                        get_log_manager().add_log(
+                                            log_type='detection',
+                                            person_name=person_obj.get_primary_face_name(),
+                                            cameras=[self.camera_name],
+                                            message=log_msg
+                                        )
+                                        person_obj.too_small_logged = True
+                                        print(f"[LOG] {log_msg} for person {person_id}")
                             continue
+                        
+                        # Reset size rejection counter if face is large enough
+                        with self.lock:
+                            person_obj = self.tracked_persons.get(person_id)
+                            if person_obj:
+                                person_obj.too_small_rejections = 0
                         
                         # Check confidence requirement
                         if yolo_conf < min_conf:
