@@ -15,7 +15,6 @@ from components.Camera_list_widget import CameraFeedWidget
 from components.Grid_feed_widget import GridFeedWidget
 from components.Camera_worker import CameraWorker
 from components.Database_viewer import DatabaseViewer
-from components.BirdsEyeViewWidget import BirdsEyeViewWidget
 from components.CameraActionManagerDialog import CameraActionManagerDialog
 import queue
 from DataModel.DetectionSystem import Ai_System_thread
@@ -140,9 +139,6 @@ class MainWindow(QMainWindow):
         )
         self.graphics_scene.addItem(self.grid_floor)
         
-        # --- Birds Eye View Setup ---
-        self.birds_eye_widget = BirdsEyeViewWidget(self)
-        self.birds_eye_view_page.layout().addWidget(self.birds_eye_widget)
         
         # Initial configure button states
         self.add_camera_btn.hide()
@@ -188,7 +184,6 @@ class MainWindow(QMainWindow):
         self.load_map_btn.clicked.connect(self.load_layout)
         self.db_btn.clicked.connect(self.show_database_page)
         self.logs_btn.clicked.connect(lambda: self._switch_or_focus_page(3))
-        self.birds_eye_btn.clicked.connect(self.show_birds_eye_view)
         self.settings_btn.clicked.connect(self.show_settings_page)
         
         # --- Actions UI ---
@@ -204,8 +199,7 @@ class MainWindow(QMainWindow):
             2: ("Database", self.db_btn),
             3: ("Logs", self.logs_btn),
             4: ("Settings", self.settings_btn),
-            5: ("Birds Eye View", self.birds_eye_btn),
-            6: ("Actions", self.actions_btn),
+            5: ("Actions", self.actions_btn),
         }
         for page_idx, (title, btn) in self._page_info.items():
             btn.setContextMenuPolicy(Qt.ContextMenuPolicy.CustomContextMenu)
@@ -451,29 +445,17 @@ class MainWindow(QMainWindow):
         if hasattr(self, 'db_viewer'):
             self.db_viewer.refresh_database()
     
-    def show_birds_eye_view(self):
-        """Switch to Birds Eye View page and initialize data sources"""
-        self._switch_or_focus_page(5)  # Birds Eye View is at index 5 (after Settings at 4)
-        if hasattr(self, 'birds_eye_widget'):
-            # Set data sources if not already set
-            if self.birds_eye_widget.global_tracker is None:
-                self.birds_eye_widget.set_data_sources(
-                    self.global_tracker,
-                    self.scene_cameras
-                )
-            # Force update
-            self.birds_eye_widget.update_visualization()
     
     def show_actions_page(self):
         """Switch to Actions page and update the list"""
-        self._switch_or_focus_page(6)
+        self._switch_or_focus_page(5)
         self.update_actions_list()
 
     def _setup_actions_log_panel(self):
         """Inject the Recent Detections log widget into the Actions page."""
         from PyQt6.QtWidgets import QListWidget, QLabel, QVBoxLayout
         # Find the actions page layout (it should already exist from .ui)
-        page = self.Content_stack.widget(6)  # Actions page index
+        page = self.Content_stack.widget(5)  # Actions page index
         layout = page.layout()
         if layout is None:
             layout = QVBoxLayout(page)

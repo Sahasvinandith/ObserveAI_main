@@ -98,19 +98,6 @@
         </widget>
        </item>
        <item>
-        <widget class="QPushButton" name="birds_eye_btn">
-         <property name="sizePolicy">
-          <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
-           <horstretch>0</horstretch>
-           <verstretch>2</verstretch>
-          </sizepolicy>
-         </property>
-         <property name="text">
-          <string>Birds Eye</string>
-         </property>
-        </widget>
-       </item>
-       <item>
         <widget class="QPushButton" name="settings_btn">
          <property name="sizePolicy">
           <sizepolicy hsizetype="Minimum" vsizetype="Expanding">
@@ -957,13 +944,6 @@ border-color: rgb(34, 34, 34);</string>
               </size>
              </property>
             </spacer>
-           </item>
-          </layout>
-         </widget>
-         <widget class="QWidget" name="birds_eye_view_page">
-          <layout class="QHBoxLayout" name="birds_eye_layout">
-           <item>
-            <widget class="QWidget" name="birds_eye_container"/>
            </item>
           </layout>
          </widget>
