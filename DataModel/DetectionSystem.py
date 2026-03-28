@@ -357,7 +357,7 @@ class DetectionSystem:
                 # DEBUG: Save face image to temp file for inspection
                 try:
                     cv2.imwrite("debug_face_temp.jpg", face_img)
-                    print(f"[DEBUG] Saved face {face_id_key} to debug_face_temp.jpg (shape={face_img.shape})")
+                    # print(f"[DEBUG] Saved face {face_id_key} to debug_face_temp.jpg (shape={face_img.shape})")
                 except Exception as e:
                     print(f"[DEBUG] Failed to save temp face: {e}")
                 
@@ -725,6 +725,7 @@ class DetectionSystem:
         for face_obj in person_faces:
             try:
                 success, bbox = face_obj.tracker.update(frame)
+
             except Exception as e:
                 # Tracker failed; skip this face for now
                 print(f"[TRACKER ERROR] face_id {face_obj.face_id}: {e}")
@@ -742,7 +743,9 @@ class DetectionSystem:
         # Check if we need to run detection (if no faces tracked or periodically)
         should_run_detection = (len(active_tracked_faces) == 0) or (self.frame_count % 10 == 0)
 
+
         if should_run_detection:
+            # print(f"[DETECTION] Running face detection for person {person_id} (tracked faces: {len(active_tracked_faces)})")
             person_crop = frame[py:py + ph, px:px + pw]
             if person_crop.size > 0:
                 # DEBUG: Time the face detection
@@ -771,10 +774,12 @@ class DetectionSystem:
                         
                         # Check size requirements
                         if gw < min_width or gh < min_height:
+                            print(f"[VALIDATION] Skipping face at ({gx}, {gy}): size ({gw} x {gh}) is too small")
                             continue
                         
                         # Check confidence requirement
                         if yolo_conf < min_conf:
+                            print(f"[VALIDATION] Skipping face at ({gx}, {gy}): confidence ({yolo_conf:.2f}) is too low")
                             continue
                         
                         new_center = (gx + gw // 2, gy + gh // 2)
@@ -806,6 +811,7 @@ class DetectionSystem:
                             else:
                                 # UNLOCKED: Re-queue for recognition to accumulate history
                                 if not matched_face.is_recognizing:
+                                    print(f"[RE-QUEUE] Re-queuing unlocked Face {matched_face.face_id} for recognition (tracker_miscount={matched_face.tracker_miscount})for local id {person_id} ")
                                     try:
                                         face_img = frame[gy:gy + gh, gx:gx + gw].copy()
                                         if face_img.size > 0:
@@ -813,8 +819,10 @@ class DetectionSystem:
                                             self.recognition_queue.put((matched_face.face_id, face_img), block=False)
                                             print(f"[QUEUE] Re-queued unlocked Face {matched_face.face_id} for recognition")
                                     except queue.Full:
+                                        print(f"[QUEUE] Recognition queue is full for face {matched_face.face_id}; skipping.")
                                         pass  # Queue full, try next time
                                     except Exception as e:
+                                        print(f"[QUEUE ERROR] Error occurred while re-queueing face {matched_face.face_id}: {e}")
                                         pass
                             continue
 
@@ -823,10 +831,11 @@ class DetectionSystem:
                         # This prevents "Zombie" faces that stay stuck on "Scanning..."
                         try:
                             face_img = frame[gy:gy + gh, gx:gx + gw].copy()
-
+                            
                             if face_img.size > 0:
                                 # Generate ID
                                 face_id = str(self.next_face_id)
+                                print(f"new face detectet for {person_id} - face_id-{face_id}")
                                 
                                 # Initialize Tracker
                                 # Create tracker using helper with robust fallbacks
@@ -860,15 +869,23 @@ class DetectionSystem:
                                     self.identified_faces[face_id] = new_face
                                     print(f"[QUEUE] Created Face {face_id} and added to identified_faces")
 
-                                # Try to push to queue
-                                self.recognition_queue.put((face_id, face_img), block=False)
+                                # Try to push to recognition queue. If the queue is full,
+                                # remove the temporary face to avoid leaving a face
+                                # object with `is_recognizing=True` that will never be processed.
+                                try:
+                                    self.recognition_queue.put((face_id, face_img), block=False)
+                                except queue.Full:
+                                    # Clean up the partially-created face
+                                    with self.lock:
+                                        if face_id in self.identified_faces:
+                                            del self.identified_faces[face_id]
+                                    print(f"[QUEUE] Recognition queue full — discarded Face {face_id}")
+                                    # Skip incrementing next_face_id so the id can be reused shortly
+                                    continue
 
-                                # SUCCESS: Now we create the object
+                                # SUCCESS: Now we finalize creation
                                 self.next_face_id += 1
                                 print(f"[QUEUE] Pushed Face {face_id} for recognition")
-
-                                
-
                                 detected_face_ids.append(face_id)
 
                         except queue.Full:
@@ -1237,8 +1254,6 @@ class DetectionSystem:
                 # Person Label - use global_tracker for consolidated name
                 prim_face = person_obj.get_primary_face_name(self.global_tracker)
                 gid = person_obj.global_id if person_obj.global_id else "-"
-                if gid == "-":
-                    print("Unconfirmed gid - detected")
                 
                 # Check if any face has locked identity
                 is_confirmed = any(
@@ -1351,9 +1366,9 @@ class DetectionSystem:
                                              f"{safe_cam}_L{local_id}_{ts}_full.jpg")
                     torso_path = os.path.join(DetectionSystem.COLOR_DEBUG_DIR,
                                               f"{safe_cam}_L{local_id}_{ts}_torso.jpg")
-                    cv2.imwrite(full_path, annotated)
-                    cv2.imwrite(torso_path, torso_crop)
-                    print(f"[COLOR DEBUG] Saved: {torso_path}")
+                    # cv2.imwrite(full_path, annotated)
+                    # cv2.imwrite(torso_path, torso_crop)
+                    # print(f"[COLOR DEBUG] Saved: {torso_path}")
             # ────────────────────────────────────────────────────────────────────
 
             hsv_crop = cv2.cvtColor(torso_crop, cv2.COLOR_BGR2HSV)

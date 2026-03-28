@@ -11,7 +11,7 @@ import re
 from PyQt6.QtWidgets import (
     QDialog, QVBoxLayout, QHBoxLayout, QLabel, QLineEdit,
     QComboBox, QDoubleSpinBox, QDialogButtonBox, QTabWidget,
-    QWidget, QPushButton, QListWidget, QListWidgetItem, QFrame
+    QWidget, QPushButton, QListWidget, QListWidgetItem, QFrame, QFileDialog
 )
 from DataModel.ActionManager import ActionManager
 from PyQt6.QtCore import Qt
@@ -186,6 +186,7 @@ class AddCameraDialog(QDialog):
 
         self._build_local_tab()
         self._build_url_tab()
+        self._build_image_tab()
 
         # ── FOV + Range row ─────────────────────────────────────
         fov_row = QHBoxLayout()
@@ -246,6 +247,8 @@ class AddCameraDialog(QDialog):
             
             if is_network:
                 self.tabs.setCurrentIndex(1) # URL Tab
+            elif url.startswith("image://"):
+                 self.tabs.setCurrentIndex(2) # Image Tab
             else:
                 self.tabs.setCurrentIndex(0) # Local Tab
 
@@ -327,6 +330,50 @@ class AddCameraDialog(QDialog):
         layout.addStretch()
         self.tabs.addTab(widget, "🌐  Network / URL")
 
+    # ── Static Image Tab ───────────────────────────────────────
+
+    def _build_image_tab(self):
+        widget = QWidget()
+        layout = QVBoxLayout(widget)
+        layout.setContentsMargins(8, 10, 8, 8)
+        layout.setSpacing(8)
+
+        layout.addWidget(QLabel("Select a static image file for debugging:"))
+        
+        file_row = QHBoxLayout()
+        self.image_path_input = QLineEdit()
+        self.image_path_input.setPlaceholderText("/path/to/image.jpg")
+        if self.camera_info and self.camera_info.get("url", "").startswith("image://"):
+            self.image_path_input.setText(self.camera_info.get("url", "")[8:])
+        file_row.addWidget(self.image_path_input)
+        
+        browse_btn = QPushButton("Browse...")
+        browse_btn.clicked.connect(self._browse_image)
+        file_row.addWidget(browse_btn)
+        layout.addLayout(file_row)
+
+        hint = QLabel(
+            "Note: This will loop the selected image frame continuously. "
+            "Useful for debugging multi-person detection."
+        )
+        hint.setStyleSheet("color: #aaa; font-size: 10pt;")
+        hint.setWordWrap(True)
+        layout.addWidget(hint)
+
+        layout.addStretch()
+        self.tabs.addTab(widget, "🖼  Static Image")
+
+    def _browse_image(self):
+        file_path, _ = QFileDialog.getOpenFileName(
+            self, "Select Image", "", "Images (*.png *.jpg *.jpeg *.bmp *.webp)"
+        )
+        if file_path:
+            self.image_path_input.setText(file_path)
+            # Auto-fill name if empty
+            if not self.name_input.text().strip():
+                import os
+                self.name_input.setText(os.path.basename(file_path).split('.')[0])
+
     # ── Public API ──────────────────────────────────────────────
 
     def get_details(self) -> tuple:
@@ -352,6 +399,12 @@ class AddCameraDialog(QDialog):
             else:
                 device = ""
             return (name, device, fov, rng, selected_actions)
-        else:
+        elif self.tabs.currentIndex() == 1:
             # URL tab
             return (name, self.url_input.text().strip(), fov, rng, selected_actions)
+        else:
+            # Image tab
+            path = self.image_path_input.text().strip()
+            if path:
+                return (name, f"image://{path}", fov, rng, selected_actions)
+            return (name, "", fov, rng, selected_actions)

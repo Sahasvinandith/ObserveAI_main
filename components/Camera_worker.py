@@ -31,6 +31,10 @@ class CameraWorker(QObject):
         """Parse url_str into url_int if it's a local device index or path"""
         import re
         if isinstance(self.url_str, str):
+            if self.url_str.startswith("image://"):
+                self.url_int = None
+                return
+            
             match = re.search(r'/dev/video(\d+)', self.url_str)
             if match:
                 self.url_int = int(match.group(1))
@@ -59,50 +63,73 @@ class CameraWorker(QObject):
         
         try:
         
-            # --- 1. Connection Phase ---
-            print(f"[{self.name}] Worker thread: Trying to connect...")
-            cap = self._open_camera()
+            # --- 1. Connection/Initialize Phase ---
+            print(f"[{self.name}] Worker thread: Initializing source...")
             
-            if not cap or not cap.isOpened():
-                self.connectionFailed.emit(f"Failed to open:\n{self.url_str}")
-                cap = None
-            else:
-                self.connectionSuccess.emit("Connected")
+            # We'll use these to track what we're actually running
+            is_image = False
+            static_image = None
+            cap = None
+
+            def _init_source():
+                nonlocal is_image, static_image, cap
+                is_image = isinstance(self.url_str, str) and self.url_str.startswith("image://")
+                
+                # Close any existing capture
+                if cap is not None:
+                    cap.release()
+                    cap = None
+                
+                if is_image:
+                    image_path = self.url_str[8:]
+                    print(f"[{self.name}] Loading static image: {image_path}")
+                    static_image = cv2.imread(image_path)
+                    if static_image is None:
+                        self.connectionFailed.emit(f"Failed to load image:\n{image_path}")
+                    else:
+                        self.connectionSuccess.emit("Image Loaded")
+                else:
+                    static_image = None
+                    cap = self._open_camera()
+                    if not cap or not cap.isOpened():
+                        self.connectionFailed.emit(f"Failed to open:\n{self.url_str}")
+                        cap = None
+                    else:
+                        self.connectionSuccess.emit("Connected")
+
+            _init_source()
             
             # --- 2. Frame Grab Phase ---
             while self.is_running:
                 # Check if reconnection is requested
                 if self.should_reconnect:
-                    print(f"[{self.name}] Reconnection attempt requested...")
+                    print(f"[{self.name}] Reconnection/Source change requested...")
                     self.should_reconnect = False
-                    
-                    # Release old connection if it exists
-                    if cap is not None:
-                        cap.release()
-                        cap = None
-                    
-                    # Try to reconnect
-                    cap = self._open_camera()
-                    if not cap or not cap.isOpened():
-                        self.connectionFailed.emit(f"Reconnection failed:\n{self.url_str}")
-                        cap = None
-                    else:
-                        self.connectionSuccess.emit("Reconnected")
+                    _init_source()
                 
                 # Only try to grab frames if connected
-                if cap is None or not cap.isOpened():
-                    QThread.msleep(500)  # Wait a bit before trying again
-                    continue
+                if is_image:
+                    if static_image is None:
+                        QThread.msleep(500)
+                        continue
+                    frame = static_image.copy()
+                    ret = True
+                    # Simulate some frame rate for image to not hog CPU completely
+                    QThread.msleep(33) # ~30 FPS
+                else:
+                    if cap is None or not cap.isOpened():
+                        QThread.msleep(500)  # Wait a bit before trying again
+                        continue
+                        
+                    ret, frame = cap.read()
                     
-                ret, frame = cap.read()
-                
-                if not ret:
-                    self.connectionFailed.emit("Camera disconnected")
-                    if cap is not None:
-                        cap.release()
-                        cap = None
-                    QThread.msleep(500)  # Wait before attempting reconnection
-                    continue
+                    if not ret:
+                        self.connectionFailed.emit("Camera disconnected")
+                        if cap is not None:
+                            cap.release()
+                            cap = None
+                        QThread.msleep(500)  # Wait before attempting reconnection
+                        continue
                 
                 if self.frame_buffer:
                     try:
