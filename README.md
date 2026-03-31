@@ -4,6 +4,17 @@
 ObserveAI is an intelligent computer-vision system built with **PyTorch**, **TensorFlow**, **YOLO (Ultralytics)**, **Deep SORT**, and **DeepFace**.  
 It provides real-time detection, tracking, and recognition through a PyQt6 graphical interface.Designed for CCTV detection systems.
 
+<div align="center">
+  <video src="https://github.com/user-attachments/assets/2ad8a3e0-196f-4696-a2cb-0af0d1091232" 
+         width="100%" 
+         controls 
+         autoplay 
+         loop 
+         muted>
+    Your browser does not support the video tag.
+  </video>
+</div>
+
 Still on development phase
 
 ---
