@@ -1,0 +1,4 @@
+- [Project Architecture](project_architecture.md) — Full ObserveAI web migration: FastAPI backend, React frontend, 6 pages mapped
+- [Widget Mappings](widget_mappings.md) — PyQt6-to-web component translations and key gotchas
+- [WebSocket Protocol](websocket_protocol.md) — Message schemas for video streams and detection events
+- [Design System](design_system.md) — Dark theme tokens, color palette, and CSS decisions

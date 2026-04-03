@@ -7,3 +7,4 @@
 maps
 *.pt
 *.db
+web/frontend/node_modules
