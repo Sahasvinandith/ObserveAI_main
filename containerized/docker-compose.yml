@@ -1,0 +1,232 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ObserveAI — Docker Compose orchestration
+#
+# Services
+# ────────
+#   ai-backend   FastAPI server + all AI inference (YOLO, DeepFace, DeepSORT,
+#                GlobalPersonTracker, CameraWorker). Exposes port 8000.
+#                The FastAPI app already serves the built React frontend at /,
+#                so this single service is the only mandatory one.
+#
+#   web-frontend (optional) — Nginx that serves static React assets and
+#                proxies /api and /ws to ai-backend. Useful if you want to
+#                decouple static serving from Python. Disabled by default
+#                (profile: frontend). Enable with:
+#                  docker compose --profile frontend up
+#
+# GPU support
+# ───────────
+#   GPU passthrough is configured on the ai-backend service with the
+#   NVIDIA Container Runtime. Requires:
+#     - nvidia-container-toolkit installed on the Docker host
+#     - nvidia-smi available
+#   To run without GPU, remove the `deploy` block from ai-backend.
+#
+# Volumes
+# ───────
+#   All persistent data lives in named volumes (or bind-mounts when you want
+#   to edit data from the host). See the `volumes:` section at the bottom.
+#   On first run, the entrypoint script creates empty scaffolding for any
+#   missing directory so the app starts cleanly.
+#
+# Quick start
+# ───────────
+#   cd containerized/
+#   docker compose build
+#   docker compose up -d
+#   # Open http://localhost:8000
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Build context is the project root ─────────────────────────────────────────
+# The ai-backend Dockerfile lives inside containerized/ but reads source from
+# the project root, so the build context must be the root.
+
+x-project-root: &project-root
+  context: ..                                     # project root
+  dockerfile: containerized/services/ai-backend/Dockerfile
+
+services:
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # ai-backend
+  # ────────────────────────────────────────────────────────────────────────────
+  ai-backend:
+    build:
+      <<: *project-root
+    image: observeai/ai-backend:latest
+    container_name: observeai-ai-backend
+    restart: unless-stopped
+
+    # ── GPU resource request (NVIDIA Container Runtime) ─────────────────────
+    # Remove this block entirely if running on CPU only.
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1          # "all" to expose all GPUs
+              capabilities: [gpu]
+
+    # ── Ports ────────────────────────────────────────────────────────────────
+    ports:
+      - "8000:8000"
+
+    # ── Environment ──────────────────────────────────────────────────────────
+    environment:
+      # TensorFlow / Keras compatibility (required by deepface)
+      TF_USE_LEGACY_KERAS: "1"
+      TF_CPP_MIN_LOG_LEVEL: "2"
+
+      # PyTorch hub model cache (maps to volume below)
+      TORCH_HOME: /app/torch_hub_cache
+
+      # DeepFace weights cache
+      DEEPFACE_HOME: /app/deepface_weights
+
+      # Uvicorn worker count — must stay at 1; all camera state is in-process
+      UVICORN_WORKERS: "1"
+
+    # ── Volumes ──────────────────────────────────────────────────────────────
+    volumes:
+      # ── Persistent data (survives container restarts) ─────────────────────
+      # Face recognition database (DeepFace images per person)
+      - faces-db:/app/Faces_db
+
+      # Pose action definitions (JSON files)
+      - actions-db:/app/Actions_db
+
+      # Camera layout / calibration maps
+      - maps:/app/maps
+
+      # Application settings
+      - settings:/app/settings.json
+
+      # SQLite activity log
+      - logs:/app/logs.db
+
+      # Action evidence frames (snapshots saved on detection)
+      - detections:/app/detections
+
+      # ── Model weight caches ────────────────────────────────────────────────
+      # YOLO .pt files — mount from host to avoid re-downloading on every build
+      # Change the left-hand side to wherever you store the weights on the host.
+      - yolo-weights:/app/yolo-weights:ro
+
+      # PyTorch Hub cache (ResNet-50 for Re-ID)
+      - torch-hub-cache:/app/torch_hub_cache
+
+      # DeepFace ArcFace model weights
+      - deepface-weights:/app/deepface_weights
+
+    # ── Device passthrough (USB cameras) ─────────────────────────────────────
+    # Uncomment the device(s) that correspond to your camera(s).
+    # RTSP cameras do not need device mounts.
+    devices:
+      - /dev/video0:/dev/video0
+      - /dev/video1:/dev/video1
+      - /dev/video2:/dev/video2
+      - /dev/video3:/dev/video3
+
+    # ── Privilege required for V4L2 USB camera access ─────────────────────────
+    # Uncomment if using USB cameras; remove if RTSP only.
+    privileged: true
+
+    # ── Health check ─────────────────────────────────────────────────────────
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 90s   # Allow time for model loading (DeepFace/YOLO warm-up)
+      retries: 5
+
+    # ── Resource limits ──────────────────────────────────────────────────────
+    # Adjust to match your host. These are conservative defaults.
+    # AI inference (YOLO + DeepFace + Re-ID) can spike to 4–8 GB RAM.
+    mem_limit: 8g
+    memswap_limit: 8g
+    cpus: 4.0
+
+    # ── Logging ──────────────────────────────────────────────────────────────
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "5"
+
+  # ────────────────────────────────────────────────────────────────────────────
+  # web-frontend (optional — profile: frontend)
+  # ────────────────────────────────────────────────────────────────────────────
+  # Enable with: docker compose --profile frontend up
+  # Use this if you want Nginx to serve static assets separately from FastAPI.
+  # ────────────────────────────────────────────────────────────────────────────
+  web-frontend:
+    profiles: [frontend]
+    build:
+      context: ..                                 # project root
+      dockerfile: containerized/services/web-frontend/Dockerfile
+    image: observeai/web-frontend:latest
+    container_name: observeai-web-frontend
+    restart: unless-stopped
+
+    ports:
+      - "80:80"
+
+    depends_on:
+      ai-backend:
+        condition: service_healthy
+
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+
+    mem_limit: 128m
+    cpus: 0.5
+
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+
+# ────────────────────────────────────────────────────────────────────────────
+# Named volumes
+# ────────────────────────────────────────────────────────────────────────────
+#
+# By default all volumes are Docker-managed (stored in /var/lib/docker/volumes).
+# To use bind mounts instead (so you can edit data from the host), replace:
+#
+#   faces-db:
+#
+# with:
+#
+#   faces-db:
+#     driver: local
+#     driver_opts:
+#       type: none
+#       o: bind
+#       device: /absolute/path/to/Faces_db
+#
+# ────────────────────────────────────────────────────────────────────────────
+volumes:
+  faces-db:
+    driver: local
+  actions-db:
+    driver: local
+  maps:
+    driver: local
+  settings:
+    driver: local
+  logs:
+    driver: local
+  detections:
+    driver: local
+  yolo-weights:
+    driver: local
+  torch-hub-cache:
+    driver: local
+  deepface-weights:
+    driver: local

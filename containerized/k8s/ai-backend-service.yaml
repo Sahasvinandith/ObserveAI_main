@@ -1,0 +1,27 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ObserveAI — ai-backend Service
+#
+# Exposes the FastAPI server within the cluster (ClusterIP) and optionally
+# externally via NodePort for local testing.
+#
+# In production, use a LoadBalancer or Ingress instead of NodePort.
+# ─────────────────────────────────────────────────────────────────────────────
+
+apiVersion: v1
+kind: Service
+metadata:
+  name: ai-backend
+  namespace: observeai
+  labels:
+    app: ai-backend
+    app.kubernetes.io/part-of: observeai
+spec:
+  selector:
+    app: ai-backend
+  ports:
+    - name: http
+      port: 8000
+      targetPort: 8000
+      protocol: TCP
+  # Change to LoadBalancer or ClusterIP for production
+  type: NodePort

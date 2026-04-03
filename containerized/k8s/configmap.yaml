@@ -1,0 +1,36 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ObserveAI — ConfigMap
+#
+# Default settings.json content. The ai-backend entrypoint writes this to
+# /app/settings.json only if the file does not already exist on the PVC.
+# ─────────────────────────────────────────────────────────────────────────────
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: observeai-config
+  namespace: observeai
+  labels:
+    app.kubernetes.io/part-of: observeai
+data:
+  settings.json: |
+    {
+        "feature_threshold": 0.5,
+        "reid_weight": 0.4,
+        "color_weight": 0.3,
+        "spatial_weight": 0.3,
+        "spatial_region_weight": 0.6,
+        "spatial_depth_weight": 0.4,
+        "ref_human_height_px": 250,
+        "default_fov": 70,
+        "dot_radius": 8,
+        "min_quality_threshold": 50,
+        "max_faces_per_user": 5,
+        "identity_confirm_frames": 3,
+        "identity_confidence_threshold": 0.6,
+        "identity_change_margin": 0.15,
+        "min_face_width": 70,
+        "min_face_height": 90,
+        "min_face_confidence": 0.5,
+        "camera_actions": {}
+    }

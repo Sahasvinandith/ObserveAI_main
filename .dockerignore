@@ -1,0 +1,58 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# .dockerignore — project root
+#
+# Applied when building from the project root as the Docker build context.
+# Excludes large binaries, runtime data, and files not needed in any image.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── Python artifacts ──────────────────────────────────────────────────────────
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/*.egg-info/
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+.venv/
+venv/
+env/
+
+# ── Model weights (large binaries — mounted as volumes at runtime) ────────────
+*.pt
+
+# ── Runtime data (mounted as volumes) ─────────────────────────────────────────
+Faces_db/
+Actions_db/
+maps/
+detections/
+debug_crops/
+logs.db
+*.db
+
+# ── Frontend build artifacts and dependencies ─────────────────────────────────
+web/frontend/node_modules/
+
+# ── Development / debug images ────────────────────────────────────────────────
+*.jpg
+*.png
+smoke.jpg
+tre.jpg
+logo.png
+debug_face_temp.jpg
+
+# ── Documentation ────────────────────────────────────────────────────────────
+*.md
+todo.txt
+final_changes.md
+
+# ── Qt resources ─────────────────────────────────────────────────────────────
+*.qrc
+
+# ── Git / IDE ─────────────────────────────────────────────────────────────────
+.git/
+.gitignore
+.vscode/
+.claude/
+
+# ── Python version file (not needed inside container) ─────────────────────────
+.python-version

@@ -1,0 +1,21 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ObserveAI — Kustomize root
+#
+# Apply all resources with:
+#   kubectl apply -k containerized/k8s/
+#
+# Dry-run validation:
+#   kubectl apply -k containerized/k8s/ --dry-run=client
+# ─────────────────────────────────────────────────────────────────────────────
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: observeai
+
+resources:
+  - namespace.yaml
+  - configmap.yaml
+  - persistent-volumes.yaml
+  - ai-backend-deployment.yaml
+  - ai-backend-service.yaml

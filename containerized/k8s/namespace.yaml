@@ -1,0 +1,7 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: observeai
+  labels:
+    app.kubernetes.io/name: observeai
+    app.kubernetes.io/part-of: observeai
