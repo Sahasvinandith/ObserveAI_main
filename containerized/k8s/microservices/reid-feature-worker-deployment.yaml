@@ -1,0 +1,81 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ObserveAI — reid-feature-worker Deployment
+#
+# Reads confirmed person tracks from person_tracks::{CAMERA_NAME} (consumer
+# group cg::reid_extract), extracts 2048-dim L2-normalized Re-ID feature
+# vectors and HSV color histograms using ResNet-50, and publishes to
+# reid_features.
+#
+# Scaling policy: KEDA ScaledObject on person_tracks::* queue lag (see
+# keda-scaledobjects.yaml).  Replicas: 1 (min) to 4 (max).
+# GPU: 1 × NVIDIA GPU per pod.
+# ─────────────────────────────────────────────────────────────────────────────
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: reid-feature-worker
+  namespace: observeai
+  labels:
+    app.kubernetes.io/name: reid-feature-worker
+    app.kubernetes.io/part-of: observeai
+    app.kubernetes.io/component: ai-inference
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: reid-feature-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: reid-feature-worker
+        app.kubernetes.io/part-of: observeai
+    spec:
+      containers:
+        - name: reid-feature-worker
+          image: observeai/reid-feature-worker:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: REDIS_URL
+              value: "redis://redis.observeai.svc.cluster.local:6379"
+            - name: CAMERA_NAME
+              value: "Front_Door"
+            - name: TORCH_HOME
+              value: "/app/torch_hub_cache"
+            - name: LOG_LEVEL
+              value: "info"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "1Gi"
+              nvidia.com/gpu: "1"
+            limits:
+              cpu: "1"
+              memory: "2Gi"
+              nvidia.com/gpu: "1"
+          volumeMounts:
+            - name: torch-hub-cache
+              mountPath: /app/torch_hub_cache
+          livenessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import redis, os; r=redis.from_url(os.environ['REDIS_URL']); r.ping()"
+            # ResNet-50 weights are downloaded on first start (~100 MB)
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule
+      volumes:
+        - name: torch-hub-cache
+          persistentVolumeClaim:
+            claimName: torch-hub-cache-pvc

@@ -1,0 +1,465 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ObserveAI — Docker Compose orchestration
+#
+# Services
+# ────────
+#   redis            — Redis 7 message broker for all inter-service streams
+#
+#   ai-backend       — FastAPI server + all AI inference (monolith mode).
+#                      Use this for single-host deployments without the
+#                      microservices stack below.
+#
+#   web-frontend     — (optional, profile: frontend) Nginx static asset server
+#
+# Microservices stack (profile: microservices)
+# ────────────────────────────────────────────
+#   cam-ingest-*         — One pod per camera; publishes to shared_raw_frames
+#   person-yolo-worker   — YOLOv8n person detection pool (GPU, scalable)
+#   deepsort-tracker-*   — Per-camera stateful DeepSORT tracker
+#   face-yolo-worker     — YOLOv11n face detection pool (GPU, scalable)
+#   reid-feature-worker  — ResNet-50 Re-ID feature pool (GPU, scalable)
+#   face-recog-worker    — ArcFace recognition pool (CPU, scalable)
+#   face-db-writer       — Face DB quality-gated writer pool (CPU, scalable)
+#   action-pose-worker   — YOLOv8n-pose action pool (GPU, scalable)
+#   global-tracker       — GlobalPersonTracker singleton + FastAPI /global_persons
+#
+# GPU support
+# ───────────
+#   GPU passthrough is configured on GPU services with the NVIDIA Container
+#   Runtime. Requires nvidia-container-toolkit on the Docker host.
+#   To run without GPU, remove the `deploy` block from GPU services.
+#
+# Quick start (monolith mode)
+# ────────────────────────────
+#   cd containerized/
+#   docker compose build ai-backend
+#   docker compose up -d ai-backend redis
+#   # Open http://localhost:8000
+#
+# Quick start (microservices mode)
+# ──────────────────────────────────
+#   cd containerized/
+#   docker compose --profile microservices build
+#   docker compose --profile microservices up -d
+# ─────────────────────────────────────────────────────────────────────────────
+
+x-project-root: &project-root
+  context: ..
+  dockerfile: containerized/services/ai-backend/Dockerfile
+
+# ── Common GPU block (reused across GPU services) ─────────────────────────────
+x-gpu-deploy: &gpu-deploy
+  resources:
+    reservations:
+      devices:
+        - driver: nvidia
+          count: 1
+          capabilities: [gpu]
+
+# ── Common logging block ──────────────────────────────────────────────────────
+x-logging-default: &logging-default
+  driver: "json-file"
+  options:
+    max-size: "20m"
+    max-file: "5"
+
+# ── Common microservices depends_on ──────────────────────────────────────────
+x-depends-redis: &depends-redis
+  redis:
+    condition: service_healthy
+
+services:
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # Redis — message broker
+  # ──────────────────────────────────────────────────────────────────────────
+  redis:
+    image: redis:7-alpine
+    container_name: observeai-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --maxmemory 512mb
+      --maxmemory-policy noeviction
+      --appendonly yes
+      --appendfsync everysec
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      start_period: 5s
+      retries: 5
+    mem_limit: 768m
+    cpus: 1.0
+    logging: *logging-default
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # ai-backend (monolith mode)
+  # ──────────────────────────────────────────────────────────────────────────
+  ai-backend:
+    build:
+      <<: *project-root
+    image: observeai/ai-backend:latest
+    container_name: observeai-ai-backend
+    restart: unless-stopped
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    ports:
+      - "8000:8000"
+    environment:
+      TF_USE_LEGACY_KERAS: "1"
+      TF_CPP_MIN_LOG_LEVEL: "2"
+      TORCH_HOME: /app/torch_hub_cache
+      DEEPFACE_HOME: /app/deepface_weights
+      UVICORN_WORKERS: "1"
+    volumes:
+      - faces-db:/app/Faces_db
+      - actions-db:/app/Actions_db
+      - maps:/app/maps
+      - settings:/app/settings.json
+      - logs:/app/logs.db
+      - detections:/app/detections
+      - yolo-weights:/app/yolo-weights:ro
+      - torch-hub-cache:/app/torch_hub_cache
+      - deepface-weights:/app/deepface_weights
+    devices:
+      - /dev/video0:/dev/video0
+      - /dev/video1:/dev/video1
+      - /dev/video2:/dev/video2
+      - /dev/video3:/dev/video3
+    privileged: true
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
+      interval: 30s
+      timeout: 10s
+      start_period: 90s
+      retries: 5
+    mem_limit: 8g
+    memswap_limit: 8g
+    cpus: 4.0
+    logging: *logging-default
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # web-frontend (optional — profile: frontend)
+  # ──────────────────────────────────────────────────────────────────────────
+  web-frontend:
+    profiles: [frontend]
+    build:
+      context: ..
+      dockerfile: containerized/services/web-frontend/Dockerfile
+    image: observeai/web-frontend:latest
+    container_name: observeai-web-frontend
+    restart: unless-stopped
+    ports:
+      - "80:80"
+    depends_on:
+      ai-backend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:80/"]
+      interval: 30s
+      timeout: 5s
+      start_period: 10s
+      retries: 3
+    mem_limit: 128m
+    cpus: 0.5
+    logging: *logging-default
+
+  # ══════════════════════════════════════════════════════════════════════════
+  # MICROSERVICES STACK  (profile: microservices)
+  # ══════════════════════════════════════════════════════════════════════════
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # cam-ingest — camera frame producers (one instance per physical camera)
+  #
+  # To add more cameras, duplicate this block and change CAMERA_NAME /
+  # CAMERA_SOURCE.  For USB cameras also add the device: entry.
+  # ──────────────────────────────────────────────────────────────────────────
+  cam-ingest-front-door:
+    profiles: [microservices]
+    build:
+      context: ..
+      dockerfile: containerized/services/cam-ingest/Dockerfile
+    image: observeai/cam-ingest:latest
+    container_name: observeai-cam-ingest-front-door
+    restart: unless-stopped
+    depends_on: *depends-redis
+    environment:
+      REDIS_URL: redis://redis:6379
+      CAMERA_NAME: Front_Door
+      CAMERA_SOURCE: "0"
+      LOG_LEVEL: info
+    # Uncomment to pass a USB camera device:
+    # devices:
+    #   - /dev/video0:/dev/video0
+    # privileged: true
+    mem_limit: 512m
+    cpus: 0.5
+    logging: *logging-default
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # person-yolo-worker — YOLOv8n person detection pool (GPU, scalable)
+  # ──────────────────────────────────────────────────────────────────────────
+  person-yolo-worker:
+    profiles: [microservices]
+    build:
+      context: ..
+      dockerfile: containerized/services/person-yolo-worker/Dockerfile
+    image: observeai/person-yolo-worker:latest
+    container_name: observeai-person-yolo-worker
+    restart: unless-stopped
+    depends_on: *depends-redis
+    deploy:
+      <<: *gpu-deploy
+    environment:
+      REDIS_URL: redis://redis:6379
+      YOLO_MODEL_PATH: /app/yolo-weights/yolov8n.pt
+      POD_NAME: person-yolo-worker-0
+      YOLO_CONFIG_DIR: /app/yolo-weights
+      LOG_LEVEL: info
+    volumes:
+      - yolo-weights:/app/yolo-weights:ro
+    mem_limit: 4g
+    cpus: 2.0
+    logging: *logging-default
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # deepsort-tracker — per-camera stateful tracker (one instance per camera)
+  # ──────────────────────────────────────────────────────────────────────────
+  deepsort-tracker-front-door:
+    profiles: [microservices]
+    build:
+      context: ..
+      dockerfile: containerized/services/deepsort-tracker/Dockerfile
+    image: observeai/deepsort-tracker:latest
+    container_name: observeai-deepsort-tracker-front-door
+    restart: unless-stopped
+    depends_on: *depends-redis
+    environment:
+      REDIS_URL: redis://redis:6379
+      CAMERA_NAME: Front_Door
+      LOG_LEVEL: info
+    mem_limit: 1g
+    cpus: 1.0
+    logging: *logging-default
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # face-yolo-worker — YOLOv11n face detection pool (GPU, scalable)
+  # ──────────────────────────────────────────────────────────────────────────
+  face-yolo-worker:
+    profiles: [microservices]
+    build:
+      context: ..
+      dockerfile: containerized/services/face-yolo-worker/Dockerfile
+    image: observeai/face-yolo-worker:latest
+    container_name: observeai-face-yolo-worker
+    restart: unless-stopped
+    depends_on: *depends-redis
+    deploy:
+      <<: *gpu-deploy
+    environment:
+      REDIS_URL: redis://redis:6379
+      YOLO_MODEL_PATH: /app/yolo-weights/yolov11n-face.pt
+      CAMERA_NAME: Front_Door
+      POD_NAME: face-yolo-worker-0
+      YOLO_CONFIG_DIR: /app/yolo-weights
+      LOG_LEVEL: info
+    volumes:
+      - yolo-weights:/app/yolo-weights:ro
+    mem_limit: 2g
+    cpus: 1.0
+    logging: *logging-default
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # reid-feature-worker — ResNet-50 Re-ID feature pool (GPU, scalable)
+  # ──────────────────────────────────────────────────────────────────────────
+  reid-feature-worker:
+    profiles: [microservices]
+    build:
+      context: ..
+      dockerfile: containerized/services/reid-feature-worker/Dockerfile
+    image: observeai/reid-feature-worker:latest
+    container_name: observeai-reid-feature-worker
+    restart: unless-stopped
+    depends_on: *depends-redis
+    deploy:
+      <<: *gpu-deploy
+    environment:
+      REDIS_URL: redis://redis:6379
+      CAMERA_NAME: Front_Door
+      POD_NAME: reid-feature-worker-0
+      TORCH_HOME: /app/torch_hub_cache
+      LOG_LEVEL: info
+    volumes:
+      - torch-hub-cache:/app/torch_hub_cache
+    mem_limit: 2g
+    cpus: 1.0
+    logging: *logging-default
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # face-recog-worker — ArcFace recognition pool (CPU, scalable)
+  # ──────────────────────────────────────────────────────────────────────────
+  face-recog-worker:
+    profiles: [microservices]
+    build:
+      context: ..
+      dockerfile: containerized/services/face-recog-worker/Dockerfile
+    image: observeai/face-recog-worker:latest
+    container_name: observeai-face-recog-worker
+    restart: unless-stopped
+    depends_on: *depends-redis
+    environment:
+      REDIS_URL: redis://redis:6379
+      FACES_DB_PATH: /app/Faces_db
+      POD_NAME: face-recog-worker-0
+      TF_USE_LEGACY_KERAS: "1"
+      TF_CPP_MIN_LOG_LEVEL: "2"
+      DEEPFACE_HOME: /app/deepface_weights
+      LOG_LEVEL: info
+    volumes:
+      - faces-db:/app/Faces_db
+      - deepface-weights:/app/deepface_weights
+    mem_limit: 2g
+    cpus: 2.0
+    logging: *logging-default
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # face-db-writer — quality-gated face persistence pool (CPU, scalable)
+  # ──────────────────────────────────────────────────────────────────────────
+  face-db-writer:
+    profiles: [microservices]
+    build:
+      context: ..
+      dockerfile: containerized/services/face-db-writer/Dockerfile
+    image: observeai/face-db-writer:latest
+    container_name: observeai-face-db-writer
+    restart: unless-stopped
+    depends_on: *depends-redis
+    environment:
+      REDIS_URL: redis://redis:6379
+      FACES_DB_PATH: /app/Faces_db
+      MAX_FACES_PER_USER: "5"
+      POD_NAME: face-db-writer-0
+      LOG_LEVEL: info
+    volumes:
+      - faces-db:/app/Faces_db
+    mem_limit: 512m
+    cpus: 0.5
+    logging: *logging-default
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # action-pose-worker — YOLOv8n-pose action detection pool (GPU, scalable)
+  # ──────────────────────────────────────────────────────────────────────────
+  action-pose-worker:
+    profiles: [microservices]
+    build:
+      context: ..
+      dockerfile: containerized/services/action-pose-worker/Dockerfile
+    image: observeai/action-pose-worker:latest
+    container_name: observeai-action-pose-worker
+    restart: unless-stopped
+    depends_on: *depends-redis
+    deploy:
+      <<: *gpu-deploy
+    environment:
+      REDIS_URL: redis://redis:6379
+      CAMERA_NAME: Front_Door
+      ACTIONS_DB_PATH: /app/Actions_db
+      POSE_MODEL_PATH: /app/yolo-weights/yolov8n-pose.pt
+      POD_NAME: action-pose-worker-0
+      YOLO_CONFIG_DIR: /app/yolo-weights
+      LOG_LEVEL: info
+    volumes:
+      - yolo-weights:/app/yolo-weights:ro
+      - actions-db:/app/Actions_db
+    mem_limit: 2g
+    cpus: 1.0
+    logging: *logging-default
+
+  # ──────────────────────────────────────────────────────────────────────────
+  # global-tracker — singleton GlobalPersonTracker + FastAPI API
+  # ──────────────────────────────────────────────────────────────────────────
+  global-tracker:
+    profiles: [microservices]
+    build:
+      context: ..
+      dockerfile: containerized/services/global-tracker/Dockerfile
+    image: observeai/global-tracker:latest
+    container_name: observeai-global-tracker
+    restart: unless-stopped
+    depends_on: *depends-redis
+    ports:
+      - "8080:8080"
+    environment:
+      REDIS_URL: redis://redis:6379
+      HTTP_PORT: "8080"
+      LOG_LEVEL: info
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8080/health')"]
+      interval: 15s
+      timeout: 5s
+      start_period: 20s
+      retries: 3
+    mem_limit: 1g
+    cpus: 1.0
+    logging: *logging-default
+
+
+# ──────────────────────────────────────────────────────────────────────────────
+# Named volumes
+# ──────────────────────────────────────────────────────────────────────────────
+#
+# To use bind-mounts instead (for editing data from the host), replace:
+#
+#   faces-db:
+#
+# with:
+#
+#   faces-db:
+#     driver: local
+#     driver_opts:
+#       type: none
+#       o: bind
+#       device: /absolute/path/to/Faces_db
+#
+# ──────────────────────────────────────────────────────────────────────────────
+volumes:
+  # Redis persistence
+  redis-data:
+    driver: local
+  # Face recognition database (shared by face-recog-worker, face-db-writer, ai-backend)
+  faces-db:
+    driver: local
+  # Pose action JSON definitions (shared by action-pose-worker, ai-backend)
+  actions-db:
+    driver: local
+  # Camera calibration / spatial mapping data
+  maps:
+    driver: local
+  # Application settings (settings.json)
+  settings:
+    driver: local
+  # SQLite activity log
+  logs:
+    driver: local
+  # Action evidence frames / detection snapshots
+  detections:
+    driver: local
+  # YOLO model weights (.pt files — mount from host to avoid re-downloading)
+  yolo-weights:
+    driver: local
+  # PyTorch Hub cache (ResNet-50 for Re-ID)
+  torch-hub-cache:
+    driver: local
+  # DeepFace ArcFace model weights
+  deepface-weights:
+    driver: local

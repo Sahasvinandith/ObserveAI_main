@@ -700,6 +700,16 @@ def get_evidence(filename: str):
 
 
 # ─────────────────────────────────────────────
+# Health check (used by Docker / k8s probes)
+# ─────────────────────────────────────────────
+
+@app.get("/health")
+def health():
+    """Lightweight liveness probe — returns 200 when the server is up."""
+    return {"status": "ok"}
+
+
+# ─────────────────────────────────────────────
 # System Status API
 # ─────────────────────────────────────────────
 

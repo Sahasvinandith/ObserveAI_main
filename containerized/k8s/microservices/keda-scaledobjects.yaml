@@ -1,0 +1,175 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ObserveAI — KEDA ScaledObjects for all autoscaled microservices
+#
+# KEDA must be installed in the cluster before applying these manifests:
+#   kubectl apply -f https://github.com/kedacore/keda/releases/download/v2.13.1/keda-2.13.1.yaml
+#
+# Verify KEDA is ready:
+#   kubectl get pods -n keda
+#
+# All ScaledObjects target the Redis Streams backend at:
+#   redis.observeai.svc.cluster.local:6379
+#
+# Trigger type: redis-streams
+#   pendingEntriesCount — number of messages pending acknowledgement in the
+#   consumer group (i.e. delivered but not yet ACKed).  This is the correct
+#   metric for backpressure-based autoscaling: it rises when workers fall
+#   behind and falls as workers catch up.
+#
+# cooldownPeriod: 30 s — short cooldown keeps GPU pods responsive to bursts
+#   without excessive scale-in/out churn at steady state.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── person-yolo-worker ────────────────────────────────────────────────────────
+# Scales on shared_raw_frames lag for consumer group cg::person_yolo.
+# Threshold 30: each pod can process ~30 buffered frames before another is needed.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: person-yolo-worker-scaler
+  namespace: observeai
+  labels:
+    app.kubernetes.io/name: person-yolo-worker
+    app.kubernetes.io/part-of: observeai
+spec:
+  scaleTargetRef:
+    name: person-yolo-worker
+  minReplicaCount: 1
+  maxReplicaCount: 4
+  cooldownPeriod: 30
+  triggers:
+    - type: redis-streams
+      metadata:
+        address: redis.observeai.svc.cluster.local:6379
+        stream: shared_raw_frames
+        consumerGroup: cg::person_yolo
+        pendingEntriesCount: "30"
+
+---
+# ── face-yolo-worker ──────────────────────────────────────────────────────────
+# Scales on person_tracks::Front_Door lag for consumer group cg::face_yolo.
+# Adjust stream name if you have multiple cameras — add one trigger per camera
+# stream, or use a wildcard-capable KEDA plugin.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: face-yolo-worker-scaler
+  namespace: observeai
+  labels:
+    app.kubernetes.io/name: face-yolo-worker
+    app.kubernetes.io/part-of: observeai
+spec:
+  scaleTargetRef:
+    name: face-yolo-worker
+  minReplicaCount: 1
+  maxReplicaCount: 4
+  cooldownPeriod: 30
+  triggers:
+    - type: redis-streams
+      metadata:
+        address: redis.observeai.svc.cluster.local:6379
+        stream: "person_tracks::Front_Door"
+        consumerGroup: "cg::face_yolo"
+        pendingEntriesCount: "20"
+
+---
+# ── reid-feature-worker ───────────────────────────────────────────────────────
+# Scales on person_tracks::Front_Door lag for consumer group cg::reid_extract.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: reid-feature-worker-scaler
+  namespace: observeai
+  labels:
+    app.kubernetes.io/name: reid-feature-worker
+    app.kubernetes.io/part-of: observeai
+spec:
+  scaleTargetRef:
+    name: reid-feature-worker
+  minReplicaCount: 1
+  maxReplicaCount: 4
+  cooldownPeriod: 30
+  triggers:
+    - type: redis-streams
+      metadata:
+        address: redis.observeai.svc.cluster.local:6379
+        stream: "person_tracks::Front_Door"
+        consumerGroup: "cg::reid_extract"
+        pendingEntriesCount: "20"
+
+---
+# ── face-recog-worker ─────────────────────────────────────────────────────────
+# Scales on face_crops lag for consumer group cg::face_recog.
+# ArcFace inference is the most latency-sensitive CPU step; keep threshold low.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: face-recog-worker-scaler
+  namespace: observeai
+  labels:
+    app.kubernetes.io/name: face-recog-worker
+    app.kubernetes.io/part-of: observeai
+spec:
+  scaleTargetRef:
+    name: face-recog-worker
+  minReplicaCount: 1
+  maxReplicaCount: 4
+  cooldownPeriod: 30
+  triggers:
+    - type: redis-streams
+      metadata:
+        address: redis.observeai.svc.cluster.local:6379
+        stream: face_crops
+        consumerGroup: "cg::face_recog"
+        pendingEntriesCount: "20"
+
+---
+# ── face-db-writer ────────────────────────────────────────────────────────────
+# Scales on identity_results lag for consumer group cg::face_db_writer.
+# Higher threshold (30): disk I/O is bounded so more backlog is acceptable.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: face-db-writer-scaler
+  namespace: observeai
+  labels:
+    app.kubernetes.io/name: face-db-writer
+    app.kubernetes.io/part-of: observeai
+spec:
+  scaleTargetRef:
+    name: face-db-writer
+  minReplicaCount: 1
+  maxReplicaCount: 3
+  cooldownPeriod: 30
+  triggers:
+    - type: redis-streams
+      metadata:
+        address: redis.observeai.svc.cluster.local:6379
+        stream: identity_results
+        consumerGroup: "cg::face_db_writer"
+        pendingEntriesCount: "30"
+
+---
+# ── action-pose-worker ────────────────────────────────────────────────────────
+# Scales on person_tracks::Front_Door lag for consumer group cg::action_detect.
+apiVersion: keda.sh/v1alpha1
+kind: ScaledObject
+metadata:
+  name: action-pose-worker-scaler
+  namespace: observeai
+  labels:
+    app.kubernetes.io/name: action-pose-worker
+    app.kubernetes.io/part-of: observeai
+spec:
+  scaleTargetRef:
+    name: action-pose-worker
+  minReplicaCount: 1
+  maxReplicaCount: 4
+  cooldownPeriod: 30
+  triggers:
+    - type: redis-streams
+      metadata:
+        address: redis.observeai.svc.cluster.local:6379
+        stream: "person_tracks::Front_Door"
+        consumerGroup: "cg::action_detect"
+        pendingEntriesCount: "20"

@@ -1,0 +1,116 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ObserveAI — PersistentVolumeClaims for the microservices stack
+#
+# These PVCs are referenced by the microservices Deployment manifests.
+# They use the default StorageClass (usually hostPath on single-node clusters
+# or a cloud provisioner on managed clusters).
+#
+# To use bind-mounts for local development, change the storageClassName to
+# "manual" and add a matching PersistentVolume, or use a tool such as
+# local-path-provisioner (Rancher) which creates hostPath PVs automatically.
+#
+# Access modes:
+#   ReadWriteOnce  — volumes written by exactly one pod at a time
+#   ReadWriteMany  — shared volumes (faces-db, actions-db) written by writer
+#                    pods and read concurrently by worker pods.
+#                    Requires NFS, CephFS, or equivalent in the cluster.
+#                    Fall back to ReadWriteOnce if your storage class does not
+#                    support RWX, and use pod affinity to co-locate readers
+#                    and writers on the same node.
+# ─────────────────────────────────────────────────────────────────────────────
+
+# ── YOLO model weights ────────────────────────────────────────────────────────
+# Shared read-only across: person-yolo-worker, face-yolo-worker,
+#   reid-feature-worker, action-pose-worker.
+# Populated once from the host (copy .pt files before first deploy).
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: yolo-weights-pvc
+  namespace: observeai
+  labels:
+    app.kubernetes.io/part-of: observeai
+    app.kubernetes.io/component: model-weights
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+# ── PyTorch Hub cache ─────────────────────────────────────────────────────────
+# Shared across reid-feature-worker replicas.
+# ResNet-50 weights (~100 MB) are downloaded on first run.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: torch-hub-cache-pvc
+  namespace: observeai
+  labels:
+    app.kubernetes.io/part-of: observeai
+    app.kubernetes.io/component: model-weights
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+# ── DeepFace ArcFace weights ──────────────────────────────────────────────────
+# Shared across face-recog-worker replicas.
+# ArcFace weights (~200 MB) are downloaded on first run.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: deepface-weights-pvc
+  namespace: observeai
+  labels:
+    app.kubernetes.io/part-of: observeai
+    app.kubernetes.io/component: model-weights
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+# ── Faces database ────────────────────────────────────────────────────────────
+# Written by face-db-writer; read by face-recog-worker.
+# Use ReadWriteMany if your storage class supports it; otherwise use
+# ReadWriteOnce and ensure all pods land on the same node via affinity rules.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: faces-db-pvc
+  namespace: observeai
+  labels:
+    app.kubernetes.io/part-of: observeai
+    app.kubernetes.io/component: database
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# ── Actions database ──────────────────────────────────────────────────────────
+# JSON pose action reference files; read-only for action-pose-worker.
+# Written by the operator / pose_creator.py tool on the host.
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: actions-db-pvc
+  namespace: observeai
+  labels:
+    app.kubernetes.io/part-of: observeai
+    app.kubernetes.io/component: database
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi

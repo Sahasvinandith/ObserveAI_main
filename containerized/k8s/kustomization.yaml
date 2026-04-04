@@ -1,0 +1,38 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ObserveAI — Kustomize root
+#
+# Apply all resources with:
+#   kubectl apply -k containerized/k8s/
+#
+# Dry-run validation:
+#   kubectl apply -k containerized/k8s/ --dry-run=client
+#
+# To apply only the monolith (ai-backend) stack:
+#   kubectl apply -f containerized/k8s/namespace.yaml
+#   kubectl apply -f containerized/k8s/configmap.yaml
+#   kubectl apply -f containerized/k8s/persistent-volumes.yaml
+#   kubectl apply -f containerized/k8s/ai-backend-deployment.yaml
+#   kubectl apply -f containerized/k8s/ai-backend-service.yaml
+#
+# To apply only the microservices stack:
+#   kubectl apply -k containerized/k8s/microservices/
+# ─────────────────────────────────────────────────────────────────────────────
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: observeai
+
+resources:
+  # Shared cluster resources
+  - namespace.yaml
+  - configmap.yaml
+  - persistent-volumes.yaml
+
+  # Monolith (ai-backend) stack
+  - ai-backend-deployment.yaml
+  - ai-backend-service.yaml
+
+  # Microservices stack (Redis + 9 decomposed services + KEDA scalers)
+  # Comment out this line if deploying only the monolith.
+  - microservices/

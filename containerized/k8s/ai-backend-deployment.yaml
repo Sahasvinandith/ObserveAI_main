@@ -1,0 +1,165 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ObserveAI — ai-backend Deployment
+#
+# Replicas: 1 — mandatory. All camera state (GlobalPersonTracker,
+# EmbeddingCache, per-camera detection queues) is held in-process memory.
+# Horizontal scaling would require a Redis-backed rewrite of these components.
+#
+# GPU: The pod requests 1 NVIDIA GPU. Requires the NVIDIA device plugin:
+#   kubectl apply -f https://raw.githubusercontent.com/NVIDIA/k8s-device-plugin/v0.14.5/nvidia-device-plugin.yml
+#
+# USB cameras: Not supported in k8s without a DaemonSet or device plugin.
+# Use RTSP streams from IP cameras instead, or deploy via Docker Compose on
+# the camera host machine.
+# ─────────────────────────────────────────────────────────────────────────────
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ai-backend
+  namespace: observeai
+  labels:
+    app: ai-backend
+    app.kubernetes.io/name: ai-backend
+    app.kubernetes.io/part-of: observeai
+spec:
+  # MUST be 1 — see note above
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ai-backend
+  template:
+    metadata:
+      labels:
+        app: ai-backend
+    spec:
+      # ── Runtime class for GPU ──────────────────────────────────────────────
+      # Uncomment if your cluster uses a non-default runtime class for NVIDIA
+      # runtimeClassName: nvidia
+
+      containers:
+        - name: ai-backend
+          image: observeai/ai-backend:latest
+          imagePullPolicy: Always
+
+          ports:
+            - containerPort: 8000
+              protocol: TCP
+              name: http
+
+          # ── Environment ────────────────────────────────────────────────────
+          env:
+            - name: TF_USE_LEGACY_KERAS
+              value: "1"
+            - name: TF_CPP_MIN_LOG_LEVEL
+              value: "2"
+            - name: TORCH_HOME
+              value: /app/torch_hub_cache
+            - name: DEEPFACE_HOME
+              value: /app/deepface_weights
+            - name: YOLO_CONFIG_DIR
+              value: /app/yolo-weights
+
+          # ── Resource requests and limits ───────────────────────────────────
+          resources:
+            requests:
+              memory: "4Gi"
+              cpu: "2"
+              nvidia.com/gpu: "1"
+            limits:
+              memory: "8Gi"
+              cpu: "4"
+              nvidia.com/gpu: "1"
+
+          # ── Volume mounts ─────────────────────────────────────────────────
+          volumeMounts:
+            - name: faces-db
+              mountPath: /app/Faces_db
+            - name: actions-db
+              mountPath: /app/Actions_db
+            - name: maps
+              mountPath: /app/maps
+            - name: settings
+              mountPath: /app/settings.json
+              subPath: settings.json
+            - name: logs
+              mountPath: /app/logs.db
+              subPath: logs.db
+            - name: detections
+              mountPath: /app/detections
+            - name: yolo-weights
+              mountPath: /app/yolo-weights
+              readOnly: true
+            - name: torch-hub-cache
+              mountPath: /app/torch_hub_cache
+            - name: deepface-weights
+              mountPath: /app/deepface_weights
+
+          # ── Probes ────────────────────────────────────────────────────────
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 90    # Allow model loading time
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 5
+
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8000
+            initialDelaySeconds: 90
+            periodSeconds: 15
+            timeoutSeconds: 5
+            failureThreshold: 3
+
+      # ── Volumes ────────────────────────────────────────────────────────────
+      volumes:
+        - name: faces-db
+          persistentVolumeClaim:
+            claimName: faces-db-pvc
+        - name: actions-db
+          persistentVolumeClaim:
+            claimName: actions-db-pvc
+        - name: maps
+          persistentVolumeClaim:
+            claimName: maps-pvc
+        - name: settings
+          configMap:
+            name: observeai-config
+            items:
+              - key: settings.json
+                path: settings.json
+        - name: logs
+          persistentVolumeClaim:
+            claimName: logs-pvc
+        - name: detections
+          persistentVolumeClaim:
+            claimName: detections-pvc
+        - name: yolo-weights
+          persistentVolumeClaim:
+            claimName: yolo-weights-pvc
+        - name: torch-hub-cache
+          persistentVolumeClaim:
+            claimName: torch-hub-cache-pvc
+        - name: deepface-weights
+          persistentVolumeClaim:
+            claimName: deepface-weights-pvc
+
+      # ── Node affinity: prefer GPU nodes ───────────────────────────────────
+      affinity:
+        nodeAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+            - weight: 100
+              preference:
+                matchExpressions:
+                  - key: nvidia.com/gpu.present
+                    operator: In
+                    values: ["true"]
+
+      # Toleration for GPU-tainted nodes (common in managed k8s)
+      tolerations:
+        - key: nvidia.com/gpu
+          operator: Exists
+          effect: NoSchedule

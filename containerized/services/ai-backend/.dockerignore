@@ -1,0 +1,71 @@
+# ── Python artifacts ──────────────────────────────────────────────────────────
+**/__pycache__
+**/*.pyc
+**/*.pyo
+**/*.pyd
+**/.Python
+**/*.egg-info
+**/dist
+**/build
+
+# ── Virtual environments ──────────────────────────────────────────────────────
+.venv
+venv
+env
+
+# ── Model weights (mounted as volumes at runtime) ─────────────────────────────
+*.pt
+
+# ── Face data (mounted as volumes at runtime) ─────────────────────────────────
+Faces_db
+
+# ── Runtime data directories (mounted as volumes) ─────────────────────────────
+Actions_db
+maps
+detections
+debug_crops
+logs.db
+
+# ── PyQt6 desktop app files (not needed in container) ────────────────────────
+main.py
+test.py
+pose_creator.py
+UIs/
+main/
+components/AddCamera_Dialog.py
+components/CameraActionManagerDialog.py
+components/CameraCalibrator.py
+components/Camera_list_widget.py
+components/Camera_widget.py
+components/Database_viewer.py
+components/Grid_feed_widget.py
+components/GridFloor.py
+components/HomographyProjector.py
+components/ImageClickDialog.py
+components/StyleHelper.py
+components/Wall.py
+components/BirdsEyeViewWidget.py
+
+# ── Frontend node_modules (built into dist already) ───────────────────────────
+web/frontend/node_modules
+
+# ── Development / debug files ─────────────────────────────────────────────────
+*.jpg
+*.png
+*.md
+todo.txt
+final_changes.md
+smoke.jpg
+tre.jpg
+logo.png
+debug_face_temp.jpg
+resources.qrc
+
+# ── Git / IDE ─────────────────────────────────────────────────────────────────
+.git
+.gitignore
+.vscode
+.claude
+
+# ── Containerized directory itself (avoid recursion) ─────────────────────────
+containerized

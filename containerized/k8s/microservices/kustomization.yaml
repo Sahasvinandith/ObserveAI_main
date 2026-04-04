@@ -1,0 +1,53 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ObserveAI — Kustomize root for the microservices stack
+#
+# Apply all microservices resources with:
+#   kubectl apply -k containerized/k8s/microservices/
+#
+# Dry-run validation:
+#   kubectl apply -k containerized/k8s/microservices/ --dry-run=client
+#
+# Prerequisites:
+#   1. Namespace already exists:
+#        kubectl apply -f containerized/k8s/namespace.yaml
+#   2. KEDA is installed in the cluster:
+#        kubectl apply -f https://github.com/kedacore/keda/releases/download/v2.13.1/keda-2.13.1.yaml
+#   3. NVIDIA GPU operator is installed (for GPU nodes):
+#        https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/getting-started.html
+#   4. Populate yolo-weights PVC before deploying GPU workers:
+#        kubectl cp yolov8n.pt observeai/<yolo-pod>:/app/yolo-weights/
+#        kubectl cp yolov11n-face.pt observeai/<yolo-pod>:/app/yolo-weights/
+#        kubectl cp yolov8n-pose.pt observeai/<yolo-pod>:/app/yolo-weights/
+# ─────────────────────────────────────────────────────────────────────────────
+
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+
+namespace: observeai
+
+resources:
+  # Infrastructure
+  - persistent-volumes.yaml
+  - redis-deployment.yaml
+
+  # Camera ingestion (one per camera)
+  - cam-ingest-deployment.yaml
+
+  # Person detection pipeline
+  - person-yolo-worker-deployment.yaml
+  - deepsort-tracker-deployment.yaml
+
+  # Parallel downstream workers
+  - face-yolo-worker-deployment.yaml
+  - reid-feature-worker-deployment.yaml
+
+  # Identity and action pipeline
+  - face-recog-worker-deployment.yaml
+  - face-db-writer-deployment.yaml
+  - action-pose-worker-deployment.yaml
+
+  # Global tracker singleton
+  - global-tracker-deployment.yaml
+
+  # KEDA autoscaling (requires KEDA CRDs to be installed)
+  - keda-scaledobjects.yaml

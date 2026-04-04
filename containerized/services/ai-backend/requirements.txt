@@ -1,0 +1,41 @@
+# ── ObserveAI ai-backend requirements ────────────────────────────────────────
+#
+# Pin major versions to guarantee reproducible builds.
+# Minor/patch updates are intentionally left open for security patches.
+#
+# GPU-capable PyTorch: the index URL below provides CUDA 12.4 wheels.
+# If you are building a CPU-only image, replace the --index-url line or
+# simply remove it and let pip choose the default (CPU) wheel.
+
+# ── Web framework ─────────────────────────────────────────────────────────────
+fastapi>=0.111.0,<1.0
+uvicorn[standard]>=0.30.0,<1.0
+python-multipart>=0.0.9
+
+# ── Computer vision ───────────────────────────────────────────────────────────
+# opencv-contrib-python includes extra modules (e.g., aruco for homography)
+opencv-contrib-python-headless>=4.9.0
+
+# ── AI / ML ───────────────────────────────────────────────────────────────────
+# PyTorch — CUDA 12.4 wheels (comment out index-url for CPU-only builds)
+--extra-index-url https://download.pytorch.org/whl/cu124
+torch>=2.3.0
+torchvision>=0.18.0
+
+# YOLO detection + pose estimation
+ultralytics>=8.2.0
+
+# DeepSORT multi-object tracker
+deep-sort-realtime>=1.3.2
+
+# DeepFace face recognition (uses ArcFace model internally)
+deepface>=0.0.93
+
+# TensorFlow (required by deepface's ArcFace backend)
+# Use tf-keras shim so deepface works with TF 2.16+ (Keras 3 split)
+tensorflow>=2.16.0,<2.17
+tf_keras>=2.16.0
+
+# ── Utilities ─────────────────────────────────────────────────────────────────
+psutil>=5.9.0
+numpy>=1.26.0,<2.0

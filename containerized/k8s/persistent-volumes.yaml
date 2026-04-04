@@ -1,0 +1,118 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ObserveAI — PersistentVolumeClaims
+#
+# These PVCs request storage for all persistent data.
+# The default StorageClass is used (adjust storageClassName if needed).
+#
+# In production, replace with your cluster's preferred storage class:
+#   - AWS EFS / EBS
+#   - GKE Persistent Disk
+#   - Azure Disk / Files
+#   - NFS / Longhorn / Rook-Ceph for on-prem
+# ─────────────────────────────────────────────────────────────────────────────
+
+---
+# Face recognition database
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: faces-db-pvc
+  namespace: observeai
+  labels:
+    app.kubernetes.io/part-of: observeai
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+# Pose action definitions
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: actions-db-pvc
+  namespace: observeai
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 100Mi
+
+---
+# Camera layout / calibration maps
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: maps-pvc
+  namespace: observeai
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 100Mi
+
+---
+# SQLite activity log
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: logs-pvc
+  namespace: observeai
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+# Action evidence frame snapshots
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: detections-pvc
+  namespace: observeai
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 10Gi
+
+---
+# YOLO model weights (.pt files)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: yolo-weights-pvc
+  namespace: observeai
+spec:
+  accessModes: [ReadOnlyMany]
+  resources:
+    requests:
+      storage: 500Mi
+
+---
+# PyTorch Hub cache (ResNet-50 for Re-ID)
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: torch-hub-cache-pvc
+  namespace: observeai
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 2Gi
+
+---
+# DeepFace ArcFace model weights
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: deepface-weights-pvc
+  namespace: observeai
+spec:
+  accessModes: [ReadWriteOnce]
+  resources:
+    requests:
+      storage: 1Gi
