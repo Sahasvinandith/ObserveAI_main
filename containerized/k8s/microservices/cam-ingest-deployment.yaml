@@ -1,0 +1,71 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ObserveAI — cam-ingest Deployment
+#
+# One Deployment per physical camera.  This file shows the template for a
+# camera named "front-door".  Duplicate and adjust CAMERA_NAME / CAMERA_SOURCE
+# for each additional camera.
+#
+# Scaling policy: fixed at 1 replica per camera (no HPA).
+# GPU: not required.
+#
+# For USB cameras, also add a Device Plugin tolerantion and /dev/videoN
+# hostPath volume.  For RTSP cameras, only CAMERA_SOURCE needs updating.
+# ─────────────────────────────────────────────────────────────────────────────
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: cam-ingest-front-door
+  namespace: observeai
+  labels:
+    app.kubernetes.io/name: cam-ingest
+    app.kubernetes.io/instance: cam-ingest-front-door
+    app.kubernetes.io/part-of: observeai
+    app.kubernetes.io/component: camera-ingestion
+spec:
+  replicas: 1
+  # Recreate: ensures only one pod captures the camera at any time
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: cam-ingest-front-door
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: cam-ingest
+        app.kubernetes.io/instance: cam-ingest-front-door
+        app.kubernetes.io/part-of: observeai
+    spec:
+      containers:
+        - name: cam-ingest
+          image: observeai/cam-ingest:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: REDIS_URL
+              value: "redis://redis.observeai.svc.cluster.local:6379"
+            - name: CAMERA_NAME
+              value: "Front_Door"
+            # For RTSP, set to the stream URL: rtsp://user:pass@host/stream
+            # For USB cameras, set to the device index: "0"
+            - name: CAMERA_SOURCE
+              value: "0"
+            - name: LOG_LEVEL
+              value: "info"
+          resources:
+            requests:
+              cpu: "100m"
+              memory: "128Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          livenessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import redis, os; r=redis.from_url(os.environ['REDIS_URL']); r.ping()"
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3

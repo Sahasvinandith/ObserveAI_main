@@ -1,0 +1,85 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ObserveAI — face-recog-worker Deployment
+#
+# Reads face crops from face_crops (consumer group cg::face_recog), runs
+# ArcFace recognition against the Faces_db embedding cache, and publishes
+# identity results to identity_results.
+# Also listens on face_db_events to reload cached embeddings incrementally.
+#
+# Scaling policy: KEDA ScaledObject on face_crops queue lag (see
+# keda-scaledobjects.yaml).  Replicas: 1 (min) to 4 (max).
+# GPU: not required (TensorFlow CPU inference is sufficient for ArcFace at
+#      this queue depth; add nvidia.com/gpu if throughput demands it).
+# ─────────────────────────────────────────────────────────────────────────────
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: face-recog-worker
+  namespace: observeai
+  labels:
+    app.kubernetes.io/name: face-recog-worker
+    app.kubernetes.io/part-of: observeai
+    app.kubernetes.io/component: ai-inference
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: face-recog-worker
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: face-recog-worker
+        app.kubernetes.io/part-of: observeai
+    spec:
+      containers:
+        - name: face-recog-worker
+          image: observeai/face-recog-worker:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: REDIS_URL
+              value: "redis://redis.observeai.svc.cluster.local:6379"
+            - name: FACES_DB_PATH
+              value: "/app/Faces_db"
+            - name: TF_USE_LEGACY_KERAS
+              value: "1"
+            - name: TF_CPP_MIN_LOG_LEVEL
+              value: "2"
+            - name: DEEPFACE_HOME
+              value: "/app/deepface_weights"
+            - name: LOG_LEVEL
+              value: "info"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          resources:
+            requests:
+              cpu: "1"
+              memory: "1Gi"
+            limits:
+              cpu: "2"
+              memory: "2Gi"
+          volumeMounts:
+            - name: faces-db
+              mountPath: /app/Faces_db
+            - name: deepface-weights
+              mountPath: /app/deepface_weights
+          livenessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import redis, os; r=redis.from_url(os.environ['REDIS_URL']); r.ping()"
+            # DeepFace downloads ArcFace weights (~200 MB) on first start
+            initialDelaySeconds: 120
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 5
+      volumes:
+        - name: faces-db
+          persistentVolumeClaim:
+            claimName: faces-db-pvc
+        - name: deepface-weights
+          persistentVolumeClaim:
+            claimName: deepface-weights-pvc

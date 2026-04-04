@@ -1,0 +1,78 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ObserveAI — face-db-writer Deployment
+#
+# Reads from identity_results (consumer group cg::face_db_writer).
+# Implements quality-gated face saving to /app/Faces_db.
+# Publishes face_db_events so face-recog-worker pods refresh their caches.
+#
+# Scaling policy: KEDA ScaledObject on identity_results queue lag (see
+# keda-scaledobjects.yaml).  Replicas: 1 (min) to 3 (max).
+# GPU: not required.
+#
+# NOTE: Faces_db is a shared volume written by this pod and read by all
+# face-recog-worker replicas.  Use ReadWriteMany storage class if available;
+# otherwise use ReadWriteOnce with pod affinity so writers and readers
+# land on the same node.
+# ─────────────────────────────────────────────────────────────────────────────
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: face-db-writer
+  namespace: observeai
+  labels:
+    app.kubernetes.io/name: face-db-writer
+    app.kubernetes.io/part-of: observeai
+    app.kubernetes.io/component: storage
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: face-db-writer
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: face-db-writer
+        app.kubernetes.io/part-of: observeai
+    spec:
+      containers:
+        - name: face-db-writer
+          image: observeai/face-db-writer:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: REDIS_URL
+              value: "redis://redis.observeai.svc.cluster.local:6379"
+            - name: FACES_DB_PATH
+              value: "/app/Faces_db"
+            - name: MAX_FACES_PER_USER
+              value: "5"
+            - name: LOG_LEVEL
+              value: "info"
+            - name: POD_NAME
+              valueFrom:
+                fieldRef:
+                  fieldPath: metadata.name
+          resources:
+            requests:
+              cpu: "200m"
+              memory: "256Mi"
+            limits:
+              cpu: "500m"
+              memory: "512Mi"
+          volumeMounts:
+            - name: faces-db
+              mountPath: /app/Faces_db
+          livenessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import redis, os; r=redis.from_url(os.environ['REDIS_URL']); r.ping()"
+            initialDelaySeconds: 15
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3
+      volumes:
+        - name: faces-db
+          persistentVolumeClaim:
+            claimName: faces-db-pvc

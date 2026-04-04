@@ -1,0 +1,67 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ObserveAI — deepsort-tracker Deployment
+#
+# Per-camera stateful DeepSORT tracker.
+# Reads person_detections::{CAMERA_NAME} via plain XREAD BLOCK.
+# Publishes confirmed tracks to person_tracks::{CAMERA_NAME}.
+#
+# Scaling policy: fixed at 1 replica per camera (no HPA).
+# GPU: not required.
+#
+# This file shows the template for the "front-door" camera.  Duplicate and
+# adjust CAMERA_NAME for each additional camera.
+# ─────────────────────────────────────────────────────────────────────────────
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: deepsort-tracker-front-door
+  namespace: observeai
+  labels:
+    app.kubernetes.io/name: deepsort-tracker
+    app.kubernetes.io/instance: deepsort-tracker-front-door
+    app.kubernetes.io/part-of: observeai
+    app.kubernetes.io/component: tracking
+spec:
+  replicas: 1
+  # Recreate: only one tracker may own a camera stream at any time
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/instance: deepsort-tracker-front-door
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: deepsort-tracker
+        app.kubernetes.io/instance: deepsort-tracker-front-door
+        app.kubernetes.io/part-of: observeai
+    spec:
+      containers:
+        - name: deepsort-tracker
+          image: observeai/deepsort-tracker:latest
+          imagePullPolicy: IfNotPresent
+          env:
+            - name: REDIS_URL
+              value: "redis://redis.observeai.svc.cluster.local:6379"
+            - name: CAMERA_NAME
+              value: "Front_Door"
+            - name: LOG_LEVEL
+              value: "info"
+          resources:
+            requests:
+              cpu: "500m"
+              memory: "512Mi"
+            limits:
+              cpu: "1"
+              memory: "1Gi"
+          livenessProbe:
+            exec:
+              command:
+                - python
+                - -c
+                - "import redis, os; r=redis.from_url(os.environ['REDIS_URL']); r.ping()"
+            initialDelaySeconds: 20
+            periodSeconds: 30
+            timeoutSeconds: 5
+            failureThreshold: 3

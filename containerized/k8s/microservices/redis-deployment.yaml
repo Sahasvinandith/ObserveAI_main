@@ -1,0 +1,140 @@
+# ─────────────────────────────────────────────────────────────────────────────
+# ObserveAI — Redis message broker
+#
+# Provides the Redis Streams backbone for all inter-service communication.
+# Single replica; not horizontally scalable (Streams require consistent view).
+#
+# Includes:
+#   ConfigMap    — redis.conf with maxmemory, AOF, and eviction settings
+#   PVC          — 5 Gi persistent volume for AOF / RDB data
+#   Deployment   — Redis 7 server
+#   Service      — ClusterIP on port 6379
+# ─────────────────────────────────────────────────────────────────────────────
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis-config
+  namespace: observeai
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: observeai
+data:
+  redis.conf: |
+    # Maximum memory before eviction
+    maxmemory 512mb
+    # Retain all keys — streams must not be evicted mid-pipeline
+    maxmemory-policy noeviction
+    # Enable Append-Only File for durability
+    appendonly yes
+    # Sync to disk every second (balance between performance and durability)
+    appendfsync everysec
+    # Disable RDB snapshots (AOF is sufficient for this workload)
+    save ""
+    # Bind to all interfaces inside the container
+    bind 0.0.0.0
+    protected-mode no
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-data-pvc
+  namespace: observeai
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: observeai
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 5Gi
+
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: observeai
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: observeai
+    app.kubernetes.io/component: message-broker
+spec:
+  replicas: 1
+  # Recreate strategy ensures the PVC is never claimed by two pods simultaneously
+  strategy:
+    type: Recreate
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: redis
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: redis
+        app.kubernetes.io/part-of: observeai
+    spec:
+      containers:
+        - name: redis
+          image: redis:7-alpine
+          command:
+            - redis-server
+            - /etc/redis/redis.conf
+          ports:
+            - name: redis
+              containerPort: 6379
+              protocol: TCP
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1"
+              memory: "512Mi"
+          volumeMounts:
+            - name: redis-config
+              mountPath: /etc/redis
+            - name: redis-data
+              mountPath: /data
+          livenessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 10
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          readinessProbe:
+            exec:
+              command: ["redis-cli", "ping"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 3
+      volumes:
+        - name: redis-config
+          configMap:
+            name: redis-config
+        - name: redis-data
+          persistentVolumeClaim:
+            claimName: redis-data-pvc
+
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: observeai
+  labels:
+    app.kubernetes.io/name: redis
+    app.kubernetes.io/part-of: observeai
+    app.kubernetes.io/component: message-broker
+spec:
+  type: ClusterIP
+  selector:
+    app.kubernetes.io/name: redis
+  ports:
+    - name: redis
+      port: 6379
+      targetPort: 6379
+      protocol: TCP

@@ -1,0 +1,2 @@
+redis>=5.0.0
+opencv-contrib-python-headless>=4.8.0
